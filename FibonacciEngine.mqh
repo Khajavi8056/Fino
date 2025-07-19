@@ -1,9 +1,8 @@
 
 //+------------------------------------------------------------------+
 //| FibonacciEngine.mqh                                              |
-//| کتابخانه‌ای برای رسم فقط آخرین فیبوناچی نوع اول و دوم          |
-//| شناسایی سقف‌ها، کف‌ها، شکست‌ها و نقاط ورود با اندیکاتور Fineflow  |
-//| فقط آخرین لگ نمایش داده می‌شود، گرافیک‌های قدیمی حذف می‌شوند      |
+//| کتابخانه‌ای برای رسم فیبوناچی‌های نوع اول (شناور) و نوع دوم (اکستنشن) |
+//| فقط با آخرین سقف/کف کار می‌کند، فقط یک فیبوناچی روی چارت نگه می‌دارد |
 //| نسخه: 1.03                                                      |
 //| تاریخ: 2025-07-20                                              |
 //+------------------------------------------------------------------+
@@ -37,8 +36,6 @@ input group "تنظیمات عمومی"
 input bool EnforceStrictSequence = true; // اعمال توالی اجباری سقف/کف
 input ENUM_TIMEFRAMES TF = PERIOD_M5; // تایم‌فریم اندیکاتور Fineflow
 input int Lookback = 3; // تعداد کندل‌ها برای نگاه به عقب و جلو
-input int MaxScanDepth = 200; // حداکثر کندل‌ها برای اسکن
-input int MaxArraySize = 50; // حداکثر اندازه آرایه‌های سقف و کف
 input bool EnableLogging = true; // فعال‌سازی لاگ‌ها
 input E_DetectionMethod DetectionMethod = METHOD_POWER_SWING; // روش تشخیص Fineflow
 input int SequentialLookback = 2; // تعداد کندل‌ها برای روش پلکانی
@@ -69,6 +66,10 @@ input color ValleyColor = clrGreen; // رنگ علامت کف (ستاره)
 input color BOSColor = clrBlue; // رنگ نوشته BOS
 input color AnchorBlockColor = clrYellow; // رنگ مستطیل اوردر بلاک میانی
 input color EntryZoneColor = clrLimeGreen; // رنگ ناحیه ورود
+input color FiboType1ColorUp = clrGreen; // رنگ فیبوناچی نوع اول (صعودی)
+input color FiboType1ColorDown = clrRed; // رنگ فیبوناچی نوع اول (نزولی)
+input color FiboType2ColorUp = clrGreen; // رنگ فیبوناچی نوع دوم (صعودی)
+input color FiboType2ColorDown = clrRed; // رنگ فیبوناچی نوع دوم (نزولی)
 input int FontSize = 10; // اندازه فونت نوشته BOS و وضعیت
 input string FontName = "Arial"; // نام فونت
 
@@ -105,16 +106,16 @@ class CFibonacciEngine {
 private:
    //--- متغیرهای داخلی
    int handleFineflow;          // هندل اندیکاتور Fineflow
-   PeakValley m_ceilings[];     // آرایه سقف‌ها
-   PeakValley m_valleys[];      // آرایه کف‌ها
+   PeakValley lastCeiling;      // آخرین سقف
+   PeakValley lastValley;       // آخرین کف
    FiboStructure currentFibo;   // فیبوناچی فعلی
    ENUM_FIBO_STATUS currentStatus; // وضعیت فعلی کتابخانه
    datetime lastCandleTime;     // زمان آخرین کندل پردازش‌شده
    string statusLabelName;      // نام لیبل وضعیت
+   datetime lastProcessedTime;  // آخرین زمان پردازش‌شده برای اسکن
 
    //--- توابع کمکی
    bool IsNewCandle();
-   void ManageDataArrays();
    void DrawGraphics(string type, double price, datetime time, string id, bool isCeiling = true);
    void DrawStatusLabel();
    void ClearOldGraphics();
@@ -143,10 +144,17 @@ public:
 CFibonacciEngine::CFibonacciEngine()
 {
    handleFineflow = INVALID_HANDLE;
-   ArraySetAsSeries(m_ceilings, true);
-   ArraySetAsSeries(m_valleys, true);
+   lastCeiling.price = 0;
+   lastCeiling.time = 0;
+   lastCeiling.id = "";
+   lastCeiling.breakTime = 0;
+   lastValley.price = 0;
+   lastValley.time = 0;
+   lastValley.id = "";
+   lastValley.breakTime = 0;
    currentStatus = STATUS_WAITING;
    lastCandleTime = 0;
+   lastProcessedTime = 0;
    statusLabelName = "FiboEngine_Status";
    currentFibo.zeroLevel = 0;
    currentFibo.hundredLevel = 0;
@@ -222,23 +230,6 @@ bool CFibonacciEngine::IsNewCandle()
 }
 
 //+------------------------------------------------------------------+
-//| مدیریت آرایه‌های داده                                          |
-//+------------------------------------------------------------------+
-void CFibonacciEngine::ManageDataArrays()
-{
-   if(ArraySize(m_ceilings) > MaxArraySize)
-   {
-      ArrayRemove(m_ceilings, 0, ArraySize(m_ceilings) - MaxArraySize);
-      if(EnableLogging) Print("مدیریت حافظه: کاهش اندازه آرایه سقف‌ها به ", MaxArraySize);
-   }
-   if(ArraySize(m_valleys) > MaxArraySize)
-   {
-      ArrayRemove(m_valleys, 0, ArraySize(m_valleys) - MaxArraySize);
-      if(EnableLogging) Print("مدیریت حافظه: کاهش اندازه آرایه کف‌ها به ", MaxArraySize);
-   }
-}
-
-//+------------------------------------------------------------------+
 //| نقشه‌بردار برای شناسایی ساختارها                              |
 //+------------------------------------------------------------------+
 void CFibonacciEngine::ScoutForStructure()
@@ -249,40 +240,34 @@ void CFibonacciEngine::ScoutForStructure()
    double highBuffer[1];
    double lowBuffer[1];
    datetime times[1];
-   int start = 1;
-   int end = MathMin(MaxScanDepth, iBars(_Symbol, TF) - 1);
+   int shift = iBarShift(_Symbol, TF, lastProcessedTime > 0 ? lastProcessedTime : iTime(_Symbol, TF, 0));
 
-   for(int i = start; i <= end; i++)
+   //--- اسکن تا پیدا کردن اولین سقف/کف یا آپدیت موارد جدید
+   for(int i = shift; i >= 1; i--)
    {
       if(CopyBuffer(handleFineflow, 0, i, 1, highBuffer) > 0 &&
          CopyBuffer(handleFineflow, 1, i, 1, lowBuffer) > 0 &&
          CopyTime(_Symbol, TF, i, 1, times) > 0)
       {
-         if(highBuffer[0] != EMPTY_VALUE && highBuffer[0] > 0)
+         if(highBuffer[0] != EMPTY_VALUE && highBuffer[0] > 0 && (lastCeiling.time == 0 || times[0] > lastCeiling.time))
          {
-            int size = ArraySize(m_ceilings);
-            ArrayResize(m_ceilings, size + 1);
-            m_ceilings[size].price = highBuffer[0];
-            m_ceilings[size].time = times[0];
-            m_ceilings[size].id = "C_" + TimeToString(times[0]);
-            m_ceilings[size].breakTime = 0;
-            if(EnableLogging) Print("سقف جدید: ", m_ceilings[size].id, " قیمت: ", highBuffer[0], " زمان: ", TimeToString(times[0]));
+            lastCeiling.price = highBuffer[0];
+            lastCeiling.time = times[0];
+            lastCeiling.id = "C_" + TimeToString(times[0]);
+            lastCeiling.breakTime = 0;
+            if(EnableLogging) Print("سقف جدید: ", lastCeiling.id, " قیمت: ", highBuffer[0], " زمان: ", TimeToString(times[0]));
          }
-         if(lowBuffer[0] != EMPTY_VALUE && lowBuffer[0] > 0)
+         if(lowBuffer[0] != EMPTY_VALUE && lowBuffer[0] > 0 && (lastValley.time == 0 || times[0] > lastValley.time))
          {
-            int size = ArraySize(m_valleys);
-            ArrayResize(m_valleys, size + 1);
-            m_valleys[size].price = lowBuffer[0];
-            m_valleys[size].time = times[0];
-            m_valleys[size].id = "V_" + TimeToString(times[0]);
-            m_valleys[size].breakTime = 0;
-            if(EnableLogging) Print("کف جدید: ", m_valleys[size].id, " قیمت: ", lowBuffer[0], " زمان: ", TimeToString(times[0]));
+            lastValley.price = lowBuffer[0];
+            lastValley.time = times[0];
+            lastValley.id = "V_" + TimeToString(times[0]);
+            lastValley.breakTime = 0;
+            if(EnableLogging) Print("کف جدید: ", lastValley.id, " قیمت: ", lowBuffer[0], " زمان: ", TimeToString(times[0]));
          }
       }
    }
-
-   //--- مدیریت حافظه
-   ManageDataArrays();
+   lastProcessedTime = iTime(_Symbol, TF, 1);
 
    //--- تشخیص شکست‌ها
    double highPrice = iHigh(_Symbol, _Period, 1);
@@ -293,106 +278,61 @@ void CFibonacciEngine::ScoutForStructure()
 
    if(BreakType == BREAK_SIMPLE)
    {
-      for(int i = 0; i < ArraySize(m_ceilings); i++)
+      if(lastCeiling.breakTime == 0 && highPrice > lastCeiling.price)
       {
-         if(m_ceilings[i].breakTime == 0 && highPrice > m_ceilings[i].price)
-         {
-            m_ceilings[i].breakTime = currentTime;
-            if(EnableLogging) Print("شکست سقف: ", m_ceilings[i].id, " در زمان ", TimeToString(currentTime));
-            if(dominantStructure.breakTime == 0 || m_ceilings[i].breakTime > dominantStructure.breakTime)
-            {
-               dominantStructure = m_ceilings[i];
-               newBreakFound = true;
-            }
-         }
+         lastCeiling.breakTime = currentTime;
+         dominantStructure = lastCeiling;
+         newBreakFound = true;
+         if(EnableLogging) Print("شکست سقف: ", lastCeiling.id, " در زمان ", TimeToString(currentTime));
       }
-      for(int i = 0; i < ArraySize(m_valleys); i++)
+      if(lastValley.breakTime == 0 && lowPrice < lastValley.price)
       {
-         if(m_valleys[i].breakTime == 0 && lowPrice < m_valleys[i].price)
-         {
-            m_valleys[i].breakTime = currentTime;
-            if(EnableLogging) Print("شکست کف: ", m_valleys[i].id, " در زمان ", TimeToString(currentTime));
-            if(dominantStructure.breakTime == 0 || m_valleys[i].breakTime > dominantStructure.breakTime)
-            {
-               dominantStructure = m_valleys[i];
-               newBreakFound = true;
-            }
-         }
+         lastValley.breakTime = currentTime;
+         dominantStructure = lastValley;
+         newBreakFound = true;
+         if(EnableLogging) Print("شکست کف: ", lastValley.id, " در زمان ", TimeToString(currentTime));
       }
    }
    else // BREAK_CONFIRMED
    {
-      static PeakValley pendingBreaks[];
-      ArraySetAsSeries(pendingBreaks, true);
-      for(int i = 0; i < ArraySize(m_ceilings); i++)
+      static PeakValley pendingBreak = {0, 0, "", 0};
+      if(lastCeiling.breakTime == 0 && highPrice > lastCeiling.price && pendingBreak.id != lastCeiling.id)
       {
-         if(m_ceilings[i].breakTime == 0 && highPrice > m_ceilings[i].price)
-         {
-            int size = ArraySize(pendingBreaks);
-            ArrayResize(pendingBreaks, size + 1);
-            pendingBreaks[size] = m_ceilings[i];
-            pendingBreaks[size].breakTime = currentTime + ConfirmationCandles * PeriodSeconds(TF);
-            if(EnableLogging) Print("شکست در انتظار تأیید سقف: ", m_ceilings[i].id);
-         }
+         pendingBreak = lastCeiling;
+         pendingBreak.breakTime = currentTime + ConfirmationCandles * PeriodSeconds(TF);
+         if(EnableLogging) Print("شکست در انتظار تأیید سقف: ", lastCeiling.id);
       }
-      for(int i = 0; i < ArraySize(m_valleys); i++)
+      if(lastValley.breakTime == 0 && lowPrice < lastValley.price && pendingBreak.id != lastValley.id)
       {
-         if(m_valleys[i].breakTime == 0 && lowPrice < m_valleys[i].price)
-         {
-            int size = ArraySize(pendingBreaks);
-            ArrayResize(pendingBreaks, size + 1);
-            pendingBreaks[size] = m_valleys[i];
-            pendingBreaks[size].breakTime = currentTime + ConfirmationCandles * PeriodSeconds(TF);
-            if(EnableLogging) Print("شکست در انتظار تأیید کف: ", m_valleys[i].id);
-         }
+         pendingBreak = lastValley;
+         pendingBreak.breakTime = currentTime + ConfirmationCandles * PeriodSeconds(TF);
+         if(EnableLogging) Print("شکست در انتظار تأیید کف: ", lastValley.id);
       }
-      for(int i = 0; i < ArraySize(pendingBreaks); i++)
+      if(pendingBreak.breakTime > 0 && currentTime >= pendingBreak.breakTime)
       {
-         if(pendingBreaks[i].breakTime > 0 && currentTime >= pendingBreaks[i].breakTime)
+         if(pendingBreak.id == lastCeiling.id)
          {
-            if(pendingBreaks[i].price > m_valleys[0].price) // سقف
-            {
-               for(int j = 0; j < ArraySize(m_ceilings); j++)
-               {
-                  if(m_ceilings[j].id == pendingBreaks[i].id)
-                  {
-                     m_ceilings[j].breakTime = currentTime;
-                     if(EnableLogging) Print("شکست تأیید شده سقف: ", m_ceilings[j].id);
-                     if(dominantStructure.breakTime == 0 || m_ceilings[j].breakTime > dominantStructure.breakTime)
-                     {
-                        dominantStructure = m_ceilings[j];
-                        newBreakFound = true;
-                     }
-                     break;
-                  }
-               }
-            }
-            else // کف
-            {
-               for(int j = 0; j < ArraySize(m_valleys); j++)
-               {
-                  if(m_valleys[j].id == pendingBreaks[i].id)
-                  {
-                     m_valleys[j].breakTime = currentTime;
-                     if(EnableLogging) Print("شکست تأیید شده کف: ", m_valleys[j].id);
-                     if(dominantStructure.breakTime == 0 || m_valleys[j].breakTime > dominantStructure.breakTime)
-                     {
-                        dominantStructure = m_valleys[j];
-                        newBreakFound = true;
-                     }
-                     break;
-                  }
-               }
-            }
+            lastCeiling.breakTime = currentTime;
+            dominantStructure = lastCeiling;
+            newBreakFound = true;
+            if(EnableLogging) Print("شکست تأیید شده سقف: ", lastCeiling.id);
          }
+         else if(pendingBreak.id == lastValley.id)
+         {
+            lastValley.breakTime = currentTime;
+            dominantStructure = lastValley;
+            newBreakFound = true;
+            if(EnableLogging) Print("شکست تأیید شده کف: ", lastValley.id);
+         }
+         pendingBreak = {0, 0, "", 0}; // ریست شکست در انتظار
       }
    }
 
-   //--- علامت‌گذاری ساختار غالب و حذف گرافیک‌های قدیمی
+   //--- علامت‌گذاری ساختار غالب
    if(newBreakFound)
    {
       ResetAnalysis();
-      bool isCeiling = dominantStructure.price > m_valleys[0].price;
+      bool isCeiling = dominantStructure.price > lastValley.price;
       DrawGraphics("structure", dominantStructure.price, dominantStructure.time, dominantStructure.id, isCeiling);
       DrawGraphics("bos", dominantStructure.price + (isCeiling ? _Point * 10 : -_Point * 10), dominantStructure.breakTime, dominantStructure.id + "_BOS", isCeiling);
 
@@ -415,6 +355,12 @@ void CFibonacciEngine::ScoutForStructure()
          DrawGraphics("anchor", anchorPrice, anchorTime, dominantStructure.id + "_Anchor", isCeiling);
          currentStatus = STATUS_WAITING;
          DrawStatusLabel();
+
+         //--- حذف سقف/کف شکسته‌شده
+         if(isCeiling)
+            lastCeiling = {0, 0, "", 0};
+         else
+            lastValley = {0, 0, "", 0};
       }
    }
 }
@@ -424,23 +370,17 @@ void CFibonacciEngine::ScoutForStructure()
 //+------------------------------------------------------------------+
 bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
 {
-   if(ArraySize(m_ceilings) == 0 || ArraySize(m_valleys) == 0) return false;
+   if(lastCeiling.price == 0 && lastValley.price == 0) return false;
 
    //--- پیدا کردن آخرین ساختار شکسته
    PeakValley dominantStructure = {0, 0, "", 0};
-   for(int i = 0; i < ArraySize(m_ceilings); i++)
-   {
-      if(m_ceilings[i].breakTime > 0 && (dominantStructure.breakTime == 0 || m_ceilings[i].breakTime > dominantStructure.breakTime))
-         dominantStructure = m_ceilings[i];
-   }
-   for(int i = 0; i < ArraySize(m_valleys); i++)
-   {
-      if(m_valleys[i].breakTime > 0 && (dominantStructure.breakTime == 0 || m_valleys[i].breakTime > dominantStructure.breakTime))
-         dominantStructure = m_valleys[i];
-   }
+   if(lastCeiling.breakTime > 0)
+      dominantStructure = lastCeiling;
+   else if(lastValley.breakTime > 0)
+      dominantStructure = lastValley;
    if(dominantStructure.breakTime == 0) return false;
 
-   bool isCeiling = dominantStructure.price > m_valleys[0].price;
+   bool isCeiling = dominantStructure.id == lastCeiling.id || (lastValley.price > 0 && dominantStructure.price > lastValley.price);
    if((isBuy && !isCeiling) || (!isBuy && isCeiling))
    {
       if(EnableLogging) Print("جهت درخواست با ساختار بازار هماهنگ نیست");
@@ -463,13 +403,6 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
    }
    if(anchorPrice == 0) return false;
 
-   //--- حذف فیبوناچی‌های قبلی
-   if(currentFibo.fiboId != "")
-   {
-      ObjectDelete(0, currentFibo.fiboId);
-      ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
-   }
-
    //--- فیبوناچی نوع دوم
    if(EnableFiboType2)
    {
@@ -477,6 +410,13 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
       double fiboHundred = dominantStructure.price;
       string fiboId = "Fibo_Type2_" + TimeToString(dominantStructure.breakTime);
       
+      //--- حذف فیبوناچی قبلی
+      if(currentFibo.fiboId != "")
+      {
+         ObjectDelete(0, currentFibo.fiboId);
+         ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
+      }
+
       if(ObjectCreate(0, fiboId, OBJ_FIBO, 0, anchorTime, fiboZero, dominantStructure.time, fiboHundred))
       {
          ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 6);
@@ -486,7 +426,7 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 4, 1.5); // سطح 150%
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 5, 2.0); // سطح 200%
-         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, isCeiling ? clrGreen : clrRed);
+         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, isCeiling ? FiboType2ColorUp : FiboType2ColorDown);
          ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
          ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -525,6 +465,13 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
          double fiboHundred = minorPrice;
          string fiboId = "Fibo_Type1_" + TimeToString(dominantStructure.breakTime);
          
+         //--- حذف فیبوناچی قبلی
+         if(currentFibo.fiboId != "")
+         {
+            ObjectDelete(0, currentFibo.fiboId);
+            ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
+         }
+
          if(ObjectCreate(0, fiboId, OBJ_FIBO, 0, anchorTime, fiboZero, minorTime, fiboHundred))
          {
             ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 4);
@@ -532,7 +479,7 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, isCeiling ? clrGreen : clrRed);
+            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, isCeiling ? FiboType1ColorUp : FiboType1ColorDown);
             ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -546,7 +493,7 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
             ObjectSetInteger(0, entryZoneId, OBJPROP_FILL, true);
 
             currentFibo.zeroLevel = fiboZero;
-            currentFibo.hundredLevel = fiboHundred;
+            currentFibo.hundredLevel = fipoHundred;
             currentFibo.zeroTime = anchorTime;
             currentFibo.hundredTime = minorTime;
             currentFibo.isType1 = true;
@@ -640,7 +587,7 @@ void CFibonacciEngine::UpdateFiboType1()
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? clrGreen : clrRed);
+            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? FiboType1ColorUp : FiboType1ColorDown);
             ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -679,7 +626,7 @@ void CFibonacciEngine::UpdateFiboType1()
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? clrGreen : clrRed);
+            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? FiboType1ColorUp : FiboType1ColorDown);
             ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -727,7 +674,7 @@ void CFibonacciEngine::UpdateFiboType2()
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? clrGreen : clrRed);
+         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? FiboType2ColorUp : FiboType2ColorDown);
          ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
          ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -760,7 +707,7 @@ void CFibonacciEngine::UpdateFiboType2()
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? clrGreen : clrRed);
+         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? FiboType2ColorUp : FiboType2ColorDown);
          ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
          ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
