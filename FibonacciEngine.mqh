@@ -1,15 +1,15 @@
-
+```mql5
 //+------------------------------------------------------------------+
 //| FibonacciEngine.mqh                                              |
-//| کتابخانه‌ای برای رسم فیبوناچی‌های نوع اول (شناور) و نوع دوم (اکستنشن) |
+//| کتابخانه‌ای برای رسم فقط آخرین فیبوناچی نوع اول و دوم          |
 //| شناسایی سقف‌ها، کف‌ها، شکست‌ها و نقاط ورود با اندیکاتور Fineflow  |
-//| کاملاً مستقل، با لاگ بهینه، آپدیت فیبوناچی و نمایش وضعیت در چارت |
-//| نسخه: 1.02                                                      |
-//| تاریخ: 2025-07-19                                              |
+//| فقط آخرین لگ نمایش داده می‌شود، گرافیک‌های قدیمی حذف می‌شوند      |
+//| نسخه: 1.03                                                      |
+//| تاریخ: 2025-07-20                                              |
 //+------------------------------------------------------------------+
 
 #property copyright "Your Name"
-#property version   "1.02"
+#property version   "1.03"
 #property strict
 
 //--- شامل فایل‌های مورد نیاز
@@ -388,7 +388,7 @@ void CFibonacciEngine::ScoutForStructure()
       }
    }
 
-   //--- علامت‌گذاری ساختار غالب
+   //--- علامت‌گذاری ساختار غالب و حذف گرافیک‌های قدیمی
    if(newBreakFound)
    {
       ResetAnalysis();
@@ -463,6 +463,13 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
    }
    if(anchorPrice == 0) return false;
 
+   //--- حذف فیبوناچی‌های قبلی
+   if(currentFibo.fiboId != "")
+   {
+      ObjectDelete(0, currentFibo.fiboId);
+      ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
+   }
+
    //--- فیبوناچی نوع دوم
    if(EnableFiboType2)
    {
@@ -470,10 +477,6 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
       double fiboHundred = dominantStructure.price;
       string fiboId = "Fibo_Type2_" + TimeToString(dominantStructure.breakTime);
       
-      //--- حذف فیبوناچی قبلی
-      if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId);
-      if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
-
       if(ObjectCreate(0, fiboId, OBJ_FIBO, 0, anchorTime, fiboZero, dominantStructure.time, fiboHundred))
       {
          ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 6);
@@ -483,7 +486,7 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 4, 1.5); // سطح 150%
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 5, 2.0); // سطح 200%
-         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, clrBlue);
+         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, isCeiling ? clrGreen : clrRed);
          ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
          ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -522,10 +525,6 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
          double fiboHundred = minorPrice;
          string fiboId = "Fibo_Type1_" + TimeToString(dominantStructure.breakTime);
          
-         //--- حذف فیبوناچی قبلی
-         if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId);
-         if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
-
          if(ObjectCreate(0, fiboId, OBJ_FIBO, 0, anchorTime, fiboZero, minorTime, fiboHundred))
          {
             ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 4);
@@ -533,8 +532,8 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, clrBlue);
-            ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, isCeiling ? clrGreen : clrRed);
+            ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
             //--- رسم ناحیه ورود
@@ -641,8 +640,8 @@ void CFibonacciEngine::UpdateFiboType1()
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, clrBlue);
-            ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? clrGreen : clrRed);
+            ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
             //--- آپدیت ناحیه ورود
@@ -680,8 +679,8 @@ void CFibonacciEngine::UpdateFiboType1()
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
             ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, clrBlue);
-            ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? clrGreen : clrRed);
+            ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_DOT);
             ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
             //--- آپدیت ناحیه ورود
@@ -728,7 +727,7 @@ void CFibonacciEngine::UpdateFiboType2()
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, clrBlue);
+         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? clrGreen : clrRed);
          ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
          ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -761,7 +760,7 @@ void CFibonacciEngine::UpdateFiboType2()
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, clrBlue);
+         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, currentFibo.isBullish ? clrGreen : clrRed);
          ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
          ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -953,3 +952,4 @@ void CFibonacciEngine::ResetAnalysis()
    if(EnableLogging) Print("تحلیل ریست شد");
 }
 //+------------------------------------------------------------------+
+```
