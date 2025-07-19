@@ -1,8 +1,9 @@
-
+```mql5
 //+------------------------------------------------------------------+
 //| FibonacciEngine.mqh                                              |
 //| کتابخانه‌ای برای رسم فیبوناچی‌های نوع اول (شناور) و نوع دوم (اکستنشن) |
-//| فقط با آخرین سقف/کف کار می‌کند، فقط یک فیبوناچی روی چارت نگه می‌دارد |
+//| شناسایی سقف‌ها، کف‌ها، شکست‌ها و نقاط ورود با اندیکاتور Fineflow  |
+//| فقط آخرین فیبوناچی روی چارت، مدیریت هوشمند سقف/کف‌ها، لاگ بهینه |
 //| نسخه: 1.03                                                      |
 //| تاریخ: 2025-07-20                                              |
 //+------------------------------------------------------------------+
@@ -36,6 +37,8 @@ input group "تنظیمات عمومی"
 input bool EnforceStrictSequence = true; // اعمال توالی اجباری سقف/کف
 input ENUM_TIMEFRAMES TF = PERIOD_M5; // تایم‌فریم اندیکاتور Fineflow
 input int Lookback = 3; // تعداد کندل‌ها برای نگاه به عقب و جلو
+input int MaxScanDepth = 50; // حداکثر کندل‌ها برای اسکن اولیه
+input int MaxArraySize = 20; // حداکثر اندازه آرایه‌های سقف و کف
 input bool EnableLogging = true; // فعال‌سازی لاگ‌ها
 input E_DetectionMethod DetectionMethod = METHOD_POWER_SWING; // روش تشخیص Fineflow
 input int SequentialLookback = 2; // تعداد کندل‌ها برای روش پلکانی
@@ -106,19 +109,20 @@ class CFibonacciEngine {
 private:
    //--- متغیرهای داخلی
    int handleFineflow;          // هندل اندیکاتور Fineflow
-   PeakValley lastCeiling;      // آخرین سقف
-   PeakValley lastValley;       // آخرین کف
+   PeakValley m_ceilings[];     // آرایه سقف‌ها
+   PeakValley m_valleys[];      // آرایه کف‌ها
    FiboStructure currentFibo;   // فیبوناچی فعلی
    ENUM_FIBO_STATUS currentStatus; // وضعیت فعلی کتابخانه
    datetime lastCandleTime;     // زمان آخرین کندل پردازش‌شده
+   datetime lastStructureTime;  // زمان آخرین سقف/کف پیدا‌شده
    string statusLabelName;      // نام لیبل وضعیت
-   datetime lastProcessedTime;  // آخرین زمان پردازش‌شده برای اسکن
 
    //--- توابع کمکی
    bool IsNewCandle();
+   void ManageDataArrays();
    void DrawGraphics(string type, double price, datetime time, string id, bool isCeiling = true);
    void DrawStatusLabel();
-   void ClearOldGraphics();
+   void ClearOldGraphics(datetime beforeTime = 0);
    bool FindMinorCorrection(datetime startTime, datetime endTime, bool isBullish, double &minorPrice, datetime &minorTime);
    bool CheckEntryZone(double zeroLevel, double hundredLevel, double minPercent, double maxPercent);
    void ResetAnalysis();
@@ -144,17 +148,11 @@ public:
 CFibonacciEngine::CFibonacciEngine()
 {
    handleFineflow = INVALID_HANDLE;
-   lastCeiling.price = 0;
-   lastCeiling.time = 0;
-   lastCeiling.id = "";
-   lastCeiling.breakTime = 0;
-   lastValley.price = 0;
-   lastValley.time = 0;
-   lastValley.id = "";
-   lastValley.breakTime = 0;
+   ArraySetAsSeries(m_ceilings, true);
+   ArraySetAsSeries(m_valleys, true);
    currentStatus = STATUS_WAITING;
    lastCandleTime = 0;
-   lastProcessedTime = 0;
+   lastStructureTime = 0;
    statusLabelName = "FiboEngine_Status";
    currentFibo.zeroLevel = 0;
    currentFibo.hundredLevel = 0;
@@ -199,6 +197,43 @@ bool CFibonacciEngine::Init()
       return false;
    }
 
+   //--- پیدا کردن اولین سقف یا کف
+   double highBuffer[1];
+   double lowBuffer[1];
+   datetime times[1];
+   for(int i = 1; i <= MaxScanDepth; i++)
+   {
+      if(CopyBuffer(handleFineflow, 0, i, 1, highBuffer) > 0 &&
+         CopyBuffer(handleFineflow, 1, i, 1, lowBuffer) > 0 &&
+         CopyTime(_Symbol, TF, i, 1, times) > 0)
+      {
+         if(highBuffer[0] != EMPTY_VALUE && highBuffer[0] > 0)
+         {
+            lastStructureTime = times[0];
+            int size = ArraySize(m_ceilings);
+            ArrayResize(m_ceilings, size + 1);
+            m_ceilings[size].price = highBuffer[0];
+            m_ceilings[size].time = times[0];
+            m_ceilings[size].id = "C_" + TimeToString(times[0]);
+            m_ceilings[size].breakTime = 0;
+            if(EnableLogging) Print("اولین سقف پیدا شد: ", m_ceilings[size].id, " قیمت: ", highBuffer[0], " زمان: ", TimeToString(times[0]));
+            break;
+         }
+         if(lowBuffer[0] != EMPTY_VALUE && lowBuffer[0] > 0)
+         {
+            lastStructureTime = times[0];
+            int size = ArraySize(m_valleys);
+            ArrayResize(m_valleys, size + 1);
+            m_valleys[size].price = lowBuffer[0];
+            m_valleys[size].time = times[0];
+            m_valleys[size].id = "V_" + TimeToString(times[0]);
+            m_valleys[size].breakTime = 0;
+            if(EnableLogging) Print("اولین کف پیدا شد: ", m_valleys[size].id, " قیمت: ", lowBuffer[0], " زمان: ", TimeToString(times[0]));
+            break;
+         }
+      }
+   }
+
    //--- ایجاد لیبل وضعیت
    if(!ObjectCreate(0, statusLabelName, OBJ_LABEL, 0, 0, 0))
    {
@@ -230,44 +265,69 @@ bool CFibonacciEngine::IsNewCandle()
 }
 
 //+------------------------------------------------------------------+
+//| مدیریت آرایه‌های داده                                          |
+//+------------------------------------------------------------------+
+void CFibonacciEngine::ManageDataArrays()
+{
+   if(ArraySize(m_ceilings) > MaxArraySize)
+   {
+      ArrayRemove(m_ceilings, 0, ArraySize(m_ceilings) - MaxArraySize);
+      if(EnableLogging) Print("مدیریت حافظه: کاهش اندازه آرایه سقف‌ها به ", MaxArraySize);
+   }
+   if(ArraySize(m_valleys) > MaxArraySize)
+   {
+      ArrayRemove(m_valleys, 0, ArraySize(m_valleys) - MaxArraySize);
+      if(EnableLogging) Print("مدیریت حافظه: کاهش اندازه آرایه کف‌ها به ", MaxArraySize);
+   }
+}
+
+//+------------------------------------------------------------------+
 //| نقشه‌بردار برای شناسایی ساختارها                              |
 //+------------------------------------------------------------------+
 void CFibonacciEngine::ScoutForStructure()
 {
    if(!IsNewCandle()) return;
 
-   //--- جمع‌آوری سقف‌ها و کف‌ها
+   //--- جمع‌آوری سقف‌ها و کف‌ها از lastStructureTime
    double highBuffer[1];
    double lowBuffer[1];
    datetime times[1];
-   int shift = iBarShift(_Symbol, TF, lastProcessedTime > 0 ? lastProcessedTime : iTime(_Symbol, TF, 0));
+   int start = 1;
+   int end = iBarShift(_Symbol, TF, lastStructureTime) + 1;
 
-   //--- اسکن تا پیدا کردن اولین سقف/کف یا آپدیت موارد جدید
-   for(int i = shift; i >= 1; i--)
+   for(int i = start; i <= end; i++)
    {
       if(CopyBuffer(handleFineflow, 0, i, 1, highBuffer) > 0 &&
          CopyBuffer(handleFineflow, 1, i, 1, lowBuffer) > 0 &&
          CopyTime(_Symbol, TF, i, 1, times) > 0)
       {
-         if(highBuffer[0] != EMPTY_VALUE && highBuffer[0] > 0 && (lastCeiling.time == 0 || times[0] > lastCeiling.time))
+         if(highBuffer[0] != EMPTY_VALUE && highBuffer[0] > 0 && times[0] > lastStructureTime)
          {
-            lastCeiling.price = highBuffer[0];
-            lastCeiling.time = times[0];
-            lastCeiling.id = "C_" + TimeToString(times[0]);
-            lastCeiling.breakTime = 0;
-            if(EnableLogging) Print("سقف جدید: ", lastCeiling.id, " قیمت: ", highBuffer[0], " زمان: ", TimeToString(times[0]));
+            lastStructureTime = times[0];
+            int size = ArraySize(m_ceilings);
+            ArrayResize(m_ceilings, size + 1);
+            m_ceilings[size].price = highBuffer[0];
+            m_ceilings[size].time = times[0];
+            m_ceilings[size].id = "C_" + TimeToString(times[0]);
+            m_ceilings[size].breakTime = 0;
+            if(EnableLogging) Print("سقف جدید: ", m_ceilings[size].id, " قیمت: ", highBuffer[0], " زمان: ", TimeToString(times[0]));
          }
-         if(lowBuffer[0] != EMPTY_VALUE && lowBuffer[0] > 0 && (lastValley.time == 0 || times[0] > lastValley.time))
+         if(lowBuffer[0] != EMPTY_VALUE && lowBuffer[0] > 0 && times[0] > lastStructureTime)
          {
-            lastValley.price = lowBuffer[0];
-            lastValley.time = times[0];
-            lastValley.id = "V_" + TimeToString(times[0]);
-            lastValley.breakTime = 0;
-            if(EnableLogging) Print("کف جدید: ", lastValley.id, " قیمت: ", lowBuffer[0], " زمان: ", TimeToString(times[0]));
+            lastStructureTime = times[0];
+            int size = ArraySize(m_valleys);
+            ArrayResize(m_valleys, size + 1);
+            m_valleys[size].price = lowBuffer[0];
+            m_valleys[size].time = times[0];
+            m_valleys[size].id = "V_" + TimeToString(times[0]);
+            m_valleys[size].breakTime = 0;
+            if(EnableLogging) Print("کف جدید: ", m_valleys[size].id, " قیمت: ", lowBuffer[0], " زمان: ", TimeToString(times[0]));
          }
       }
    }
-   lastProcessedTime = iTime(_Symbol, TF, 1);
+
+   //--- مدیریت حافظه
+   ManageDataArrays();
 
    //--- تشخیص شکست‌ها
    double highPrice = iHigh(_Symbol, _Period, 1);
@@ -278,61 +338,119 @@ void CFibonacciEngine::ScoutForStructure()
 
    if(BreakType == BREAK_SIMPLE)
    {
-      if(lastCeiling.breakTime == 0 && highPrice > lastCeiling.price)
+      for(int i = 0; i < ArraySize(m_ceilings); i++)
       {
-         lastCeiling.breakTime = currentTime;
-         dominantStructure = lastCeiling;
-         newBreakFound = true;
-         if(EnableLogging) Print("شکست سقف: ", lastCeiling.id, " در زمان ", TimeToString(currentTime));
+         if(m_ceilings[i].breakTime == 0 && highPrice > m_ceilings[i].price)
+         {
+            m_ceilings[i].breakTime = currentTime;
+            if(EnableLogging) Print("شکست سقف: ", m_ceilings[i].id, " در زمان ", TimeToString(currentTime));
+            if(dominantStructure.breakTime == 0 || m_ceilings[i].breakTime > dominantStructure.breakTime)
+            {
+               dominantStructure = m_ceilings[i];
+               newBreakFound = true;
+            }
+         }
       }
-      if(lastValley.breakTime == 0 && lowPrice < lastValley.price)
+      for(int i = 0; i < ArraySize(m_valleys); i++)
       {
-         lastValley.breakTime = currentTime;
-         dominantStructure = lastValley;
-         newBreakFound = true;
-         if(EnableLogging) Print("شکست کف: ", lastValley.id, " در زمان ", TimeToString(currentTime));
+         if(m_valleys[i].breakTime == 0 && lowPrice < m_valleys[i].price)
+         {
+            m_valleys[i].breakTime = currentTime;
+            if(EnableLogging) Print("شکست کف: ", m_valleys[i].id, " در زمان ", TimeToString(currentTime));
+            if(dominantStructure.breakTime == 0 || m_valleys[i].breakTime > dominantStructure.breakTime)
+            {
+               dominantStructure = m_valleys[i];
+               newBreakFound = true;
+            }
+         }
       }
    }
    else // BREAK_CONFIRMED
    {
-      static PeakValley pendingBreak = {0, 0, "", 0};
-      if(lastCeiling.breakTime == 0 && highPrice > lastCeiling.price && pendingBreak.id != lastCeiling.id)
+      static PeakValley pendingBreaks[];
+      ArraySetAsSeries(pendingBreaks, true);
+      for(int i = 0; i < ArraySize(m_ceilings); i++)
       {
-         pendingBreak = lastCeiling;
-         pendingBreak.breakTime = currentTime + ConfirmationCandles * PeriodSeconds(TF);
-         if(EnableLogging) Print("شکست در انتظار تأیید سقف: ", lastCeiling.id);
-      }
-      if(lastValley.breakTime == 0 && lowPrice < lastValley.price && pendingBreak.id != lastValley.id)
-      {
-         pendingBreak = lastValley;
-         pendingBreak.breakTime = currentTime + ConfirmationCandles * PeriodSeconds(TF);
-         if(EnableLogging) Print("شکست در انتظار تأیید کف: ", lastValley.id);
-      }
-      if(pendingBreak.breakTime > 0 && currentTime >= pendingBreak.breakTime)
-      {
-         if(pendingBreak.id == lastCeiling.id)
+         if(m_ceilings[i].breakTime == 0 && highPrice > m_ceilings[i].price)
          {
-            lastCeiling.breakTime = currentTime;
-            dominantStructure = lastCeiling;
-            newBreakFound = true;
-            if(EnableLogging) Print("شکست تأیید شده سقف: ", lastCeiling.id);
+            int size = ArraySize(pendingBreaks);
+            ArrayResize(pendingBreaks, size + 1);
+            pendingBreaks[size] = m_ceilings[i];
+            pendingBreaks[size].breakTime = currentTime + ConfirmationCandles * PeriodSeconds(TF);
+            if(EnableLogging) Print("شکست در انتظار تأیید سقف: ", m_ceilings[i].id);
          }
-         else if(pendingBreak.id == lastValley.id)
+      }
+      for(int i = 0; i < ArraySize(m_valleys); i++)
+      {
+         if(m_valleys[i].breakTime == 0 && lowPrice < m_valleys[i].price)
          {
-            lastValley.breakTime = currentTime;
-            dominantStructure = lastValley;
-            newBreakFound = true;
-            if(EnableLogging) Print("شکست تأیید شده کف: ", lastValley.id);
+            int size = ArraySize(pendingBreaks);
+            ArrayResize(pendingBreaks, size + 1);
+            pendingBreaks[size] = m_valleys[i];
+            pendingBreaks[size].breakTime = currentTime + ConfirmationCandles * PeriodSeconds(TF);
+            if(EnableLogging) Print("شکست در انتظار تأیید کف: ", m_valleys[i].id);
          }
-         pendingBreak = {0, 0, "", 0}; // ریست شکست در انتظار
+      }
+      for(int i = 0; i < ArraySize(pendingBreaks); i++)
+      {
+         if(pendingBreaks[i].breakTime > 0 && currentTime >= pendingBreaks[i].breakTime)
+         {
+            if(pendingBreaks[i].price > m_valleys[0].price) // سقف
+            {
+               for(int j = 0; j < ArraySize(m_ceilings); j++)
+               {
+                  if(m_ceilings[j].id == pendingBreaks[i].id)
+                  {
+                     m_ceilings[j].breakTime = currentTime;
+                     if(EnableLogging) Print("شکست تأیید شده سقف: ", m_ceilings[j].id);
+                     if(dominantStructure.breakTime == 0 || m_ceilings[j].breakTime > dominantStructure.breakTime)
+                     {
+                        dominantStructure = m_ceilings[j];
+                        newBreakFound = true;
+                     }
+                     break;
+                  }
+               }
+            }
+            else // کف
+            {
+               for(int j = 0; j < ArraySize(m_valleys); j++)
+               {
+                  if(m_valleys[j].id == pendingBreaks[i].id)
+                  {
+                     m_valleys[j].breakTime = currentTime;
+                     if(EnableLogging) Print("شکست تأیید شده کف: ", m_valleys[j].id);
+                     if(dominantStructure.breakTime == 0 || m_valleys[j].breakTime > dominantStructure.breakTime)
+                     {
+                        dominantStructure = m_valleys[j];
+                        newBreakFound = true;
+                     }
+                     break;
+                  }
+               }
+            }
+         }
       }
    }
 
    //--- علامت‌گذاری ساختار غالب
    if(newBreakFound)
    {
+      //--- حذف تمام گرافیک‌ها و داده‌های قدیمی‌تر از زمان شکست
+      ClearOldGraphics(dominantStructure.breakTime);
+      for(int i = ArraySize(m_ceilings) - 1; i >= 0; i--)
+      {
+         if(m_ceilings[i].time < dominantStructure.breakTime || m_ceilings[i].breakTime > 0)
+            ArrayRemove(m_ceilings, i, 1);
+      }
+      for(int i = ArraySize(m_valleys) - 1; i >= 0; i--)
+      {
+         if(m_valleys[i].time < dominantStructure.breakTime || m_valleys[i].breakTime > 0)
+            ArrayRemove(m_valleys, i, 1);
+      }
       ResetAnalysis();
-      bool isCeiling = dominantStructure.price > lastValley.price;
+
+      bool isCeiling = dominantStructure.price > m_valleys[0].price || ArraySize(m_valleys) == 0;
       DrawGraphics("structure", dominantStructure.price, dominantStructure.time, dominantStructure.id, isCeiling);
       DrawGraphics("bos", dominantStructure.price + (isCeiling ? _Point * 10 : -_Point * 10), dominantStructure.breakTime, dominantStructure.id + "_BOS", isCeiling);
 
@@ -355,12 +473,6 @@ void CFibonacciEngine::ScoutForStructure()
          DrawGraphics("anchor", anchorPrice, anchorTime, dominantStructure.id + "_Anchor", isCeiling);
          currentStatus = STATUS_WAITING;
          DrawStatusLabel();
-
-         //--- حذف سقف/کف شکسته‌شده
-         if(isCeiling)
-            lastCeiling = {0, 0, "", 0};
-         else
-            lastValley = {0, 0, "", 0};
       }
    }
 }
@@ -370,17 +482,23 @@ void CFibonacciEngine::ScoutForStructure()
 //+------------------------------------------------------------------+
 bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
 {
-   if(lastCeiling.price == 0 && lastValley.price == 0) return false;
+   if(ArraySize(m_ceilings) == 0 && ArraySize(m_valleys) == 0) return false;
 
    //--- پیدا کردن آخرین ساختار شکسته
    PeakValley dominantStructure = {0, 0, "", 0};
-   if(lastCeiling.breakTime > 0)
-      dominantStructure = lastCeiling;
-   else if(lastValley.breakTime > 0)
-      dominantStructure = lastValley;
+   for(int i = 0; i < ArraySize(m_ceilings); i++)
+   {
+      if(m_ceilings[i].breakTime > 0 && (dominantStructure.breakTime == 0 || m_ceilings[i].breakTime > dominantStructure.breakTime))
+         dominantStructure = m_ceilings[i];
+   }
+   for(int i = 0; i < ArraySize(m_valleys); i++)
+   {
+      if(m_valleys[i].breakTime > 0 && (dominantStructure.breakTime == 0 || m_valleys[i].breakTime > dominantStructure.breakTime))
+         dominantStructure = m_valleys[i];
+   }
    if(dominantStructure.breakTime == 0) return false;
 
-   bool isCeiling = dominantStructure.id == lastCeiling.id || (lastValley.price > 0 && dominantStructure.price > lastValley.price);
+   bool isCeiling = dominantStructure.price > m_valleys[0].price || ArraySize(m_valleys) == 0;
    if((isBuy && !isCeiling) || (!isBuy && isCeiling))
    {
       if(EnableLogging) Print("جهت درخواست با ساختار بازار هماهنگ نیست");
@@ -411,11 +529,8 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
       string fiboId = "Fibo_Type2_" + TimeToString(dominantStructure.breakTime);
       
       //--- حذف فیبوناچی قبلی
-      if(currentFibo.fiboId != "")
-      {
-         ObjectDelete(0, currentFibo.fiboId);
-         ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
-      }
+      if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId);
+      if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
 
       if(ObjectCreate(0, fiboId, OBJ_FIBO, 0, anchorTime, fiboZero, dominantStructure.time, fiboHundred))
       {
@@ -466,11 +581,8 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
          string fiboId = "Fibo_Type1_" + TimeToString(dominantStructure.breakTime);
          
          //--- حذف فیبوناچی قبلی
-         if(currentFibo.fiboId != "")
-         {
-            ObjectDelete(0, currentFibo.fiboId);
-            ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
-         }
+         if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId);
+         if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
 
          if(ObjectCreate(0, fiboId, OBJ_FIBO, 0, anchorTime, fiboZero, minorTime, fiboHundred))
          {
@@ -493,7 +605,7 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
             ObjectSetInteger(0, entryZoneId, OBJPROP_FILL, true);
 
             currentFibo.zeroLevel = fiboZero;
-            currentFibo.hundredLevel = fipoHundred;
+            currentFibo.hundredLevel = fiboHundred;
             currentFibo.zeroTime = anchorTime;
             currentFibo.hundredTime = minorTime;
             currentFibo.isType1 = true;
@@ -804,10 +916,27 @@ void CFibonacciEngine::DrawStatusLabel()
 //+------------------------------------------------------------------+
 //| پاک کردن اشیاء گرافیکی قدیمی                                  |
 //+------------------------------------------------------------------+
-void CFibonacciEngine::ClearOldGraphics()
+void CFibonacciEngine::ClearOldGraphics(datetime beforeTime = 0)
 {
-   ObjectsDeleteAll(0, -1, -1);
-   if(EnableLogging) Print("اشیاء گرافیکی قدیمی پاک شدند");
+   if(beforeTime == 0)
+   {
+      ObjectsDeleteAll(0, -1, -1);
+      if(EnableLogging) Print("تمام اشیاء گرافیکی پاک شدند");
+   }
+   else
+   {
+      string objects[];
+      int total = ObjectsTotal(0, -1, -1);
+      ArrayResize(objects, total);
+      for(int i = 0; i < total; i++)
+      {
+         string name = ObjectName(0, i, -1, -1);
+         datetime time = (datetime)ObjectGetInteger(0, name, OBJPROP_TIME);
+         if(time < beforeTime)
+            ObjectDelete(0, name);
+      }
+      if(EnableLogging) Print("اشیاء گرافیکی قدیمی‌تر از ", TimeToString(beforeTime), " پاک شدند");
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -886,7 +1015,8 @@ bool CFibonacciEngine::CheckEntryZone(double zeroLevel, double hundredLevel, dou
 //+------------------------------------------------------------------+
 void CFibonacciEngine::ResetAnalysis()
 {
-   ClearOldGraphics();
+   if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId);
+   if(currentFibo.fiboId != "") ObjectDelete(0, currentFibo.fiboId + "_EntryZone");
    currentFibo.zeroLevel = 0;
    currentFibo.hundredLevel = 0;
    currentFibo.zeroTime = 0;
@@ -899,3 +1029,4 @@ void CFibonacciEngine::ResetAnalysis()
    if(EnableLogging) Print("تحلیل ریست شد");
 }
 //+------------------------------------------------------------------+
+```
