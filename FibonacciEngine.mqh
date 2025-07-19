@@ -4,16 +4,33 @@
 //| کتابخانه‌ای برای رسم فیبوناچی‌های نوع اول (شناور) و نوع دوم (اکستنشن) |
 //| شناسایی سقف‌ها، کف‌ها، شکست‌ها و نقاط ورود با اندیکاتور Fineflow  |
 //| کاملاً مستقل، با لاگ بهینه و نمایش وضعیت در چارت               |
-//| نسخه: 1.00                                                      |
+//| نسخه: 1.01                                                      |
 //| تاریخ: 2025-07-19                                              |
 //+------------------------------------------------------------------+
 
 #property copyright "Your Name"
-#property version   "1.00"
+#property version   "1.01"
 #property strict
 
 //--- شامل فایل‌های مورد نیاز
 #include <Trade\Trade.mqh>
+
+//--- تعریف ثابت‌های لازم از Fineflow
+enum E_DetectionMethod {
+   METHOD_SIMPLE,         // روش ساده (فراکتال)
+   METHOD_SEQUENTIAL,     // روش پلکانی انعطاف‌پذیر
+   METHOD_POWER_SWING,    // روش فیلتر قدرت
+   METHOD_ZIGZAG,         // روش زیگزاگ
+   METHOD_BREAK_OF_STRUCTURE, // روش شکست ساختار (BOS)
+   METHOD_MARKET_STRUCTURE_SHIFT // روش تغییر ساختار بازار (MSS)
+};
+
+enum E_SequentialCriterion {
+   CRITERION_HIGH,     // استفاده از High برای پلکانی
+   CRITERION_LOW,      // استفاده از Low برای پلکانی
+   CRITERION_OPEN,     // استفاده از Open برای پلکانی
+   CRITERION_CLOSE     // استفاده از Close برای پلکانی
+};
 
 //--- ورودی‌ها (Inputs)
 input group "تنظیمات عمومی"
@@ -23,6 +40,14 @@ input int Lookback = 3; // تعداد کندل‌ها برای نگاه به ع�
 input int MaxScanDepth = 200; // حداکثر کندل‌ها برای اسکن
 input int MaxArraySize = 50; // حداکثر اندازه آرایه‌های سقف و کف
 input bool EnableLogging = true; // فعال‌سازی لاگ‌ها
+input E_DetectionMethod DetectionMethod = METHOD_POWER_SWING; // روش تشخیص Fineflow
+input int SequentialLookback = 2; // تعداد کندل‌ها برای روش پلکانی
+input bool UseStrictSequential = true; // حالت سخت‌گیرانه پلکانی
+input E_SequentialCriterion SequentialCriterion = CRITERION_HIGH; // معیار پلکانی
+input int AtrPeriod = 14; // دوره ATR
+input double AtrMultiplier = 2.5; // ضریب ATR
+input int ZigZagDepth = 12; // عمق زیگزاگ
+input double ZigZagDeviation = 5; // انحراف زیگزاگ
 
 input group "تنظیمات شکست"
 enum ENUM_BREAK_TYPE {
@@ -53,7 +78,7 @@ enum ENUM_FIBO_STATUS {
    STATUS_FIBO_TYPE1_ACTIVE, // فیبوناچی نوع اول فعال
    STATUS_FIBO_TYPE2_ACTIVE, // فیبوناچی نوع دوم فعال
    STATUS_IN_ENTRY_ZONE,     // در ناحیه ورود
-   STATUS_INVALID             // تحلیل باطل شده
+   STATUS_INVALID            // تحلیل باطل شده
 };
 
 //--- ساختار برای ذخیره اطلاعات سقف و کف
@@ -146,15 +171,15 @@ bool CFibonacciEngine::Init()
    //--- بارگذاری اندیکاتور Fineflow
    handleFineflow = iCustom(_Symbol, TF, "Fineflow",
                            EnforceStrictSequence,
-                           METHOD_POWER_SWING, // روش پیش‌فرض
+                           DetectionMethod,
                            Lookback,
-                           2, // SequentialLookback
-                           true, // UseStrictSequential
-                           CRITERION_HIGH, // SequentialCriterion
-                           14, // AtrPeriod
-                           2.5, // AtrMultiplier
-                           12, // ZigZagDepth
-                           5, // ZigZagDeviation
+                           SequentialLookback,
+                           UseStrictSequential,
+                           SequentialCriterion,
+                           AtrPeriod,
+                           AtrMultiplier,
+                           ZigZagDepth,
+                           ZigZagDeviation,
                            false); // EnableLogging
    if(handleFineflow == INVALID_HANDLE)
    {
@@ -466,15 +491,14 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
 
       //--- رسم فیبوناچی نوع اول
       string fiboId = "Fibo_Type1_" + TimeToString(dominantStructure.breakTime);
-      if(ObjectCreate(0, fiboId, OBJ_FIBONACCI, 0, anchorTime, fiboZero, minorTime, fiboHundred))
+      if(ObjectCreate(0, fiboId, OBJ_FIBO, 0, anchorTime, fiboZero, minorTime, fiboHundred))
       {
-         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 3);
+         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 4);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 0, 0.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
-         ObjectSetIntegerქ
-         Integer(0, fiboId, OBJPROP_COLOR, clrBlue);
+         ObjectSetInteger(0, fiboId, OBJPROP_COLOR, clrBlue);
          ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
          ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
 
@@ -506,9 +530,9 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(bool isBuy)
       double fiboZero = anchorPrice;
       double fiboHundred = dominantStructure.price;
       string fiboId = "Fibo_Type2_" + TimeToString(dominantStructure.breakTime);
-      if(ObjectCreate(0, fiboId, OBJ_FIBONACCI, 0, anchorTime, fiboZero, dominantStructure.time, fiboHundred))
+      if(ObjectCreate(0, fiboId, OBJ_FIBO, 0, anchorTime, fiboZero, dominantStructure.time, fiboHundred))
       {
-         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 5);
+         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 6);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 0, 0.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
@@ -594,8 +618,8 @@ void CFibonacciEngine::CheckConditions()
          currentFibo.hundredTime = iTime(_Symbol, _Period, highestShift);
          string fiboId = "Fibo_Type1_" + TimeToString(currentFibo.hundredTime);
          ObjectDelete(0, fiboId);
-         ObjectCreate(0, fiboId, OBJ_FIBONACCI, 0, currentFibo.zeroTime, currentFibo.zeroLevel, currentFibo.hundredTime, currentFibo.hundredLevel);
-         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 3);
+         ObjectCreate(0, fiboId, OBJ_FIBO, 0, currentFibo.zeroTime, currentFibo.zeroLevel, currentFibo.hundredTime, currentFibo.hundredLevel);
+         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 4);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 0, 0.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
@@ -621,12 +645,12 @@ void CFibonacciEngine::CheckConditions()
          currentFibo.hundredTime = iTime(_Symbol, _Period, lowestShift);
          string fiboId = "Fibo_Type1_" + TimeToString(currentFibo.hundredTime);
          ObjectDelete(0, fiboId);
-         ObjectCreate(0, fiboId, OBJ_FIBONACCI, 0, currentFibo.zeroTime, currentFibo.zeroLevel, currentFibo.hundredTime, currentFibo.hundredLevel);
-         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 3);
+         ObjectCreate(0, fiboId, OBJ_FIBO, 0, currentFibo.zeroTime, currentFibo.zeroLevel, currentFibo.hundredTime, currentFibo.hundredLevel);
+         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 4);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 0, 0.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
-         ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMax / 100.0);
+         ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 3, FiboEntryZoneMin / 100.0);
          ObjectSetInteger(0, fiboId, OBJPROP_COLOR, clrBlue);
          ObjectSetInteger(0, fiboId, OBJPROP_STYLE, STYLE_SOLID);
          ObjectSetInteger(0, fiboId, OBJPROP_WIDTH, 1);
@@ -656,8 +680,8 @@ void CFibonacciEngine::CheckConditions()
          currentFibo.hundredLevel = level150;
          currentFibo.hundredTime = iTime(_Symbol, _Period, 1);
          fiboId = "Fibo_Type2_" + TimeToString(currentFibo.hundredTime);
-         ObjectCreate(0, fiboId, OBJ_FIBONACCI, 0, currentFibo.zeroTime, currentFibo.zeroLevel, currentFibo.hundredTime, currentFibo.hundredLevel);
-         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 3);
+         ObjectCreate(0, fiboId, OBJ_FIBO, 0, currentFibo.zeroTime, currentFibo.zeroLevel, currentFibo.hundredTime, currentFibo.hundredLevel);
+         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 4);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 0, 0.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
@@ -683,8 +707,8 @@ void CFibonacciEngine::CheckConditions()
          currentFibo.hundredLevel = level200;
          currentFibo.hundredTime = iTime(_Symbol, _Period, 1);
          fiboId = "Fibo_Type2_" + TimeToString(currentFibo.hundredTime);
-         ObjectCreate(0, fiboId, OBJ_FIBONACCI, 0, currentFibo.zeroTime, currentFibo.zeroLevel, currentFibo.hundredTime, currentFibo.hundredLevel);
-         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 3);
+         ObjectCreate(0, fiboId, OBJ_FIBO, 0, currentFibo.zeroTime, currentFibo.zeroLevel, currentFibo.hundredTime, currentFibo.hundredLevel);
+         ObjectSetInteger(0, fiboId, OBJPROP_LEVELS, 4);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 0, 0.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 1, 1.0);
          ObjectSetDouble(0, fiboId, OBJPROP_LEVELVALUE, 2, FiboEntryZoneMin / 100.0);
@@ -813,15 +837,37 @@ bool CFibonacciEngine::FindMinorCorrection(datetime startTime, datetime endTime,
       {
          minorPrice = iLow(_Symbol, TF, i);
          minorTime = iTime(_Symbol, TF, i);
-         if(EnableLogging) Print("اصلاح مینور (کف) پیدا شد: ", minorPrice, " زمان: ", TimeToString(minorTime));
-         return true;
+         //--- بررسی پولبک به ناحیه 50-68 درصد
+         double fiboZero = iLow(_Symbol, TF, iBarShift(_Symbol, TF, startTime));
+         double fiboHundred = iHigh(_Symbol, TF, i);
+         double entryZoneMin = fiboZero + (fiboHundred - fiboZero) * (FiboEntryZoneMin / 100.0);
+         double entryZoneMax = fiboZero + (fiboHundred - fiboZero) * (FiboEntryZoneMax / 100.0);
+         for(int k = i; k >= startShift; k--)
+         {
+            if(iLow(_Symbol, TF, k) >= entryZoneMin && iLow(_Symbol, TF, k) <= entryZoneMax)
+            {
+               if(EnableLogging) Print("اصلاح مینور (کف) پیدا شد: ", minorPrice, " زمان: ", TimeToString(minorTime));
+               return true;
+            }
+         }
       }
       else if(!isBullish && isMinorPeak)
       {
          minorPrice = iHigh(_Symbol, TF, i);
          minorTime = iTime(_Symbol, TF, i);
-         if(EnableLogging) Print("اصلاح مینور (سقف) پیدا شد: ", minorPrice, " زمان: ", TimeToString(minorTime));
-         return true;
+         //--- بررسی پولبک به ناحیه 50-68 درصد
+         double fiboZero = iHigh(_Symbol, TF, iBarShift(_Symbol, TF, startTime));
+         double fiboHundred = iLow(_Symbol, TF, i);
+         double entryZoneMin = fiboHundred + (fiboZero - fiboHundred) * (FiboEntryZoneMin / 100.0);
+         double entryZoneMax = fiboHundred + (fiboZero - fiboHundred) * (FiboEntryZoneMax / 100.0);
+         for(int k = i; k >= startShift; k--)
+         {
+            if(iHigh(_Symbol, TF, k) >= entryZoneMin && iHigh(_Symbol, TF, k) <= entryZoneMax)
+            {
+               if(EnableLogging) Print("اصلاح مینور (سقف) پیدا شد: ", minorPrice, " زمان: ", TimeToString(minorTime));
+               return true;
+            }
+         }
       }
    }
    return false;
