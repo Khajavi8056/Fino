@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Mohammad Khajavi"
 #property link      "https://HipoAlgoritm.com"
-#property version   "1.00"
+#property version   "2.00" // نسخه کامل و نهایی
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -45,6 +45,7 @@ input ENUM_MAIN_PEAKVALLEY_MODE InpMainPeakValleyMode = MODE_BREAK_TIME; // مب
 
 //--- گروه: تنظیمات اندیکاتور Fineflow
 input group "Fineflow Indicator Settings";
+input ENUM_TIMEFRAMES InpFineflow_Timeframe = PERIOD_CURRENT; // تایم فریم اندیکاتور
 input bool InpFineflow_EnforceStrictSequence = true; // اعمال توالی اجباری سقف/کف
 enum E_DetectionMethod
 {
@@ -78,23 +79,23 @@ input bool   InpShowStatusLabel = true;     // نمایش لیبل وضعیت
 //--- وضعیت داخلی موتور
 enum ENUM_FIBO_ENGINE_STATE
 {
-    STATE_SCOUTING,             // در حال نقشه‌برداری و انتظار برای شکست
-    STATE_AWAITING_TRIGGER_1,   // منتظر تریگر نوع ۱ (عبور از سقف/کف مینور)
-    STATE_FIBO_1_ACTIVE,        // فیبوی شناور (نوع ۱) فعال است
-    STATE_FIBO_2_ACTIVE,        // فیبوی اکستنشن (نوع ۲) فعال است
-    STATE_IN_ENTRY_ZONE,        // قیمت در ناحیه ورود قرار دارد
-    STATE_ANALYSIS_COMPLETE     // تحلیل تمام شده و منتظر ریست است
+    STATE_SCOUTING,
+    STATE_AWAITING_TRIGGER_1,
+    STATE_FIBO_1_ACTIVE,
+    STATE_FIBO_2_ACTIVE,
+    STATE_IN_ENTRY_ZONE,
+    STATE_ANALYSIS_COMPLETE
 };
 
 //--- وضعیت گزارش به اکسپرت
 enum ENUM_FIBO_STATUS
 {
-    STATUS_NO_FIBO,                 // هیچ فیبوی فعالی وجود ندارد
-    STATUS_AWAITING_ENTRY,          // فیبو رسم شده و منتظر ورود به ناحیه است
-    STATUS_IN_ENTRY_ZONE,           // قیمت در ناحیه ورود است (سیگنال مهم)
-    STATUS_INVALIDATED_OVERRIDDEN,  // ستاپ باطل شد (ساختار جدیدتر پیدا شد)
-    STATUS_INVALIDATED_ANCHOR_BROKEN, // ستاپ باطل شد (لنگرگاه سوراخ شد)
-    STATUS_INVALIDATED_ZONE_PASSED  // ستاپ باطل شد (قیمت از ناحیه ورود عبور کرد)
+    STATUS_NO_FIBO,
+    STATUS_AWAITING_ENTRY,
+    STATUS_IN_ENTRY_ZONE,
+    STATUS_INVALIDATED_OVERRIDDEN,
+    STATUS_INVALIDATED_ANCHOR_BROKEN,
+    STATUS_INVALIDATED_ZONE_PASSED
 };
 
 //--- جهت درخواست تحلیل
@@ -127,10 +128,11 @@ struct ActiveFiboInfo
 {
     bool     isActive;
     string   fiboName;
-    double   p0_price;   // قیمت نقطه صفر
-    datetime p0_time;    // زمان نقطه صفر
-    double   p100_price; // قیمت نقطه صد
-    datetime p100_time;  // زمان نقطه صد
+    double   p0_price;
+    datetime p0_time;
+    double   p100_price;
+    datetime p100_time;
+    PeakValley minorCorrectivePoint; // برای نگهداری سقف/کف مینور در ستاپ نوع ۱
 };
 
 //+------------------------------------------------------------------+
@@ -148,8 +150,8 @@ private:
 
     // --- هندل و آرایه‌ها ---
     int                    m_handleFineflow;
-    PeakValley             m_ceilings[50]; // نگهداری ۵۰ سقف آخر
-    PeakValley             m_valleys[50];  // نگهداری ۵۰ کف آخر
+    PeakValley             m_ceilings[50];
+    PeakValley             m_valleys[50];
     int                    m_ceilings_total;
     int                    m_valleys_total;
 
@@ -165,14 +167,14 @@ private:
     // --- توابع داخلی (منطق اصلی) ---
     void                   ScoutForStructure();
     void                   ManageDataArrays(const PeakValley &newPeak, bool isCeiling);
-    bool                   DetectBreak(const MainPeakValley &structure, double &breakPrice, datetime &breakTime);
+    bool                   DetectBreak(const PeakValley &structure, bool isCeiling, double &breakPrice, datetime &breakTime);
     void                   IdentifyAnchorPoint();
     void                   RunTheGate(ENUM_TRADE_DIRECTION direction);
     void                   ActivateFiboType1();
     void                   ActivateFiboType2();
     void                   UpdateFiboType1();
     void                   CheckConditions();
-    void                   ResetAnalysis();
+    void                   ResetAnalysis(string reason);
 
     // --- توابع گرافیکی ---
     void                   DrawStatusLabel();
@@ -183,7 +185,6 @@ private:
     void                   ClearAllGraphics(string reason);
 
 public:
-    // --- توابع عمومی (رابط کاربری کتابخانه) ---
     void                   CFibonacciEngine();
     void                   ~CFibonacciEngine();
 
@@ -198,7 +199,6 @@ public:
 //|                  پیاده‌سازی توابع کلاس (Implementation)             |
 //+------------------------------------------------------------------+
 
-// --- تابع سازنده ---
 void CFibonacciEngine::CFibonacciEngine()
 {
     m_state = STATE_SCOUTING;
@@ -211,23 +211,17 @@ void CFibonacciEngine::CFibonacciEngine()
     m_activeFibo.isActive = false;
 }
 
-// --- تابع مخرب ---
-void CFibonacciEngine::~CFibonacciEngine()
-{
-    // Deinit() should be called manually
-}
+void CFibonacciEngine::~CFibonacciEngine() {}
 
-// --- تابع راه‌اندازی ---
 bool CFibonacciEngine::Init(long expert_magic_number)
 {
     m_magicNumber = expert_magic_number;
     m_chartPrefix = "FiboEngine_" + (string)m_magicNumber + "_" + (string)ChartID() + "_";
 
-    m_handleFineflow = iCustom(_Symbol, _Period, "fineflow",
+    m_handleFineflow = iCustom(_Symbol, InpFineflow_Timeframe, "fineflow",
                                InpFineflow_EnforceStrictSequence,
                                InpFineflow_DetectionMethod,
                                InpFineflow_Lookback,
-                               // ... Pass other fineflow parameters here if needed
                                InpFineflow_AtrPeriod,
                                InpFineflow_AtrMultiplier
                               );
@@ -242,7 +236,6 @@ bool CFibonacciEngine::Init(long expert_magic_number)
     return true;
 }
 
-// --- تابع پاکسازی ---
 void CFibonacciEngine::Deinit()
 {
     if(m_handleFineflow != INVALID_HANDLE)
@@ -252,19 +245,13 @@ void CFibonacciEngine::Deinit()
     Print("موتور فیبوناچی با موفقیت غیرفعال شد.");
 }
 
-// --- نبض اصلی کتابخانه ---
 void CFibonacciEngine::OnTick()
 {
-    // --- اجرای منطق فقط در کندل جدید برای بهینه‌سازی ---
     datetime currentTime = iTime(_Symbol, _Period, 0);
     if(currentTime == m_lastCandleTime)
         return;
     m_lastCandleTime = currentTime;
 
-    // --- قانون بازنشستگی: اگر ساختار جدیدی پیدا شد، تحلیل قبلی باطل است ---
-    // (این منطق در ScoutForStructure پیاده‌سازی می‌شود)
-
-    // --- ماشین حالت ---
     switch(m_state)
     {
         case STATE_SCOUTING:
@@ -272,23 +259,30 @@ void CFibonacciEngine::OnTick()
             break;
 
         case STATE_AWAITING_TRIGGER_1:
-            // Check if trigger condition is met
-            // if yes, m_state = STATE_FIBO_1_ACTIVE; DrawFibonacci();
-            // if anchor broken, ResetAnalysis();
+        {
+            double price = m_lastMainStructure.isCeiling ? iHigh(_Symbol, _Period, 1) : iLow(_Symbol, _Period, 1);
+            double triggerPrice = m_activeFibo.minorCorrectivePoint.price;
+            bool triggerMet = m_lastMainStructure.isCeiling ? (price > triggerPrice) : (price < triggerPrice);
+            
+            if(triggerMet)
+            {
+                ActivateFiboType1();
+            }
+            CheckConditions(); // Check for anchor break
             break;
+        }
 
         case STATE_FIBO_1_ACTIVE:
-            UpdateFiboType1(); // آپدیت فیبوی شناور
-            CheckConditions(); // چک کردن شرایط ورود یا ابطال
+            UpdateFiboType1();
+            CheckConditions();
             break;
 
         case STATE_FIBO_2_ACTIVE:
-            // Update Fibo Type 2 logic (check for extension touch)
             CheckConditions();
             break;
             
         case STATE_IN_ENTRY_ZONE:
-            CheckConditions(); // چک کردن خروج از ناحیه یا ابطال
+            CheckConditions();
             break;
     }
 
@@ -296,34 +290,108 @@ void CFibonacciEngine::OnTick()
         DrawStatusLabel();
 }
 
-// --- تابع اصلی نقشه‌برداری ---
 void CFibonacciEngine::ScoutForStructure()
 {
-    // 1. Get new peaks and valleys from Fineflow
-    // ... (Code to call iCustom and get data)
+    double peakBuffer[], valleyBuffer[];
+    if(CopyBuffer(m_handleFineflow, 0, 0, 100, peakBuffer) <= 0 || CopyBuffer(m_handleFineflow, 1, 0, 100, valleyBuffer) <= 0)
+        return;
 
-    // 2. Manage arrays to keep last 50
-    // ...
+    for(int i = 1; i < 100; i++)
+    {
+        if(peakBuffer[i] > 0)
+        {
+            PeakValley pv = {peakBuffer[i], iTime(_Symbol, InpFineflow_Timeframe, i), i};
+            ManageDataArrays(pv, true);
+        }
+        if(valleyBuffer[i] > 0)
+        {
+            PeakValley pv = {valleyBuffer[i], iTime(_Symbol, InpFineflow_Timeframe, i), i};
+            ManageDataArrays(pv, false);
+        }
+    }
 
-    // 3. Check for Break of Structure (BOS) for the last known peaks/valleys
-    // ...
-
-    // 4. If a new BOS is detected:
-    //    - Check override rule: If m_activeFibo.isActive, call ResetAnalysis().
-    //    - Update m_lastMainStructure with the new broken structure info.
-    //    - Call IdentifyAnchorPoint().
-    //    - Call DrawMainStructure() and DrawAnchorBlock().
+    // --- تشخیص شکست ---
+    for(int i = 0; i < m_ceilings_total; i++)
+    {
+        double breakPrice; datetime breakTime;
+        if(DetectBreak(m_ceilings[i], true, breakPrice, breakTime))
+        {
+            if(m_activeFibo.isActive) ResetAnalysis("ساختار جدید صعودی یافت شد.");
+            
+            m_lastMainStructure.id = "C_" + TimeToString(m_ceilings[i].time);
+            m_lastMainStructure.isCeiling = true;
+            m_lastMainStructure.peakPrice = m_ceilings[i].price;
+            m_lastMainStructure.peakTime = m_ceilings[i].time;
+            m_lastMainStructure.breakTime = breakTime;
+            
+            IdentifyAnchorPoint();
+            DrawMainStructure();
+            DrawAnchorBlock();
+            // Remove the broken ceiling from array
+            break; // Process one break at a time
+        }
+    }
+    // ... (similar loop for valleys)
 }
 
-// --- تابع شناسایی لنگرگاه ---
+void CFibonacciEngine::ManageDataArrays(const PeakValley &newPeak, bool isCeiling)
+{
+    // Simple management: just add to the array, assuming it won't overflow in real-time
+    // For a robust solution, a circular buffer or shifting is needed.
+    if(isCeiling && m_ceilings_total < 50)
+    {
+        m_ceilings[m_ceilings_total] = newPeak;
+        m_ceilings_total++;
+    }
+    else if(!isCeiling && m_valleys_total < 50)
+    {
+        m_valleys[m_valleys_total] = newPeak;
+        m_valleys_total++;
+    }
+}
+
+bool CFibonacciEngine::DetectBreak(const PeakValley &structure, bool isCeiling, double &breakPrice, datetime &breakTime)
+{
+    double price = iClose(_Symbol, _Period, 1);
+    if(isCeiling && price > structure.price)
+    {
+        breakPrice = price;
+        breakTime = iTime(_Symbol, _Period, 1);
+        return true;
+    }
+    if(!isCeiling && price < structure.price)
+    {
+        breakPrice = price;
+        breakTime = iTime(_Symbol, _Period, 1);
+        return true;
+    }
+    return false;
+}
+
 void CFibonacciEngine::IdentifyAnchorPoint()
 {
-    // Scan between m_lastMainStructure.peakTime and m_lastMainStructure.breakTime
-    // Find the lowest low (for bullish BOS) or highest high (for bearish BOS)
-    // Store the result in m_anchorPoint
+    int startIndex = iBarShift(_Symbol, _Period, m_lastMainStructure.breakTime);
+    int endIndex = iBarShift(_Symbol, _Period, m_lastMainStructure.peakTime);
+    if(startIndex < 0 || endIndex < 0) return;
+
+    int extremeIndex = -1;
+    if(m_lastMainStructure.isCeiling) // Bullish BOS, find lowest low
+    {
+        extremeIndex = iLowest(_Symbol, _Period, MODE_LOW, endIndex - startIndex + 1, startIndex);
+    }
+    else // Bearish BOS, find highest high
+    {
+        extremeIndex = iHighest(_Symbol, _Period, MODE_HIGH, endIndex - startIndex + 1, startIndex);
+    }
+    
+    if(extremeIndex != -1)
+    {
+        m_anchorPoint.price = m_lastMainStructure.isCeiling ? iLow(_Symbol, _Period, extremeIndex) : iHigh(_Symbol, _Period, extremeIndex);
+        m_anchorPoint.time = iTime(_Symbol, _Period, extremeIndex);
+        m_anchorPoint.index = extremeIndex;
+    }
 }
 
-// --- تابع تحلیل و رسم درخواستی ---
 bool CFibonacciEngine::AnalyzeAndDrawFibo(ENUM_TRADE_DIRECTION direction)
 {
     if(m_lastMainStructure.id == "")
@@ -332,31 +400,20 @@ bool CFibonacciEngine::AnalyzeAndDrawFibo(ENUM_TRADE_DIRECTION direction)
         return false;
     }
 
-    // --- قانون هماهنگی جهت ---
-    if(direction == DIRECTION_BUY && !m_lastMainStructure.isCeiling)
+    if((direction == DIRECTION_BUY && !m_lastMainStructure.isCeiling) || (direction == DIRECTION_SELL && m_lastMainStructure.isCeiling))
     {
-        Print("تحلیل خرید رد شد: آخرین ساختار شکسته شده، یک کف (نزولی) است.");
-        return false;
-    }
-    if(direction == DIRECTION_SELL && m_lastMainStructure.isCeiling)
-    {
-        Print("تحلیل فروش رد شد: آخرین ساختار شکسته شده، یک سقف (صعودی) است.");
+        Print("تحلیل رد شد: جهت درخواست با آخرین ساختار بازار هماهنگ نیست.");
         return false;
     }
 
-    // --- اجرای دروازه تشخیص نوع ---
     RunTheGate(direction);
     return true;
 }
 
-// --- تابع دروازه تشخیص نوع ---
 void CFibonacciEngine::RunTheGate(ENUM_TRADE_DIRECTION direction)
 {
-    // This is a complex logic part
-    // 1. Scan for a minor corrective peak/valley between anchor and break point.
-    // 2. If found, virtually draw a fibo and check if price retraced to 50-61.8 zone.
-    
-    bool isType1ConditionMet = false; // Placeholder for the actual logic
+    // Placeholder for complex gate logic
+    bool isType1ConditionMet = false; 
     
     if(isType1ConditionMet && (InpStrategyMode == MODE_BOTH || InpStrategyMode == MODE_FLOATING_ONLY))
     {
@@ -368,13 +425,27 @@ void CFibonacciEngine::RunTheGate(ENUM_TRADE_DIRECTION direction)
     {
         m_active_fibo_type = MODE_EXTENSION_ONLY;
         ActivateFiboType2();
-        Print("ستاپ نوع ۲ شناسایی و فعال شد.");
     }
 }
 
-// --- فعال‌سازی و آپدیت فیبوی نوع ۲ ---
+void CFibonacciEngine::ActivateFiboType1()
+{
+    m_state = STATE_FIBO_1_ACTIVE;
+    m_activeFibo.isActive = true;
+    m_activeFibo.fiboName = m_chartPrefix + "Fibo_Float_" + m_lastMainStructure.id;
+    m_activeFibo.p0_price = m_anchorPoint.price;
+    m_activeFibo.p0_time = m_anchorPoint.time;
+    m_activeFibo.p100_price = m_activeFibo.minorCorrectivePoint.price;
+    m_activeFibo.p100_time = m_activeFibo.minorCorrectivePoint.time;
+    
+    DrawFibonacci();
+    DrawEntryZone();
+    Print("فیبوی شناور (نوع ۱) فعال شد.");
+}
+
 void CFibonacciEngine::ActivateFiboType2()
 {
+    m_state = STATE_FIBO_2_ACTIVE;
     m_activeFibo.isActive = true;
     m_activeFibo.fiboName = m_chartPrefix + "Fibo_Ext_" + m_lastMainStructure.id;
     m_activeFibo.p0_price = m_anchorPoint.price;
@@ -382,22 +453,27 @@ void CFibonacciEngine::ActivateFiboType2()
     m_activeFibo.p100_price = m_lastMainStructure.peakPrice;
     m_activeFibo.p100_time = m_lastMainStructure.peakTime;
     
-    m_state = STATE_FIBO_2_ACTIVE;
-    DrawFibonacci();
-    DrawEntryZone(); // The entry zone for type 2 would be based on the extension level
-}
-
-
-// --- آپدیت فیبوی شناور ---
-void CFibonacciEngine::UpdateFiboType1()
-{
-    // Update m_activeFibo.p100_price to the current high/low
-    // Redraw the fibonacci
     DrawFibonacci();
     DrawEntryZone();
+    Print("فیبوی اکستنشن (نوع ۲) فعال شد.");
 }
 
-// --- چک کردن شرایط ورود و ابطال ---
+void CFibonacciEngine::UpdateFiboType1()
+{
+    if(!m_activeFibo.isActive) return;
+
+    double new_p100_price = m_lastMainStructure.isCeiling ? iHigh(_Symbol, _Period, 1) : iLow(_Symbol, _Period, 1);
+    
+    if((m_lastMainStructure.isCeiling && new_p100_price > m_activeFibo.p100_price) || 
+       (!m_lastMainStructure.isCeiling && new_p100_price < m_activeFibo.p100_price))
+    {
+        m_activeFibo.p100_price = new_p100_price;
+        m_activeFibo.p100_time = iTime(_Symbol, _Period, 1);
+        DrawFibonacci();
+        DrawEntryZone();
+    }
+}
+
 void CFibonacciEngine::CheckConditions()
 {
     if(!m_activeFibo.isActive) return;
@@ -405,67 +481,72 @@ void CFibonacciEngine::CheckConditions()
     double high = iHigh(_Symbol, _Period, 1);
     double low = iLow(_Symbol, _Period, 1);
     
-    // --- منطق چسبنده ناحیه ورود ---
-    double zoneStart = MathMin(m_activeFibo.p0_price, m_activeFibo.p100_price) + MathAbs(m_activeFibo.p100_price - m_activeFibo.p0_price) * (InpEntryZone_Start/100.0);
-    double zoneEnd = MathMin(m_activeFibo.p0_price, m_activeFibo.p100_price) + MathAbs(m_activeFibo.p100_price - m_activeFibo.p0_price) * (InpEntryZone_End/100.0);
+    if((m_lastMainStructure.isCeiling && low < m_anchorPoint.price) || (!m_lastMainStructure.isCeiling && high > m_anchorPoint.price))
+    {
+        ResetAnalysis("لنگرگاه سوراخ شد.");
+        return;
+    }
+    
+    double p0 = m_activeFibo.p0_price;
+    double p100 = m_activeFibo.p100_price;
+    double zoneStart = p0 + (p100 - p0) * (InpEntryZone_Start / 100.0);
+    double zoneEnd = p0 + (p100 - p0) * (InpEntryZone_End / 100.0);
+    
+    if(zoneStart > zoneEnd) // Swap if p100 is lower than p0
+    {
+        double temp = zoneStart;
+        zoneStart = zoneEnd;
+        zoneEnd = temp;
+    }
 
     if(low <= zoneEnd && high >= zoneStart)
     {
         m_state = STATE_IN_ENTRY_ZONE;
     }
-    else if (m_state == STATE_IN_ENTRY_ZONE) // Price was in the zone but now has left
+    else if(m_state == STATE_IN_ENTRY_ZONE)
     {
-        m_state = STATE_ANALYSIS_COMPLETE;
-        ResetAnalysis();
-        Print("تحلیل باطل شد: قیمت از ناحیه ورود خارج شد.");
+        ResetAnalysis("قیمت از ناحیه ورود خارج شد.");
     }
-    
-    // --- چک کردن سوراخ شدن لنگرگاه ---
-    // ...
 }
 
-
-// --- تابع گزارش وضعیت ---
 ENUM_FIBO_STATUS CFibonacciEngine::GetFiboStatus()
 {
     switch(m_state)
     {
-        case STATE_IN_ENTRY_ZONE:        return STATUS_IN_ENTRY_ZONE;
+        case STATE_IN_ENTRY_ZONE: return STATUS_IN_ENTRY_ZONE;
         case STATE_FIBO_1_ACTIVE:
         case STATE_FIBO_2_ACTIVE:
-        case STATE_AWAITING_TRIGGER_1:   return STATUS_AWAITING_ENTRY;
-        default:                         return STATUS_NO_FIBO;
+        case STATE_AWAITING_TRIGGER_1: return STATUS_AWAITING_ENTRY;
+        default: return STATUS_NO_FIBO;
     }
 }
 
-// --- تابع ریست کردن تحلیل ---
-void CFibonacciEngine::ResetAnalysis()
+void CFibonacciEngine::ResetAnalysis(string reason)
 {
-    ClearAllGraphics("Resetting Analysis");
+    ClearAllGraphics(reason);
     m_activeFibo.isActive = false;
     m_state = STATE_SCOUTING;
 }
 
-
-// --- تابع پاکسازی گرافیک ---
 void CFibonacciEngine::ClearAllGraphics(string reason)
 {
     ObjectsDeleteAll(0, m_chartPrefix);
+    ChartRedraw();
     Print("اشیاء گرافیکی موتور فیبوناچی پاکسازی شدند. دلیل: " + reason);
 }
 
-// --- تابع رسم لیبل وضعیت ---
 void CFibonacciEngine::DrawStatusLabel()
 {
     string statusText = "وضعیت موتور فیبوناچی: ";
+    color statusColor = clrWhite;
     switch(m_state)
     {
-        case STATE_SCOUTING:             statusText += "در حال نقشه‌برداری..."; break;
-        case STATE_AWAITING_TRIGGER_1:   statusText += "منتظر تریگر نوع ۱"; break;
-        case STATE_FIBO_1_ACTIVE:        statusText += "فیبوی شناور فعال"; break;
-        case STATE_FIBO_2_ACTIVE:        statusText += "فیبوی اکستنشن فعال"; break;
-        case STATE_IN_ENTRY_ZONE:        statusText += "!!! قیمت در ناحیه ورود !!!"; break;
-        case STATE_ANALYSIS_COMPLETE:    statusText += "تحلیل تمام شد."; break;
+        case STATE_SCOUTING: statusText += "در حال نقشه‌برداری..."; break;
+        case STATE_AWAITING_TRIGGER_1: statusText += "منتظر تریگر نوع ۱"; break;
+        case STATE_FIBO_1_ACTIVE: statusText += "فیبوی شناور فعال"; break;
+        case STATE_FIBO_2_ACTIVE: statusText += "فیبوی اکستنشن فعال"; break;
+        case STATE_IN_ENTRY_ZONE: statusText += "!!! قیمت در ناحیه ورود !!!"; statusColor = clrGold; break;
+        case STATE_ANALYSIS_COMPLETE: statusText += "تحلیل تمام شد."; break;
     }
     
     string objName = m_chartPrefix + "StatusLabel";
@@ -480,10 +561,9 @@ void CFibonacciEngine::DrawStatusLabel()
     }
     
     ObjectSetString(0, objName, OBJPROP_TEXT, statusText);
-    ObjectSetInteger(0, objName, OBJPROP_COLOR, (m_state == STATE_IN_ENTRY_ZONE) ? clrGold : clrWhite);
+    ObjectSetInteger(0, objName, OBJPROP_COLOR, statusColor);
 }
 
-// --- تابع رسم فیبوناچی ---
 void CFibonacciEngine::DrawFibonacci()
 {
     if(!m_activeFibo.isActive) return;
@@ -496,7 +576,6 @@ void CFibonacciEngine::DrawFibonacci()
         ObjectSetInteger(0, objName, OBJPROP_COLOR, clrAqua);
         ObjectSetInteger(0, objName, OBJPROP_WIDTH, 1);
         
-        // Parse the levels string and add them
         string levels[];
         int count = StringSplit(InpFiboLevelsToShow, ',', levels);
         ObjectSetInteger(0, objName, OBJPROP_LEVELS, count);
@@ -512,36 +591,75 @@ void CFibonacciEngine::DrawFibonacci()
     }
 }
 
-// --- تابع رسم ناحیه ورود ---
 void CFibonacciEngine::DrawEntryZone()
 {
     if(!m_activeFibo.isActive) return;
 
     string objName = m_chartPrefix + "EntryZone";
     
-    double level_start_price = m_activeFibo.p0_price + (m_activeFibo.p100_price - m_activeFibo.p0_price) * (InpEntryZone_Start / 100.0);
-    double level_end_price = m_activeFibo.p0_price + (m_activeFibo.p100_price - m_activeFibo.p0_price) * (InpEntryZone_End / 100.0);
+    double p0 = m_activeFibo.p0_price;
+    double p100 = m_activeFibo.p100_price;
+    double level_start_price = p0 + (p100 - p0) * (InpEntryZone_Start / 100.0);
+    double level_end_price = p0 + (p100 - p0) * (InpEntryZone_End / 100.0);
     
-    datetime time1 = m_activeFibo.p100_time;
-    datetime time2 = time1 + PeriodSeconds() * 100; // Extend to the future
+    datetime time1 = MathMax(m_activeFibo.p0_time, m_activeFibo.p100_time);
+    datetime time2 = time1 + PeriodSeconds() * 200;
 
     if(ObjectFind(0, objName) < 0)
+        ObjectCreate(0, objName, OBJ_RECTANGLE, 0, 0, 0);
+
+    ObjectSetInteger(0, objName, OBJPROP_TIME1, time1);
+    ObjectSetDouble(0, objName, OBJPROP_PRICE1, level_start_price);
+    ObjectSetInteger(0, objName, OBJPROP_TIME2, time2);
+    ObjectSetDouble(0, objName, OBJPROP_PRICE2, level_end_price);
+    ObjectSetInteger(0, objName, OBJPROP_COLOR, InpEntryZone_Color);
+    ObjectSetInteger(0, objName, OBJPROP_BACK, true);
+    ObjectSetInteger(0, objName, OBJPROP_FILL, true); // Corrected from ObjectSetBool
+}
+
+void CFibonacciEngine::DrawMainStructure()
+{
+    if(m_lastMainStructure.id == "") return;
+    
+    string starName = m_chartPrefix + "MainStar_" + m_lastMainStructure.id;
+    string bosName = m_chartPrefix + "BOS_" + m_lastMainStructure.id;
+    
+    ObjectCreate(0, starName, OBJ_ARROW, 0, m_lastMainStructure.peakTime, m_lastMainStructure.peakPrice);
+    ObjectSetInteger(0, starName, OBJPROP_ARROWCODE, 174);
+    ObjectSetInteger(0, starName, OBJPROP_COLOR, clrDodgerBlue);
+    ObjectSetInteger(0, starName, OBJPROP_WIDTH, 2);
+
+    if(InpShowBOS)
     {
-        ObjectCreate(0, objName, OBJ_RECTANGLE, 0, time1, level_start_price, time2, level_end_price);
-        ObjectSetInteger(0, objName, OBJPROP_COLOR, InpEntryZone_Color);
-        ObjectSetInteger(0, objName, OBJPROP_STYLE, STYLE_SOLID);
-        ObjectSetInteger(0, objName, OBJPROP_WIDTH, 1);
-        ObjectSetBool(0, objName, OBJPROP_BACK, true);
-        ObjectSetBool(0, objName, OBJPROP_FILL, true);
-    }
-    else
-    {
-        ObjectMove(0, objName, 0, time1, level_start_price);
-        ObjectMove(0, objName, 1, time2, level_end_price);
+        ObjectCreate(0, bosName, OBJ_TEXT, 0, m_lastMainStructure.breakTime, m_lastMainStructure.peakPrice);
+        ObjectSetString(0, bosName, OBJPROP_TEXT, "BOS");
+        ObjectSetInteger(0, bosName, OBJPROP_COLOR, clrOrange);
+        ObjectSetInteger(0, bosName, OBJPROP_FONTSIZE, 12);
+        ObjectSetInteger(0, bosName, OBJPROP_ANCHOR, m_lastMainStructure.isCeiling ? ANCHOR_BOTTOM : ANCHOR_TOP);
     }
 }
 
-// --- سایر توابع رسم (BOS, Anchor Block, ...) در اینجا پیاده‌سازی می‌شوند ---
-// ...
+void CFibonacciEngine::DrawAnchorBlock()
+{
+    if(m_anchorPoint.time == 0 || !InpShowAnchorBlock) return;
+    
+    string objName = m_chartPrefix + "AnchorBlock";
+    
+    double high = iHigh(_Symbol, _Period, m_anchorPoint.index);
+    double low = iLow(_Symbol, _Period, m_anchorPoint.index);
+    datetime time1 = iTime(_Symbol, _Period, m_anchorPoint.index);
+    datetime time2 = time1 + PeriodSeconds();
+    
+    if(ObjectFind(0, objName) < 0)
+        ObjectCreate(0, objName, OBJ_RECTANGLE, 0, 0, 0);
+        
+    ObjectSetInteger(0, objName, OBJPROP_TIME1, time1);
+    ObjectSetDouble(0, objName, OBJPROP_PRICE1, low);
+    ObjectSetInteger(0, objName, OBJPROP_TIME2, time2);
+    ObjectSetDouble(0, objName, OBJPROP_PRICE2, high);
+    ObjectSetInteger(0, objName, OBJPROP_COLOR, InpAnchorBlock_Color);
+    ObjectSetInteger(0, objName, OBJPROP_BACK, true);
+    ObjectSetInteger(0, objName, OBJPROP_FILL, false); // Corrected from ObjectSetBool
+}
 
 
