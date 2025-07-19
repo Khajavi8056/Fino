@@ -3,12 +3,12 @@
 //| کتابخانه‌ای برای رسم فیبوناچی‌های نوع اول (شناور) و نوع دوم (اکستنشن) |
 //| شناسایی سقف‌ها، کف‌ها، شکست‌ها و نقاط ورود با اندیکاتور Fineflow  |
 //| فقط آخرین فیبوناچی و سقف/کف شکسته‌شده روی چارت، مدیریت بهینه   |
-//| نسخه: 1.04                                                      |
+//| نسخه: 1.05                                                      |
 //| تاریخ: 2025-07-20                                              |
 //+------------------------------------------------------------------+
 
 #property copyright "Your Name"
-#property version   "1.04"
+#property version   "1.05"
 #property strict
 
 //--- شامل فایل‌های مورد نیاز
@@ -120,7 +120,7 @@ private:
    //--- توابع کمکی
    bool IsNewCandle();
    void ManageDataArrays();
-   void DrawGraphics(string type, double price, datetime time, string id, bool isCeiling = true);
+   void DrawGraphics(string type, double price, datetime time, string id, bool isCeiling = true, double highPrice = 0, double lowPrice = 0);
    void DrawStatusLabel();
    void ClearOldGraphics(datetime beforeTime = 0);
    bool FindMinorCorrection(datetime startTime, datetime endTime, bool isBullish, double &minorPrice, datetime &minorTime);
@@ -398,7 +398,7 @@ void CFibonacciEngine::ScoutForStructure()
             if(EnableLogging) Print("شکست در انتظار تأیید کف: ", m_valleys[j].id);
          }
       }
-      for(int j = 0; j < ArraySize(pendingBreaks); j++)
+      for(int j = ArraySize(pendingBreaks) - 1; j >= 0; j--)
       {
          if(pendingBreaks[j].breakTime > 0 && currentTime >= pendingBreaks[j].breakTime)
          {
@@ -421,20 +421,22 @@ void CFibonacciEngine::ScoutForStructure()
             }
             else // کف
             {
-               for(int k = 0; k < ArraySize(m_valleys);:// FibonacciEngine.mqh ادامه
-            {
-               if(m_valleys[k].id == pendingBreaks[j].id)
+               for(int k = 0; k < ArraySize(m_valleys); k++)
                {
-                  m_valleys[k].breakTime = currentTime;
-                  if(EnableLogging) Print("شکست تأیید شده کف: ", m_valleys[k].id);
-                  if(dominantStructure.breakTime == 0 || m_valleys[k].breakTime > dominantStructure.breakTime)
+                  if(m_valleys[k].id == pendingBreaks[j].id)
                   {
-                     dominantStructure = m_valleys[k];
-                     newBreakFound = true;
+                     m_valleys[k].breakTime = currentTime;
+                     if(EnableLogging) Print("شکست تأیید شده کف: ", m_valleys[k].id);
+                     if(dominantStructure.breakTime == 0 || m_valleys[k].breakTime > dominantStructure.breakTime)
+                     {
+                        dominantStructure = m_valleys[k];
+                        newBreakFound = true;
+                     }
+                     break;
                   }
-                  break;
                }
             }
+            ArrayRemove(pendingBreaks, j, 1); // حذف شکست تأییدشده از آرایه موقت
          }
       }
    }
@@ -473,7 +475,8 @@ void CFibonacciEngine::ScoutForStructure()
       //--- رسم گرافیک‌های جدید
       bool isCeiling = m_lastBrokenStructure.price > (ArraySize(m_valleys) > 0 ? m_valleys[0].price : 0);
       DrawGraphics("structure", m_lastBrokenStructure.price, m_lastBrokenStructure.time, m_lastBrokenStructure.id, isCeiling);
-      DrawGraphics("bos", iClose(_Symbol, _Period, 1), m_lastBrokenStructure.breakTime, m_lastBrokenStructure.id + "_BOS", isCeiling);
+      datetime bosTime = (BreakType == BREAK_SIMPLE) ? m_lastBrokenStructure.breakTime : currentTime;
+      DrawGraphics("bos", iClose(_Symbol, _Period, iBarShift(_Symbol, _Period, bosTime)), bosTime, m_lastBrokenStructure.id + "_BOS", isCeiling);
 
       //--- پیدا کردن اوردر بلاک میانی (لنگرگاه)
       double anchorPrice = 0;
@@ -1062,4 +1065,4 @@ void CFibonacciEngine::ResetAnalysis()
    DrawStatusLabel();
    if(EnableLogging) Print("تحلیل فیبوناچی ریست شد");
 }
-//+-----------------------------------------------------------------
+//+------------------------------------------------------------------+
