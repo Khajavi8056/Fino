@@ -1,6 +1,7 @@
 //+------------------------------------------------------------------+
-//| SimpleFibonacciTestExpert.mq5                                   |
-//| اکسپرت تست برای کتابخانه SimpleFibonacciEngine                |
+//| SimpleFiboTestExpert.mq5                                        |
+//| اکسپرت تست برای کتابخانه SimpleFibonacciEngine                 |
+//| فقط برای فراخوانی و تست رسم فیبوناچی و معاملات ساده          |
 //| نسخه: 1.00                                                     |
 //| تاریخ: 2025-07-20                                             |
 //+------------------------------------------------------------------+
@@ -13,12 +14,14 @@
 //--- شامل کتابخانه فیبوناچی
 #include <SimpleFibonacciEngine.mqh>
 
-//--- ورودی‌های اکسپرت (حداقل برای مدیریت معاملات)
+//--- شامل فایل‌های مورد نیاز
+#include <Trade\Trade.mqh>
+
+//--- ورودی‌های اکسپرت
 input group "تنظیمات معاملاتی"
 input double LotSize = 0.1; // حجم معامله
-input int StopLossPoints = 100; // استاپ لاس (به نقاط)
-input int TakeProfitPoints = 200; // تیک پرافیت (به نقاط)
-input bool EnableLogging = true; // فعال‌سازی لاگ‌ها
+input double StopLossMultiplier = 1.0; // ضریب استاپ‌لاس (بر اساس فاصله صفر تا 100 فیبو)
+input double TakeProfitMultiplier = 1.5; // ضریب تیک‌پرویت (بر اساس فاصله صفر تا 100 فیبو)
 
 //--- متغیرهای جهانی
 CSimpleFibonacciEngine fiboEngine; // نمونه از کتابخانه فیبوناچی
@@ -30,7 +33,7 @@ bool isInitialized = false; // وضعیت مقداردهی اولیه
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   //--- مقداردهی اولیه کتابخانه
+   //--- مقداردهی اولیه کتابخانه فیبوناچی
    if(!fiboEngine.Init())
    {
       Print("خطا در مقداردهی اولیه کتابخانه فیبوناچی");
@@ -43,7 +46,7 @@ int OnInit()
    trade.SetTypeFilling(ORDER_FILLING_IOC);
 
    isInitialized = true;
-   if(EnableLogging) Print("اکسپرت با موفقیت مقداردهی اولیه شد");
+   Print("اکسپرت با موفقیت مقداردهی اولیه شد");
    return(INIT_SUCCEEDED);
 }
 
@@ -54,7 +57,7 @@ void OnTick()
 {
    if(!isInitialized) return;
 
-   //--- بررسی ساختارهای بازار
+   //--- بررسی ساختارهای بازار (سقف‌ها، کف‌ها، شکست‌ها)
    fiboEngine.ScoutForStructure();
 
    //--- بررسی وضعیت فیبوناچی
@@ -69,35 +72,36 @@ void OnTick()
       //--- چک کردن اینکه معامله باز در جهت فعلی وجود نداشته باشه
       if(!PositionSelect(_Symbol))
       {
-         double sl = 0, tp = 0;
          double price = isBullish ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
          double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+
+         //--- محاسبه استاپ‌لاس و تیک‌پرویت بر اساس سطوح فیبوناچی
+         double fiboRange = MathAbs(fiboEngine.currentFibo.hundredLevel - fiboEngine.currentFibo.zeroLevel);
+         double sl = isBullish ? fiboEngine.currentFibo.zeroLevel : fiboEngine.currentFibo.zeroLevel + fiboRange * StopLossMultiplier;
+         double tp = isBullish ? fiboEngine.currentFibo.zeroLevel + fiboRange * TakeProfitMultiplier : 
+                               fiboEngine.currentFibo.zeroLevel - fiboRange * TakeProfitMultiplier;
 
          //--- تنظیم استاپ‌لاس و تیک‌پرویت
          if(isBullish)
          {
-            sl = price - StopLossPoints * point;
-            tp = price + TakeProfitPoints * point;
             if(trade.Buy(LotSize, _Symbol, price, sl, tp))
             {
-               if(EnableLogging) Print("معامله خرید باز شد: قیمت=", price, ", SL=", sl, ", TP=", tp);
+               Print("معامله خرید باز شد: قیمت=", price, ", SL=", sl, ", TP=", tp);
             }
             else
             {
-               if(EnableLogging) Print("خطا در باز کردن معامله خرید: ", trade.ResultRetcode());
+               Print("خطا در باز کردن معامله خرید: ", trade.ResultRetcode());
             }
          }
          else
          {
-            sl = price + StopLossPoints * point;
-            tp = price - TakeProfitPoints * point;
             if(trade.Sell(LotSize, _Symbol, price, sl, tp))
             {
-               if(EnableLogging) Print("معامله فروش باز شد: قیمت=", price, ", SL=", sl, ", TP=", tp);
+               Print("معامله فروش باز شد: قیمت=", price, ", SL=", sl, ", TP=", tp);
             }
             else
             {
-               if(EnableLogging) Print("خطا در باز کردن معامله فروش: ", trade.ResultRetcode());
+               Print("خطا در باز کردن معامله فروش: ", trade.ResultRetcode());
             }
          }
       }
@@ -106,13 +110,13 @@ void OnTick()
    //--- بررسی شرایط فیبوناچی (نگهبانی)
    fiboEngine.CheckConditions();
 
-   //--- اگر تحلیل باطل شده یا در انتظار هستیم، فیبوناچی جدید رسم کن
+   //--- اگر تحلیل باطل شده یا در انتظار ساختار جدید هستیم، فیبوناچی جدید رسم کن
    if(fiboStatus == STATUS_WAITING || fiboStatus == STATUS_INVALID)
    {
       bool isBuy = (fiboEngine.m_lastBrokenStructure.price > (ArraySize(fiboEngine.m_valleys) > 0 ? fiboEngine.m_valleys[0].price : 0)) ? false : true;
       if(fiboEngine.AnalyzeAndDrawFibo(isBuy))
       {
-         if(EnableLogging) Print("فیبوناچی جدید رسم شد: جهت=", isBuy ? "صعودی" : "نزولی");
+         Print("فیبوناچی جدید رسم شد: جهت=", isBuy ? "صعودی" : "نزولی");
       }
    }
 }
@@ -122,7 +126,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   if(EnableLogging) Print("اکسپرت متوقف شد. دلیل: ", reason);
+   Print("اکسپرت متوقف شد. دلیل: ", reason);
 }
 
 //+------------------------------------------------------------------+
