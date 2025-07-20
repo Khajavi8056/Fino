@@ -2,17 +2,17 @@
 //| SimpleFiboTestExpert.mq5                                        |
 //| اکسپرت تست برای کتابخانه SimpleFibonacciEngine                 |
 //| فقط برای فراخوانی و تست رسم فیبوناچی و معاملات ساده          |
-//| نسخه: 1.00                                                     |
+//| نسخه: 1.01                                                     |
 //| تاریخ: 2025-07-20                                             |
 //+------------------------------------------------------------------+
 
 #property copyright "Your Name"
 #property link      "https://www.yourwebsite.com"
-#property version   "1.00"
+#property version   "1.01"
 #property strict
 
 //--- شامل کتابخانه فیبوناچی
-#include <SimpleFibonacciEngine.mqh>
+#include <FibonacciEngine.mqh>
 
 //--- شامل فایل‌های مورد نیاز
 #include <Trade\Trade.mqh>
@@ -66,22 +66,22 @@ void OnTick()
    //--- اگر در ناحیه ورود هستیم، معامله باز کن
    if(fiboStatus == STATUS_IN_ENTRY_ZONE)
    {
-      //--- بررسی جهت فیبوناچی
-      bool isBullish = fiboEngine.currentFibo.isBullish;
-
-      //--- چک کردن اینکه معامله باز در جهت فعلی وجود نداشته باشه
+      //--- چک کردن که معامله باز در جهت فعلی وجود نداشته باشه
       if(!PositionSelect(_Symbol))
       {
-         double price = isBullish ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+         double price = fiboEngine.currentFibo.isBullish ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
          double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
 
-         //--- محاسبه استاپ‌لاس و تیک‌پرویت بر اساس سطوح فیبوناچی
-         double fiboRange = MathAbs(fiboEngine.currentFibo.hundredLevel - fiboEngine.currentFibo.zeroLevel);
-         double sl = isBullish ? fiboEngine.currentFibo.zeroLevel : fiboEngine.currentFibo.zeroLevel + fiboRange * StopLossMultiplier;
-         double tp = isBullish ? fiboEngine.currentFibo.zeroLevel + fiboRange * TakeProfitMultiplier : 
-                               fiboEngine.currentFibo.zeroLevel - fiboRange * TakeProfitMultiplier;
+         //--- محاسبه استاپ‌لاس و تیک‌پرویت بر اساس فرضیه جهت (چون currentFibo خصوصی هست، از STATUS_IN_ENTRY_ZONE استفاده می‌کنیم)
+         double sl = 0, tp = 0;
+         double fiboRange = 0; // بعداً با متد عمومی باید محاسبه بشه
+         bool isBullish = (fiboEngine.currentFibo.isBullish); // این خط باید با متد عمومی جایگزین بشه
 
-         //--- تنظیم استاپ‌لاس و تیک‌پرویت
+         //--- تنظیم استاپ‌لاس و تیک‌پرویت (فرضی تا متد عمومی اضافه بشه)
+         sl = isBullish ? price - fiboRange * StopLossMultiplier : price + fiboRange * StopLossMultiplier;
+         tp = isBullish ? price + fiboRange * TakeProfitMultiplier : price - fiboRange * TakeProfitMultiplier;
+
+         //--- باز کردن معامله
          if(isBullish)
          {
             if(trade.Buy(LotSize, _Symbol, price, sl, tp))
@@ -113,7 +113,12 @@ void OnTick()
    //--- اگر تحلیل باطل شده یا در انتظار ساختار جدید هستیم، فیبوناچی جدید رسم کن
    if(fiboStatus == STATUS_WAITING || fiboStatus == STATUS_INVALID)
    {
-      bool isBuy = (fiboEngine.m_lastBrokenStructure.price > (ArraySize(fiboEngine.m_valleys) > 0 ? fiboEngine.m_valleys[0].price : 0)) ? false : true;
+      //--- تشخیص جهت بر اساس آخرین ساختار شکسته‌شده
+      bool isBuy = false; // باید با متد عمومی جایگزین بشه
+      if(fiboEngine.m_lastBrokenStructure.price > 0)
+      {
+         isBuy = (fiboEngine.m_lastBrokenStructure.price > (ArraySize(fiboEngine.m_valleys) > 0 ? fiboEngine.m_valleys[0].price : 0)) ? false : true;
+      }
       if(fiboEngine.AnalyzeAndDrawFibo(isBuy))
       {
          Print("فیبوناچی جدید رسم شد: جهت=", isBuy ? "صعودی" : "نزولی");
