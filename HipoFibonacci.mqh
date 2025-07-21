@@ -269,11 +269,7 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]) {
-   ArraySetAsSeries(high, true);
-   ArraySetAsSeries(low, true);
-   ArraySetAsSeries(open, true);
-   ArraySetAsSeries(close, true);
-   ArraySetAsSeries(time, true);
+   if(currentStatus == WAITING_FOR_COMMAND) return;
 
    rates_total = rates_total_input;
    ArrayResize(high, rates_total);
@@ -281,11 +277,20 @@ void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &ti
    ArrayResize(open, rates_total);
    ArrayResize(close, rates_total);
    ArrayResize(time, rates_total);
+
+   // 1. اول داده‌ها را کپی کن
    ArrayCopy(high, high_input, 0, 0, rates_total);
    ArrayCopy(low, low_input, 0, 0, rates_total);
    ArrayCopy(open, open_input, 0, 0, rates_total);
    ArrayCopy(close, close_input, 0, 0, rates_total);
    ArrayCopy(time, time_input, 0, 0, rates_total);
+
+   // 2. حالا که آرایه‌ها پر شدن، به متاتریدر بگو چطور بخوندشون
+   ArraySetAsSeries(high, true);
+   ArraySetAsSeries(low, true);
+   ArraySetAsSeries(open, true);
+   ArraySetAsSeries(close, true);
+   ArraySetAsSeries(time, true);
 
    if(signalType == SIGNAL_BUY) ProcessBuyLogic();
    else if(signalType == SIGNAL_SELL) ProcessSellLogic();
@@ -552,8 +557,8 @@ void CHipoFibonacci::ProcessSellLogic() {
             finalPoint.price = low[1];
             finalPoint.time = time[1];
             finalPoint.position = 1;
+            if(settings.Enable_Logging) Print("آپدیت کف نهایی سناریو ۲ در قیمت ", finalPoint.price, " در ", TimeToString(finalPoint.time));
             if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.IntermediateFibo_Color, "Scenario2");
-            if(settings.Enable_Logging && finalPoint.price > 0) Print("آپدیت کف نهایی سناریو ۲ در قیمت ", finalPoint.price, " در ", TimeToString(finalPoint.time));
          }
          if(low[1] > finalPoint.price && finalPoint.price > 0) {
             if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.SellEntryFibo_Color, "Scenario2");
@@ -594,7 +599,7 @@ void CHipoFibonacci::ProcessSellLogic() {
 }
 
 //+------------------------------------------------------------------+
-//| یافتن لگ حرکتی (نسخه بهینه و حرفه‌ای)                             |
+//| یافتن لگ حرکتی (نسخه نهایی، بهینه و حرفه‌ای)                       |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out) {
