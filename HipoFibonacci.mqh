@@ -2,14 +2,13 @@
 //| HipoFibonacci.mqh                                                |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 2.5 (پاکسازی کامل، Sleep برای اطمینان، رنگ مستقیم)         |
+//| نسخه: 2.4 (با تابع DrawFibo ضدضربه برای حل باگ رنگ متاتریدر)     |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "2.5"
+#property version   "2.4"
 #property strict
-#include <WinUser32.mqh> // برای استفاده از Sleep
 
 //+------------------------------------------------------------------+
 //| تعریف انوم‌ها (Enums)                                            |
@@ -89,13 +88,14 @@ private:
    datetime time[];
    int rates_total;
 
-   void ResetState(); // تابع مرکزی برای ریست کردن و پاکسازی کامل
+   void ResetState(); // تابع مرکزی برای ریست کردن و پاکسازی
    bool FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out);
    void CreateStatusPanel();
    void UpdateStatusPanel();
    void DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario = "");
    void DrawLegPoints(); // رسم نقاط به‌جای خطوط
-   void DeleteAllObjects(); // حذف همه آبجکت‌های چارت
+   void DeleteFiboObjects();
+   void DeleteLegPoints(); // حذف نقاط
    double CalculateFiboLevelPrice(E_FiboType type, double level);
    void ProcessBuyLogic();
    void ProcessSellLogic();
@@ -128,7 +128,12 @@ CHipoFibonacci::CHipoFibonacci() {
 //+------------------------------------------------------------------+
 
 CHipoFibonacci::~CHipoFibonacci() {
-   DeleteAllObjects();
+   ResetState();
+   ObjectDelete(0, "HipoFibonacci_Panel_BG");
+   ObjectDelete(0, "HipoFibonacci_Panel_Title");
+   ObjectDelete(0, "HipoFibonacci_Panel_Separator");
+   ObjectDelete(0, "HipoFibonacci_Panel_Status");
+   ObjectDelete(0, "HipoFibonacci_Panel_Signal");
 }
 
 //+------------------------------------------------------------------+
@@ -175,21 +180,19 @@ void CHipoFibonacci::Init(HipoSettings &inputSettings) {
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe) {
-   // پاکسازی کامل همه آبجکت‌ها قبل از اجرای دستور جدید
-   DeleteAllObjects();
-
-   // تأخیر کوچک برای اطمینان از پردازش کامل
-   Sleep(1);
-
    if(isInFocusMode && type != STOP_SEARCH) {
       if(settings.Enable_Logging) Print("[HipoFibo] New command ignored due to Focus Mode.");
       return;
    }
 
-   signalType = type;
-   settings.CalculationTimeframe = timeframe == 0 ? PERIOD_CURRENT : timeframe;
-   currentStatus = SEARCHING_FOR_LEG;
-   if(settings.Enable_Logging) Print("دریافت دستور ", EnumToString(type), " در تایم‌فریم ", EnumToString(timeframe));
+   ResetState(); // تمیزکاری قبل از هر دستور جدید
+
+   if(type != STOP_SEARCH) {
+      signalType = type;
+      settings.CalculationTimeframe = timeframe == 0 ? PERIOD_CURRENT : timeframe;
+      currentStatus = SEARCHING_FOR_LEG;
+      if(settings.Enable_Logging) Print("دریافت دستور ", EnumToString(type), " در تایم‌فریم ", EnumToString(timeframe));
+   }
    UpdateStatusPanel();
 }
 
@@ -235,10 +238,8 @@ void CHipoFibonacci::OnNewCandle(const MqlRates &rates[]) {
 
 void CHipoFibonacci::OnTradePerformed() {
    if(isEntryZoneActive) {
-      DeleteAllObjects();
-      Sleep(1);
       ResetState();
-      if(settings.Enable_Logging) Print("معامله انجام شد، ساختار و آبجکت‌ها ریست شد.");
+      if(settings.Enable_Logging) Print("معامله انجام شد، ساختار ریست شد.");
    }
 }
 
@@ -595,15 +596,15 @@ void CHipoFibonacci::DrawLegPoints() {
 }
 
 //+------------------------------------------------------------------+
-//| حذف همه آبجکت‌های چارت (DeleteAllObjects)                      |
+//| حذف نقاط لگ (DeleteLegPoints)                                    |
 //+------------------------------------------------------------------+
 
-void CHipoFibonacci::DeleteAllObjects() {
+void CHipoFibonacci::DeleteLegPoints() {
+   string prefix = "HipoPoint_" + TimeToString(anchorID);
    for(int i = ObjectsTotal(0, 0, -1) - 1; i >= 0; i--) {
       string name = ObjectName(0, i);
-      ObjectDelete(0, name);
+      if(StringFind(name, prefix) >= 0) ObjectDelete(0, name);
    }
-   if(settings.Enable_Logging) Print("[HipoFibo] All objects deleted from chart.");
 }
 
 //+------------------------------------------------------------------+
@@ -692,37 +693,46 @@ void CHipoFibonacci::UpdateStatusPanel() {
 }
 
 //+------------------------------------------------------------------+
-//| رسم فیبوناچی (نسخه مستقیم با رنگ اولیه و تأییدیه)               |
+//| رسم فیبوناچی (نسخه نهایی و ضدضربه برای حل باگ رنگ متاتریدر)      |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario) {
    string name = "HipoFibo_" + EnumToString(type) + "_" + TimeToString(anchorID);
    if(scenario != "") name += "_" + scenario;
 
-   // ساخت مستقیم با رنگ مشخص‌شده
-   if(!ObjectCreate(0, name, OBJ_FIBO, 0, time1, price1, time2, price2)) {
-      if(settings.Enable_Logging) Print("[HipoFibo] Failed to create ", name, ", error: ", GetLastError());
-      return;
+   // مرحله ۱: ساخت آبجکت با مختصات موقت (هر دو نقطه در شروع)
+   if(!ObjectCreate(0, name, OBJ_FIBO, 0, time1, price1, time1, price1)) {
+      // اگر ساخت ناموفق بود، سعی کن مشخصاتش رو تغییر بدی
+      ObjectSetInteger(0, name, OBJPROP_TIME, 0, time1);
+      ObjectSetDouble(0, name, OBJPROP_PRICE, 0, price1);
    }
 
-   // اعمال مشخصات بلافاصله بعد از ساخت
+   // مرحله ۲: تنظیم تمام مشخصات (رنگ، استایل، سطوح و ...)
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
    ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
    ObjectSetString(0, name, OBJPROP_TEXT, scenario != "" ? scenario : EnumToString(type));
    
-   // تنظیم سطوح فیبوناچی
    ObjectSetInteger(0, name, OBJPROP_LEVELS, settings.FibonacciLevelsCount);
    for(int i = 0; i < settings.FibonacciLevelsCount; i++) {
       ObjectSetDouble(0, name, OBJPROP_LEVELVALUE, i, settings.FibonacciLevels[i] / 100.0);
       ObjectSetString(0, name, OBJPROP_LEVELTEXT, i, DoubleToString(settings.FibonacciLevels[i], 1) + "%");
    }
 
-   // چک نهایی برای اطمینان از رنگ
-   if(ObjectGetInteger(0, name, OBJPROP_COLOR) != clr) {
-      ObjectSetInteger(0, name, OBJPROP_COLOR, clr); // دوباره اعمال کن اگه درست نشد
-      if(settings.Enable_Logging) Print("[HipoFibo] Color corrected for ", name);
+   // مرحله ۳: حالا که همه چیز تنظیم شد، نقطه دوم را به مکان نهایی منتقل کن
+   ObjectMove(0, name, 1, time2, price2);
+}
+
+//+------------------------------------------------------------------+
+//| حذف اشیاء فیبوناچی (DeleteFiboObjects)                         |
+//+------------------------------------------------------------------+
+
+void CHipoFibonacci::DeleteFiboObjects() {
+   string prefix = "HipoFibo_" + TimeToString(anchorID);
+   for(int i = ObjectsTotal(0, 0, -1) - 1; i >= 0; i--) {
+      string name = ObjectName(0, i);
+      if(StringFind(name, prefix) >= 0) ObjectDelete(0, name);
    }
 }
 
@@ -757,6 +767,10 @@ double CHipoFibonacci::CalculateFiboLevelPrice(E_FiboType type, double level) {
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::ResetState() {
+   if(anchorID != 0) { // فقط اگر ساختار فعالی وجود داشت پاک کن
+      DeleteFiboObjects();
+      DeleteLegPoints();
+   }
    signalType = STOP_SEARCH;
    currentStatus = WAITING_FOR_COMMAND;
    anchorID = 0;
