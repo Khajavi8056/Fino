@@ -2,18 +2,18 @@
 //| HipoFibonacci.mqh                                                |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 1.8                                                        |
-//| توضیحات: این فایل شامل کلاس CHipoFibonacci است که برای شناسایی نقاط چرخش بازار با استفاده از اندیکاتور Fineflow، رسم سطوح فیبوناچی و مدیریت استراتژی‌های معاملاتی در متاتریدر 5 طراحی شده است. |
+//| نسخه: 2.0                                                        |
+//| توضیحات: این فایل شامل کلاس CHipoFibonacci است که برای شناسایی لگ‌های حرکتی بازار با تأخیر صفر، رسم سطوح فیبوناچی و مدیریت استراتژی‌های معاملاتی در متاتریدر 5 طراحی شده است. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.8"
+#property version   "2.0"
 #property strict
 
 //+------------------------------------------------------------------+
 //| تعریف انوم‌ها (Enums)                                            |
-//| این بخش شامل انوم‌هایی است که برای دسته‌بندی نوع سیگنال‌ها، وضعیت‌ها، نوع فیبوناچی و روش‌های تشخیص استفاده می‌شوند. |
+//| این بخش شامل انوم‌هایی است که برای دسته‌بندی نوع سیگنال‌ها، وضعیت‌ها و نوع فیبوناچی استفاده می‌شوند. |
 //+------------------------------------------------------------------+
 
 enum E_SignalType {
@@ -24,10 +24,8 @@ enum E_SignalType {
 
 enum E_Status {
    WAITING_FOR_COMMAND,            // منتظر دریافت دستور
-   SEARCHING_FOR_ANCHOR_LOW,       // جستجوی نقطه پایین لنگرگاه
-   SEARCHING_FOR_ANCHOR_HIGH,      // جستجوی نقطه بالای لنگرگاه
+   SEARCHING_FOR_LEG,              // جستجوی لگ حرکتی
    MONITORING_SCENARIO_1_PROGRESS, // پایش پیشرفت سناریو 1
-   SCENARIO_1_AWAITING_PULLBACK,   // سناریو 1 - انتظار برای پولبک
    SCENARIO_1_AWAITING_BREAKOUT,   // سناریو 1 - انتظار برای شکست
    SCENARIO_1_CONFIRMED_AWAITING_ENTRY, // سناریو 1 - انتظار برای ورود تأیید شده
    SCENARIO_2_ACTIVE_TARGETING_EXTENSION, // پایش سناریو 2 و هدف‌گذاری اکستنشن
@@ -41,25 +39,9 @@ enum E_FiboType {
    FIBO_FINAL          // سطح فیبوناچی نهایی
 };
 
-enum E_DetectionMethod {
-   METHOD_SIMPLE,                // روش ساده
-   METHOD_SEQUENTIAL,            // روش ترتیبی
-   METHOD_POWER_SWING,           // روش نوسان قدرتی
-   METHOD_ZIGZAG,                // روش زیgzاگ
-   METHOD_BREAK_OF_STRUCTURE,    // روش شکست ساختار
-   METHOD_MARKET_STRUCTURE_SHIFT // روش تغییر ساختار بازار
-};
-
-enum E_SequentialCriterion {
-   CRITERION_HIGH,  // معیار بالا
-   CRITERION_LOW,   // معیار پایین
-   CRITERION_OPEN,  // معیار باز
-   CRITERION_CLOSE  // معیار بسته
-};
-
 //+------------------------------------------------------------------+
 //| تعریف ساختارها (Structures)                                       |
-//| این بخش شامل ساختارهایی برای ذخیره تنظیمات و نقاط چرخش است.       |
+//| این بخش شامل ساختارهایی برای ذخیره تنظیمات و نقاط لگ است.       |
 //+------------------------------------------------------------------+
 
 struct PeakValley {
@@ -70,23 +52,12 @@ struct PeakValley {
 
 struct HipoSettings {
    ENUM_TIMEFRAMES CalculationTimeframe; // تایم‌فریم محاسبات
-   ENUM_TIMEFRAMES ExecutionTimeframe;   // تایم‌فریم اجرایی اندیکاتور
    bool Enable_Drawing;                  // فعال‌سازی رسم
    bool Enable_Logging;                  // فعال‌سازی لاگ
    bool Enable_Status_Panel;             // فعال‌سازی پنل وضعیت
    int MaxCandles;                       // حداکثر تعداد کندل‌ها
    double MarginPips;                    // حاشیه به پیپ
-
-   bool EnforceStrictSequence;           // اجبار به ترتیب دقیق
-   E_DetectionMethod DetectionMethod;    // روش تشخیص
-   int Lookback;                         // بازه نگاه به عقب
-   int SequentialLookback;               // بازه نگاه به عقب ترتیبی
-   bool UseStrictSequential;             // استفاده از ترتیب دقیق
-   E_SequentialCriterion SequentialCriterion; // معیار ترتیبی
-   int AtrPeriod;                        // دوره ATR
-   double AtrMultiplier;                 // ضریب ATR
-   int ZigZagDepth;                      // عمق زیgzاگ
-   double ZigZagDeviation;               // انحراف زیgzاگ
+   int KingPeakLookback;                 // بازه نگاه به عقب برای قله/دره پادشاه
 
    double EntryZone_LowerLevel;          // سطح پایین ناحیه ورود
    double EntryZone_UpperLevel;          // سطح بالا ناحیه ورود
@@ -103,7 +74,7 @@ struct HipoSettings {
 
 //+------------------------------------------------------------------+
 //| کلاس CHipoFibonacci                                              |
-//| این کلاس اصلی برای مدیریت منطق تشخیص نقاط با اندیکاتور Fineflow و رسم سطوح است. |
+//| این کلاس اصلی برای مدیریت منطق تشخیص لگ و رسم سطوح است.         |
 //+------------------------------------------------------------------+
 
 class CHipoFibonacci {
@@ -119,21 +90,24 @@ private:
    datetime entryZoneActivationTime;
    string finalFiboScenario;
    bool isEntryZoneActive;
-   int handleFineflow;                   // هندل اندیکاتور Fineflow
-   int handleATR;                        // هندل اندیکاتور ATR
-   double atrBuffer[];
-   double peakBuffer[];
-   double valleyBuffer[];
+   bool isInFocusMode;
+   double high[];
+   double low[];
+   double open[];
+   double close[];
+   datetime time[];
+   int rates_total;
 
+   bool FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out); // یافتن لگ حرکتی
    void CreateStatusPanel();          // ایجاد پنل وضعیت
    void UpdateStatusPanel();          // به‌روزرسانی پنل وضعیت
    void DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario = ""); // رسم فیبوناچی
+   void DrawLegLines();               // رسم خطوط لگ
    void DeleteFiboObjects();          // حذف اشیاء فیبوناچی
+   void DeleteLegLines();             // حذف خطوط لگ
    double CalculateFiboLevelPrice(E_FiboType type, double level); // محاسبه قیمت سطح فیبوناچی
-   void ProcessBuyLogic(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]); // پردازش منطق خرید
-   void ProcessSellLogic(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]); // پردازش منطق فروش
-   bool FindValley(const int rates_total, datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], datetime startTime = 0); // یافتن دره
-   bool FindPeak(const int rates_total, datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], datetime startTime = 0); // یافتن قله
+   void ProcessBuyLogic();            // پردازش منطق خرید
+   void ProcessSellLogic();           // پردازش منطق فروش
 
 public:
    CHipoFibonacci();                  // سازنده
@@ -141,7 +115,7 @@ public:
 
    void Init(HipoSettings &inputSettings); // تنظیم اولیه
    void ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe); // دریافت دستور
-   void OnNewCandle(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]); // پردازش کندل جدید
+   void OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]); // پردازش کندل جدید
    bool IsEntryZoneActive() { return isEntryZoneActive; } // بررسی فعال بودن ناحیه ورود
    datetime GetEntryZoneActivationTime() { return entryZoneActivationTime; } // دریافت زمان فعال‌سازی ناحیه ورود
    string GetFinalFiboScenario() { return finalFiboScenario; } // دریافت سناریوی نهایی
@@ -173,11 +147,7 @@ CHipoFibonacci::CHipoFibonacci() {
    entryZoneActivationTime = 0;
    finalFiboScenario = "";
    isEntryZoneActive = false;
-   handleFineflow = INVALID_HANDLE;
-   handleATR = INVALID_HANDLE;
-   ArrayInitialize(atrBuffer, 0);
-   ArrayInitialize(peakBuffer, 0);
-   ArrayInitialize(valleyBuffer, 0);
+   isInFocusMode = false;
 }
 
 //+------------------------------------------------------------------+
@@ -186,10 +156,10 @@ CHipoFibonacci::CHipoFibonacci() {
 //+------------------------------------------------------------------+
 
 CHipoFibonacci::~CHipoFibonacci() {
-   if(handleFineflow != INVALID_HANDLE) IndicatorRelease(handleFineflow);
-   if(handleATR != INVALID_HANDLE) IndicatorRelease(handleATR);
    DeleteFiboObjects();
+   DeleteLegLines();
    ObjectDelete(0, "HipoFibonacci_Panel");
+   ObjectDelete(0, "HipoFibonacci_Panel_BG");
 }
 
 //+------------------------------------------------------------------+
@@ -199,23 +169,12 @@ CHipoFibonacci::~CHipoFibonacci() {
 
 void CHipoFibonacci::Init(HipoSettings &inputSettings) {
    settings.CalculationTimeframe = inputSettings.CalculationTimeframe == 0 ? PERIOD_CURRENT : inputSettings.CalculationTimeframe;
-   settings.ExecutionTimeframe = inputSettings.ExecutionTimeframe == 0 ? PERIOD_CURRENT : inputSettings.ExecutionTimeframe;
    settings.Enable_Drawing = inputSettings.Enable_Drawing;
    settings.Enable_Logging = inputSettings.Enable_Logging;
    settings.Enable_Status_Panel = inputSettings.Enable_Status_Panel;
    settings.MaxCandles = inputSettings.MaxCandles > 0 ? inputSettings.MaxCandles : 500;
    settings.MarginPips = inputSettings.MarginPips > 0 ? inputSettings.MarginPips : 1.0;
-
-   settings.EnforceStrictSequence = inputSettings.EnforceStrictSequence;
-   settings.DetectionMethod = inputSettings.DetectionMethod;
-   settings.Lookback = inputSettings.Lookback > 0 ? inputSettings.Lookback : 3;
-   settings.SequentialLookback = inputSettings.SequentialLookback > 0 ? inputSettings.SequentialLookback : 2;
-   settings.UseStrictSequential = inputSettings.UseStrictSequential;
-   settings.SequentialCriterion = inputSettings.SequentialCriterion;
-   settings.AtrPeriod = inputSettings.AtrPeriod > 0 ? inputSettings.AtrPeriod : 14;
-   settings.AtrMultiplier = inputSettings.AtrMultiplier > 0 ? inputSettings.AtrMultiplier : 2.5;
-   settings.ZigZagDepth = inputSettings.ZigZagDepth > 0 ? inputSettings.ZigZagDepth : 12;
-   settings.ZigZagDeviation = inputSettings.ZigZagDeviation > 0 ? inputSettings.ZigZagDeviation : 5.0;
+   settings.KingPeakLookback = inputSettings.KingPeakLookback > 0 ? inputSettings.KingPeakLookback : 100;
 
    settings.EntryZone_LowerLevel = inputSettings.EntryZone_LowerLevel > 0 ? inputSettings.EntryZone_LowerLevel : 50.0;
    settings.EntryZone_UpperLevel = inputSettings.EntryZone_UpperLevel > settings.EntryZone_LowerLevel ? inputSettings.EntryZone_UpperLevel : 68.0;
@@ -240,20 +199,6 @@ void CHipoFibonacci::Init(HipoSettings &inputSettings) {
    settings.BuyEntryFibo_Color = inputSettings.BuyEntryFibo_Color == clrNONE ? clrLightGreen : inputSettings.BuyEntryFibo_Color;
    settings.SellEntryFibo_Color = inputSettings.SellEntryFibo_Color == clrNONE ? clrRed : inputSettings.SellEntryFibo_Color;
 
-   ArrayResize(atrBuffer, settings.MaxCandles);
-   ArrayResize(peakBuffer, settings.MaxCandles);
-   ArrayResize(valleyBuffer, settings.MaxCandles);
-
-   // ایجاد هندل اندیکاتور Fineflow
-   handleFineflow = iCustom(_Symbol, settings.ExecutionTimeframe, "Fineflow", settings.EnforceStrictSequence, settings.DetectionMethod, settings.Lookback, settings.SequentialLookback, settings.UseStrictSequential, settings.SequentialCriterion, settings.AtrPeriod, settings.AtrMultiplier, settings.ZigZagDepth, settings.ZigZagDeviation, settings.Enable_Logging);
-   if(handleFineflow == INVALID_HANDLE && settings.Enable_Logging) Print("خطا در ایجاد هندل Fineflow");
-
-   // ایجاد هندل ATR برای روش Power Swing
-   if(settings.DetectionMethod == METHOD_POWER_SWING) {
-      handleATR = iATR(_Symbol, settings.ExecutionTimeframe, settings.AtrPeriod);
-      if(handleATR == INVALID_HANDLE && settings.Enable_Logging) Print("خطا در ایجاد هندل ATR");
-   }
-
    if(settings.Enable_Status_Panel) CreateStatusPanel();
 }
 
@@ -263,9 +208,15 @@ void CHipoFibonacci::Init(HipoSettings &inputSettings) {
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe) {
+   if(isInFocusMode && type != STOP_SEARCH) {
+      if(settings.Enable_Logging) Print("[HipoFibo] New command received, but system is in 'Focus Mode'. New command ignored.");
+      return;
+   }
+
    if(type == STOP_SEARCH) {
       if(settings.Enable_Logging) Print("دریافت دستور توقف جستجو");
       DeleteFiboObjects();
+      DeleteLegLines();
       signalType = STOP_SEARCH;
       currentStatus = WAITING_FOR_COMMAND;
       anchorID = 0;
@@ -284,15 +235,12 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
       isEntryZoneActive = false;
       entryZoneActivationTime = 0;
       finalFiboScenario = "";
+      isInFocusMode = false;
       UpdateStatusPanel();
    } else {
       signalType = type;
-      settings.ExecutionTimeframe = timeframe == 0 ? PERIOD_CURRENT : timeframe;
-      // بازسازی هندل Fineflow با تایم‌فریم جدید
-      if(handleFineflow != INVALID_HANDLE) IndicatorRelease(handleFineflow);
-      handleFineflow = iCustom(_Symbol, settings.ExecutionTimeframe, "Fineflow", settings.EnforceStrictSequence, settings.DetectionMethod, settings.Lookback, settings.SequentialLookback, settings.UseStrictSequential, settings.SequentialCriterion, settings.AtrPeriod, settings.AtrMultiplier, settings.ZigZagDepth, settings.ZigZagDeviation, settings.Enable_Logging);
-      if(handleFineflow == INVALID_HANDLE && settings.Enable_Logging) Print("خطا در بازسازی هندل Fineflow با تایم‌فریم جدید");
-      currentStatus = (type == SIGNAL_BUY) ? SEARCHING_FOR_ANCHOR_LOW : SEARCHING_FOR_ANCHOR_HIGH;
+      settings.CalculationTimeframe = timeframe == 0 ? PERIOD_CURRENT : timeframe;
+      currentStatus = SEARCHING_FOR_LEG;
       anchorID = 0;
       anchor.price = 0;
       anchor.time = 0;
@@ -309,6 +257,7 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
       isEntryZoneActive = false;
       entryZoneActivationTime = 0;
       finalFiboScenario = "";
+      isInFocusMode = false;
       if(settings.Enable_Logging) Print("دریافت دستور ", EnumToString(type), " در تایم‌فریم ", EnumToString(timeframe));
       UpdateStatusPanel();
    }
@@ -319,72 +268,25 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
 //| این تابع با دریافت داده‌های جدید کندل، منطق را به‌روزرسانی می‌کند. |
 //+------------------------------------------------------------------+
 
-void CHipoFibonacci::OnNewCandle(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]) {
+void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]) {
    if(currentStatus == WAITING_FOR_COMMAND) return;
 
-   // کپی داده‌های اندیکاتور Fineflow
-   if(CopyBuffer(handleFineflow, 0, 0, MathMin(rates_total, settings.MaxCandles), peakBuffer) <= 0 ||
-      CopyBuffer(handleFineflow, 1, 0, MathMin(rates_total, settings.MaxCandles), valleyBuffer) <= 0) {
-      if(settings.Enable_Logging) Print("خطا در کپی بافرهای Fineflow");
-      return;
-   }
+   rates_total = rates_total_input;
+   ArrayResize(high, rates_total);
+   ArrayResize(low, rates_total);
+   ArrayResize(open, rates_total);
+   ArrayResize(close, rates_total);
+   ArrayResize(time, rates_total);
+   ArrayCopy(high, high_input, 0, 0, rates_total);
+   ArrayCopy(low, low_input, 0, 0, rates_total);
+   ArrayCopy(open, open_input, 0, 0, rates_total);
+   ArrayCopy(close, close_input, 0, 0, rates_total);
+   ArrayCopy(time, time_input, 0, 0, rates_total);
 
-   // کپی داده‌های ATR برای روش Power Swing
-   if(settings.DetectionMethod == METHOD_POWER_SWING && handleATR != INVALID_HANDLE) {
-      if(CopyBuffer(handleATR, 0, 0, MathMin(rates_total, settings.MaxCandles), atrBuffer) <= 0) {
-         if(settings.Enable_Logging) Print("خطا در کپی مقادیر ATR");
-         return;
-      }
-   }
-
-   if(signalType == SIGNAL_BUY) ProcessBuyLogic(rates_total, time, open, high, low, close);
-   else if(signalType == SIGNAL_SELL) ProcessSellLogic(rates_total, time, open, high, low, close);
+   if(signalType == SIGNAL_BUY) ProcessBuyLogic();
+   else if(signalType == SIGNAL_SELL) ProcessSellLogic();
 
    UpdateStatusPanel();
-}
-
-//+------------------------------------------------------------------+
-//| یافتن دره (Find Valley)                                          |
-//| این تابع نقاط پایین (دره) را از بافر اندیکاتور Fineflow می‌خواند. |
-//| حرکت از جدید (اندیس 0) به قدیم و یافتن اولین دره معتبر از زمان شروع. |
-//+------------------------------------------------------------------+
-
-bool CHipoFibonacci::FindValley(const int rates_total, datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], datetime startTime) {
-   int startIdx = (startTime == 0) ? 0 : -1; // شروع از جدیدترین کندل مگر اینکه زمان خاصی مشخص شده باشد
-   for(int i = 0; i < MathMin(rates_total, settings.MaxCandles); i++) {
-      if(time[i] <= startTime || startTime == 0) {
-         if(valleyBuffer[i] > 0) {
-            localPrice = valleyBuffer[i];
-            localTime = time[i];
-            localPosition = i;
-            return true;
-         }
-         if(startIdx == -1) startIdx = i; // تنظیم اندیس شروع اگر زمان خاص داده شده باشد
-      }
-   }
-   return false;
-}
-
-//+------------------------------------------------------------------+
-//| یافتن قله (Find Peak)                                            |
-//| این تابع نقاط بالا (قله) را از بافر اندیکاتور Fineflow می‌خواند. |
-//| حرکت از جدید (اندیس 0) به قدیم و یافتن اولین قله معتبر از زمان شروع. |
-//+------------------------------------------------------------------+
-
-bool CHipoFibonacci::FindPeak(const int rates_total, datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], datetime startTime) {
-   int startIdx = (startTime == 0) ? 0 : -1; // شروع از جدیدترین کندل مگر اینکه زمان خاصی مشخص شده باشد
-   for(int i = 0; i < MathMin(rates_total, settings.MaxCandles); i++) {
-      if(time[i] <= startTime || startTime == 0) {
-         if(peakBuffer[i] > 0) {
-            localPrice = peakBuffer[i];
-            localTime = time[i];
-            localPosition = i;
-            return true;
-         }
-         if(startIdx == -1) startIdx = i; // تنظیم اندیس شروع اگر زمان خاص داده شده باشد
-      }
-   }
-   return false;
 }
 
 //+------------------------------------------------------------------+
@@ -392,29 +294,22 @@ bool CHipoFibonacci::FindPeak(const int rates_total, datetime &localTime, double
 //| این تابع منطق مربوط به استراتژی خرید را مدیریت می‌کند.           |
 //+------------------------------------------------------------------+
 
-void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]) {
-   if(currentStatus == SEARCHING_FOR_ANCHOR_LOW) {
-      datetime localTime;
-      double localPrice;
-      int localPosition;
-      if(FindValley(rates_total, localTime, localPrice, localPosition, time)) {
-         anchor.price = localPrice;
-         anchor.time = localTime;
-         anchor.position = localPosition;
-         anchorID = localTime;
-         datetime peakTime;
-         double peakPrice;
-         int peakPosition;
-         if(FindPeak(rates_total, peakTime, peakPrice, peakPosition, time, localTime)) {
-            mother.price = peakPrice;
-            mother.time = peakTime;
-            mother.position = peakPosition;
-            if(settings.Enable_Drawing) DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
-            if(settings.Enable_Logging) Print("Anchor_Low یافت شد در قیمت ", localPrice, " در ", TimeToString(localTime), ", Mother_High در ", peakPrice);
-            currentStatus = MONITORING_SCENARIO_1_PROGRESS;
+void CHipoFibonacci::ProcessBuyLogic() {
+   if(currentStatus == SEARCHING_FOR_LEG && !isInFocusMode) {
+      PeakValley localMother, localAnchor;
+      if(FindHipoLeg(localMother, localAnchor)) {
+         mother = localMother;
+         anchor = localAnchor;
+         anchorID = localAnchor.time;
+         isInFocusMode = true;
+         if(settings.Enable_Drawing) {
+            DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
+            DrawLegLines();
          }
+         if(settings.Enable_Logging) Print("لگ خرید یافت شد: Mother_High در قیمت ", mother.price, " در ", TimeToString(mother.time), ", Anchor_Low در ", anchor.price);
+         currentStatus = MONITORING_SCENARIO_1_PROGRESS;
       } else {
-         if(settings.Enable_Logging) Print("هیچ دره‌ای در ", settings.MaxCandles, " کندل یافت نشد");
+         if(settings.Enable_Logging) Print("[HipoFibo] Not enough candle data to find a leg");
       }
    }
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
@@ -422,11 +317,16 @@ void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       if(high[1] > mother.price) {
          currentStatus = SCENARIO_2_ACTIVE_TARGETING_EXTENSION;
+         temporary.price = 0;
+         temporary.time = 0;
+         temporary.position = 0;
          finalPoint.price = 0;
          finalPoint.time = 0;
          finalPoint.position = 0;
@@ -449,7 +349,9 @@ void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       if(high[1] > temporary.price) {
@@ -476,13 +378,17 @@ void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       if(high[1] > CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
          if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", high[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       double extensionLow = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_LowerLevel);
@@ -507,13 +413,17 @@ void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       if(high[1] > CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
          if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", high[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       double goldenZoneLow = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_LowerLevel);
@@ -534,29 +444,22 @@ void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time
 //| این تابع منطق مربوط به استراتژی فروش را مدیریت می‌کند.           |
 //+------------------------------------------------------------------+
 
-void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]) {
-   if(currentStatus == SEARCHING_FOR_ANCHOR_HIGH) {
-      datetime localTime;
-      double localPrice;
-      int localPosition;
-      if(FindPeak(rates_total, localTime, localPrice, localPosition, time)) {
-         anchor.price = localPrice;
-         anchor.time = localTime;
-         anchor.position = localPosition;
-         anchorID = localTime;
-         datetime valleyTime;
-         double valleyPrice;
-         int valleyPosition;
-         if(FindValley(rates_total, valleyTime, valleyPrice, valleyPosition, time, localTime)) {
-            mother.price = valleyPrice;
-            mother.time = valleyTime;
-            mother.position = valleyPosition;
-            if(settings.Enable_Drawing) DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
-            if(settings.Enable_Logging) Print("Anchor_High یافت شد در قیمت ", localPrice, " در ", TimeToString(localTime), ", Mother_Low در ", valleyPrice);
-            currentStatus = MONITORING_SCENARIO_1_PROGRESS;
+void CHipoFibonacci::ProcessSellLogic() {
+   if(currentStatus == SEARCHING_FOR_LEG && !isInFocusMode) {
+      PeakValley localMother, localAnchor;
+      if(FindHipoLeg(localMother, localAnchor)) {
+         mother = localMother;
+         anchor = localAnchor;
+         anchorID = localAnchor.time;
+         isInFocusMode = true;
+         if(settings.Enable_Drawing) {
+            DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
+            DrawLegLines();
          }
+         if(settings.Enable_Logging) Print("لگ فروش یافت شد: Mother_Low در قیمت ", mother.price, " در ", TimeToString(mother.time), ", Anchor_High در ", anchor.price);
+         currentStatus = MONITORING_SCENARIO_1_PROGRESS;
       } else {
-         if(settings.Enable_Logging) Print("هیچ قله‌ای در ", settings.MaxCandles, " کندل یافت نشد");
+         if(settings.Enable_Logging) Print("[HipoFibo] Not enough candle data to find a leg");
       }
    }
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
@@ -564,11 +467,16 @@ void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &tim
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       if(low[1] < mother.price) {
          currentStatus = SCENARIO_2_ACTIVE_TARGETING_EXTENSION;
+         temporary.price = 0;
+         temporary.time = 0;
+         temporary.position = 0;
          finalPoint.price = 0;
          finalPoint.time = 0;
          finalPoint.position = 0;
@@ -591,7 +499,9 @@ void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &tim
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       if(low[1] < temporary.price) {
@@ -618,13 +528,17 @@ void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &tim
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       if(low[1] < CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
          if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", low[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       double extensionLow = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_LowerLevel);
@@ -649,13 +563,17 @@ void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &tim
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       if(low[1] < CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
          if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", low[1]);
          DeleteFiboObjects();
-         currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
+         DeleteLegLines();
+         currentStatus = SEARCHING_FOR_LEG;
+         isInFocusMode = false;
          return;
       }
       double goldenZoneLow = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_LowerLevel);
@@ -672,17 +590,149 @@ void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &tim
 }
 
 //+------------------------------------------------------------------+
+//| یافتن لگ حرکتی (Find Hipo Leg)                                  |
+//| این تابع لگ حرکتی (قله/دره پادشاه و لنگرگاه) را شناسایی می‌کند. |
+//+------------------------------------------------------------------+
+
+bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out) {
+   if(rates_total < settings.KingPeakLookback) {
+      if(settings.Enable_Logging) Print("[HipoFibo] Not enough candle data to find a leg");
+      return false;
+   }
+
+   int start = MathMin(rates_total - 1, settings.MaxCandles - 1);
+   int end = MathMax(1, start - settings.KingPeakLookback + 1);
+
+   if(signalType == SIGNAL_BUY) {
+      // یافتن Mother_High
+      double highest = high[end];
+      int highest_idx = end;
+      for(int i = end + 1; i <= start; i++) {
+         if(high[i] > highest) {
+            highest = high[i];
+            highest_idx = i;
+         }
+      }
+      mother_out.price = highest;
+      mother_out.time = time[highest_idx];
+      mother_out.position = highest_idx;
+
+      // یافتن Anchor_Low
+      double lowest = low[highest_idx];
+      int lowest_idx = highest_idx;
+      for(int i = highest_idx; i >= 1; i--) {
+         if(low[i] < lowest) {
+            lowest = low[i];
+            lowest_idx = i;
+         }
+      }
+      anchor_out.price = lowest;
+      anchor_out.time = time[lowest_idx];
+      anchor_out.position = lowest_idx;
+
+      // اعتبارسنجی
+      if(mother_out.position > anchor_out.position && mother_out.position - anchor_out.position > 2) {
+         return true;
+      }
+      return false;
+   } else if(signalType == SIGNAL_SELL) {
+      // یافتن Mother_Low
+      double lowest = low[end];
+      int lowest_idx = end;
+      for(int i = end + 1; i <= start; i++) {
+         if(low[i] < lowest) {
+            lowest = low[i];
+            lowest_idx = i;
+         }
+      }
+      mother_out.price = lowest;
+      mother_out.time = time[lowest_idx];
+      mother_out.position = lowest_idx;
+
+      // یافتن Anchor_High
+      double highest = high[lowest_idx];
+      int highest_idx = lowest_idx;
+      for(int i = lowest_idx; i >= 1; i--) {
+         if(high[i] > highest) {
+            highest = high[i];
+            highest_idx = i;
+         }
+      }
+      anchor_out.price = highest;
+      anchor_out.time = time[highest_idx];
+      anchor_out.position = highest_idx;
+
+      // اعتبارسنجی
+      if(mother_out.position > anchor_out.position && mother_out.position - anchor_out.position > 2) {
+         return true;
+      }
+      return false;
+   }
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| رسم خطوط لگ (Draw Leg Lines)                                     |
+//| این تابع خطوط افقی نقطه‌چین برای Mother و Anchor رسم می‌کند.     |
+//+------------------------------------------------------------------+
+
+void CHipoFibonacci::DrawLegLines() {
+   string mother_name = "HipoLine_Mother_" + TimeToString(anchorID);
+   string anchor_name = "HipoLine_Anchor_" + TimeToString(anchorID);
+   color anchor_color = (signalType == SIGNAL_BUY) ? settings.BuyEntryFibo_Color : settings.SellEntryFibo_Color;
+
+   ObjectCreate(0, mother_name, OBJ_HLINE, 0, 0, mother.price);
+   ObjectSetInteger(0, mother_name, OBJPROP_COLOR, settings.MotherFibo_Color);
+   ObjectSetInteger(0, mother_name, OBJPROP_STYLE, STYLE_DOT);
+   ObjectSetInteger(0, mother_name, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, mother_name, OBJPROP_RAY, true);
+   ObjectSetString(0, mother_name, OBJPROP_TEXT, "Mother Level");
+
+   ObjectCreate(0, anchor_name, OBJ_HLINE, 0, 0, anchor.price);
+   ObjectSetInteger(0, anchor_name, OBJPROP_COLOR, anchor_color);
+   ObjectSetInteger(0, anchor_name, OBJPROP_STYLE, STYLE_DOT);
+   ObjectSetInteger(0, anchor_name, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, anchor_name, OBJPROP_RAY, true);
+   ObjectSetString(0, anchor_name, OBJPROP_TEXT, "Anchor Level");
+}
+
+//+------------------------------------------------------------------+
+//| حذف خطوط لگ (Delete Leg Lines)                                   |
+//| این تابع خطوط افقی لگ را از چارت حذف می‌کند.                    |
+//+------------------------------------------------------------------+
+
+void CHipoFibonacci::DeleteLegLines() {
+   string prefix = "HipoLine_" + TimeToString(anchorID);
+   for(int i = ObjectsTotal(0, 0, -1) - 1; i >= 0; i--) {
+      string name = ObjectName(0, i);
+      if(StringFind(name, prefix) >= 0) ObjectDelete(0, name);
+   }
+}
+
+//+------------------------------------------------------------------+
 //| ایجاد پنل وضعیت (Create Status Panel)                            |
-//| این تابع یک پنل وضعیت روی چارت ایجاد می‌کند.                     |
+//| این تابع یک پنل وضعیت گرافیکی روی چارت ایجاد می‌کند.            |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::CreateStatusPanel() {
-   if(!ObjectCreate(0, "HipoFibonacci_Panel", OBJ_LABEL, 0, 0, 0)) return;
-   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_XDISTANCE, 10);
-   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_YDISTANCE, 10);
-   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_ZORDER, 0);
-   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_FONTSIZE, 10);
+   // ایجاد کادر پس‌زمینه
+   ObjectCreate(0, "HipoFibonacci_Panel_BG", OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, "HipoFibonacci_Panel_BG", OBJPROP_XDISTANCE, 10);
+   ObjectSetInteger(0, "HipoFibonacci_Panel_BG", OBJPROP_YDISTANCE, 10);
+   ObjectSetInteger(0, "HipoFibonacci_Panel_BG", OBJPROP_XSIZE, 200);
+   ObjectSetInteger(0, "HipoFibonacci_Panel_BG", OBJPROP_YSIZE, 80);
+   ObjectSetInteger(0, "HipoFibonacci_Panel_BG", OBJPROP_BGCOLOR, clrBlack);
+   ObjectSetInteger(0, "HipoFibonacci_Panel_BG", OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, "HipoFibonacci_Panel_BG", OBJPROP_COLOR, clrWhite);
+   ObjectSetInteger(0, "HipoFibonacci_Panel_BG", OBJPROP_CORNER, CORNER_LEFT_UPPER);
+
+   // ایجاد متن پنل
+   ObjectCreate(0, "HipoFibonacci_Panel", OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_XDISTANCE, 15);
+   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_YDISTANCE, 15);
+   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_ZORDER, 1);
+   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_FONTSIZE, 12);
    ObjectSetString(0, "HipoFibonacci_Panel", OBJPROP_FONT, "Arial");
    UpdateStatusPanel();
 }
@@ -694,14 +744,12 @@ void CHipoFibonacci::CreateStatusPanel() {
 
 void CHipoFibonacci::UpdateStatusPanel() {
    if(!settings.Enable_Status_Panel) return;
-   string statusText = "HipoFibonacci Library\n";
+   string statusText = "HipoFibonacci v2.0\n";
    statusText += "وضعیت: ";
    switch(currentStatus) {
       case WAITING_FOR_COMMAND: statusText += "منتظر دستور"; break;
-      case SEARCHING_FOR_ANCHOR_LOW: statusText += "جستجوی کف لنگرگاه"; break;
-      case SEARCHING_FOR_ANCHOR_HIGH: statusText += "جستجوی سقف لنگرگاه"; break;
+      case SEARCHING_FOR_LEG: statusText += "جستجوی لگ حرکتی"; break;
       case MONITORING_SCENARIO_1_PROGRESS: statusText += "پایش سناریو ۱"; break;
-      case SCENARIO_1_AWAITING_PULLBACK: statusText += "سناریو ۱ - انتظار پولبک"; break;
       case SCENARIO_1_AWAITING_BREAKOUT: statusText += "سناریو ۱ - انتظار شکست"; break;
       case SCENARIO_1_CONFIRMED_AWAITING_ENTRY: statusText += "سناریو ۱ - انتظار ورود"; break;
       case SCENARIO_2_ACTIVE_TARGETING_EXTENSION: statusText += "پایش سناریو ۲"; break;
@@ -711,10 +759,12 @@ void CHipoFibonacci::UpdateStatusPanel() {
    statusText += "\nدستور: ";
    color textColor = clrGray;
    switch(signalType) {
-      case SIGNAL_BUY: { statusText += "خرید"; textColor = clrGreen; break; }
-      case SIGNAL_SELL: { statusText += "فروش"; textColor = clrRed; break; }
-      case STOP_SEARCH: { statusText += "توقف"; textColor = clrGray; break; }
+      case SIGNAL_BUY: statusText += "خرید"; textColor = clrGreen; break;
+      case SIGNAL_SELL: statusText += "فروش"; textColor = clrRed; break;
+      case STOP_SEARCH: statusText += "توقف"; textColor = clrGray; break;
    }
+   if(isInFocusMode) statusText += "\nحالت تمرکز: فعال";
+   else statusText += "\nحالت تمرکز: غیرفعال";
    ObjectSetString(0, "HipoFibonacci_Panel", OBJPROP_TEXT, statusText);
    ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_COLOR, textColor);
 }
@@ -727,7 +777,7 @@ void CHipoFibonacci::UpdateStatusPanel() {
 void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario) {
    string name = "HipoFibo_" + EnumToString(type) + "_" + TimeToString(anchorID);
    if(scenario != "") name += "_" + scenario;
-   if(!ObjectCreate(0, name, OBJ_FIBO, 0, time1, price1, time2, price2)) return;
+   ObjectCreate(0, name, OBJ_FIBO, 0, time1, price1, time2, price2);
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
