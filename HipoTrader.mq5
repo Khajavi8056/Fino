@@ -2,14 +2,14 @@
 //| HipoTrader.mq5                                                  |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 2.1                                                        |
-//| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 2.0) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ریسک، رابط کاربری، و تنظیمات چارت به‌صورت استاندارد و بهینه پیاده‌سازی شده است. |
-//| هماهنگی: این کد با نسخه 2.0 کتابخانه HipoFibonacci.mqh طراحی شده و از ساختارها و توابع آن به‌صورت دقیق استفاده می‌کند. |
+//| نسخه: 2.2                                                        |
+//| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 2.4) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ریسک، رابط کاربری، و تنظیمات چارت به‌صورت استاندارد و بهینه پیاده‌سازی شده است. |
+//| هماهنگی: این کد با نسخه 2.4 کتابخانه HipoFibonacci.mqh طراحی شده و از ساختارها و توابع آن استفاده می‌کند. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "2.1"
+#property version   "2.2"
 #property strict
 
 // شامل کردن کتابخانه‌های مورد نیاز
@@ -164,11 +164,16 @@ void OnDeinit(const int reason) {
    if(macd_htf_handle != INVALID_HANDLE) IndicatorRelease(macd_htf_handle);
    if(macd_mtf_handle != INVALID_HANDLE) IndicatorRelease(macd_mtf_handle);
    ObjectDelete(0, "HipoTrader_Panel_BG");
-   ObjectDelete(0, "HipoTrader_Panel_Trend");
-   ObjectDelete(0, "HipoTrader_Panel_HTF");
-   ObjectDelete(0, "HipoTrader_Panel_MTF");
-   ObjectDelete(0, "HipoTrader_Panel_Fibo");
-   ObjectDelete(0, "HipoTrader_Panel_Status");
+   ObjectDelete(0, "HipoTrader_Panel_Trend_Bullet");
+   ObjectDelete(0, "HipoTrader_Panel_Trend_Text");
+   ObjectDelete(0, "HipoTrader_Panel_HTF_Bullet");
+   ObjectDelete(0, "HipoTrader_Panel_HTF_Text");
+   ObjectDelete(0, "HipoTrader_Panel_MTF_Bullet");
+   ObjectDelete(0, "HipoTrader_Panel_MTF_Text");
+   ObjectDelete(0, "HipoTrader_Panel_Fibo_Bullet");
+   ObjectDelete(0, "HipoTrader_Panel_Fibo_Text");
+   ObjectDelete(0, "HipoTrader_Panel_Status_Bullet");
+   ObjectDelete(0, "HipoTrader_Panel_Status_Text");
    if(Enable_MACD_Display) {
       ObjectDelete(0, "HTF_MACD");
       ObjectDelete(0, "MTF_MACD");
@@ -236,7 +241,7 @@ bool OnNewBar() {
 }
 
 //+------------------------------------------------------------------+
-//| تابع پردازش اصلی (نسخه جدید با منطق درخواست/پاسخ)                |
+//| تابع پردازش اصلی (نسخه جدید با منطق درخواست/پاسخ و پاکسازی)      |
 //| این تابع منطق اصلی تحلیل و ارسال دستور به کتابخانه را اجرا می‌کند. |
 //+------------------------------------------------------------------+
 
@@ -263,26 +268,34 @@ void CoreProcessing() {
       else if(OnNewBar() && htf_sell_permission && mtf_sell_trigger) newTrend = TREND_DOWN;
    }
 
-   // شرط ۱: اگر روند صعودی است و ما قبلاً دستوری نداده‌ایم
-   if(newTrend == TREND_UP && !isCommandSent) {
-      currentTrend = TREND_UP;
-      HipoFibo.ReceiveCommand(SIGNAL_BUY, PERIOD_CURRENT);
-      isCommandSent = true; // قفل فعال شد، منتظر پاسخ کتابخانه هستیم
-      Print("دستور خرید جدید صادر شد. اکسپرت در حالت انتظار.");
-   }
-   // شرط ۲: اگر روند نزولی است و ما قبلاً دستوری نداده‌ایم
-   else if(newTrend == TREND_DOWN && !isCommandSent) {
-      currentTrend = TREND_DOWN;
-      HipoFibo.ReceiveCommand(SIGNAL_SELL, PERIOD_CURRENT);
-      isCommandSent = true; // قفل فعال شد
-      Print("دستور فروش جدید صادر شد. اکسپرت در حالت انتظار.");
-   }
-   // شرط ۳: اگر روند تغییر کرده و خنثی یا مخالف شده، و ما قبلاً دستوری داده بودیم
-   else if(newTrend != currentTrend && isCommandSent) {
+   // چک وضعیت فعلی کتابخونه
+   E_Status currentStatus = HipoFibo.GetCurrentStatus();
+
+   // شرط توقف بر اساس تغییر HTF
+   if((newTrend != currentTrend && isCommandSent) || (newTrend == NEUTRAL && isCommandSent)) {
       currentTrend = newTrend;
       HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
-      isCommandSent = false; // قفل آزاد شد، چون خودمان دستور توقف دادیم
-      Print("روند در اکسپرت تغییر کرد. دستور توقف به کتابخانه ارسال شد.");
+      isCommandSent = false;
+      Print("روند در اکسپرت تغییر کرد یا خنثی شد. دستور توقف به کتابخانه ارسال شد.");
+      return;
+   }
+
+   // ارسال سیگنال جدید فقط اگر قبلاً دستوری ارسال نشده باشه
+   if(newTrend != NEUTRAL && !isCommandSent) {
+      // پاکسازی قبل از شروع ساختار جدید
+      HipoFibo.DeleteAllObjects();
+      Print("پاکسازی کامل چارت قبل از شروع ساختار جدید.");
+
+      currentTrend = newTrend;
+      if(newTrend == TREND_UP) {
+         HipoFibo.ReceiveCommand(SIGNAL_BUY, PERIOD_CURRENT);
+         isCommandSent = true;
+         Print("دستور خرید جدید صادر شد. اکسپرت در حالت انتظار.");
+      } else if(newTrend == TREND_DOWN) {
+         HipoFibo.ReceiveCommand(SIGNAL_SELL, PERIOD_CURRENT);
+         isCommandSent = true;
+         Print("دستور فروش جدید صادر شد. اکسپرت در حالت انتظار.");
+      }
    }
 }
 
@@ -342,8 +355,8 @@ void ExecuteTrade() {
       }
    }
 
-   HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
-   isCommandSent = false; // آزادسازی قفل پس از اجرای معامله
+   // بعد از معامله، قفل آزاد می‌شه ولی پاکسازی نمی‌کنیم
+   isCommandSent = false;
 
    if(trade.ResultRetcode() == TRADE_RETCODE_DONE) {
       Print("معامله با موفقیت اجرا شد - حجم: ", volume, "، SL: ", final_sl_price, "، TP: ", take_profit);
@@ -408,6 +421,7 @@ void CreateMACDDisplay(ENUM_TIMEFRAMES timeframe, color macdColor, color signalC
       if(subwindow > 0) ChartIndicatorAdd(ChartID(), subwindow, handle);
    }
 }
+
 //+------------------------------------------------------------------+
 //| تابع ایجاد پنل رابط کاربری (نسخه نهایی با لیبل‌های جدا)           |
 //+------------------------------------------------------------------+
@@ -452,7 +466,6 @@ void CreateTraderPanel() {
     }
     UpdateTraderPanel();
 }
-
 
 //+------------------------------------------------------------------+
 //| تابع به‌روزرسانی پنل رابط کاربری (نسخه نهایی با لیبل‌های جدا)    |
@@ -518,7 +531,6 @@ void UpdateTraderPanel() {
     ObjectSetInteger(0, "HipoTrader_Panel_Status_Bullet", OBJPROP_COLOR, status_color);
     ObjectSetString(0, "HipoTrader_Panel_Status_Text", OBJPROP_TEXT, status_text);
 }
-
 
 //+------------------------------------------------------------------+
 //| تابع تبدیل رنگ به نام (GetColorName)                             |
