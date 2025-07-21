@@ -109,7 +109,7 @@ private:
    PeakValley anchor;
    PeakValley mother;
    PeakValley temporary;
-   PeakValley final;
+   PeakValley finalPoint;
    datetime entryZoneActivationTime;
    string finalFiboScenario;
    bool isEntryZoneActive;
@@ -181,9 +181,9 @@ CHipoFibonacci::CHipoFibonacci() {
    temporary.price = 0;
    temporary.time = 0;
    temporary.position = 0;
-   final.price = 0;
-   final.time = 0;
-   final.position = 0;
+   finalPoint.price = 0;
+   finalPoint.time = 0;
+   finalPoint.position = 0;
    entryZoneActivationTime = 0;
    finalFiboScenario = "";
    isEntryZoneActive = false;
@@ -285,9 +285,9 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
       temporary.price = 0;
       temporary.time = 0;
       temporary.position = 0;
-      final.price = 0;
-      final.time = 0;
-      final.position = 0;
+      finalPoint.price = 0;
+      finalPoint.time = 0;
+      finalPoint.position = 0;
       isEntryZoneActive = false;
       entryZoneActivationTime = 0;
       finalFiboScenario = "";
@@ -307,9 +307,9 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
       temporary.price = 0;
       temporary.time = 0;
       temporary.position = 0;
-      final.price = 0;
-      final.time = 0;
-      final.position = 0;
+      finalPoint.price = 0;
+      finalPoint.time = 0;
+      finalPoint.position = 0;
       isEntryZoneActive = false;
       entryZoneActivationTime = 0;
       finalFiboScenario = "";
@@ -391,9 +391,9 @@ void CHipoFibonacci::ProcessBuyLogic() {
       if(high[1] > mother.price) {
          currentStatus = SCENARIO_2_ACTIVE_TARGETING_EXTENSION;
          isPullbackStarted = false;
-         final.price = 0;
-         final.time = 0;
-         final.position = 0;
+         finalPoint.price = 0;
+         finalPoint.time = 0;
+         finalPoint.position = 0;
          if(settings.Enable_Logging) Print("ورود به سناریو ۲: شکست Mother_High در ", high[1]);
          return;
       }
@@ -418,9 +418,9 @@ void CHipoFibonacci::ProcessBuyLogic() {
       }
       if(high[1] > temporary.price) {
          if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, high[1], anchor.time, time[1], settings.BuyEntryFibo_Color, "Scenario1");
-         final.price = high[1];
-         final.time = time[1];
-         final.position = 1;
+         finalPoint.price = high[1];
+         finalPoint.time = time[1];
+         finalPoint.position = 1;
          finalFiboScenario = "Scenario1";
          currentStatus = SCENARIO_1_CONFIRMED_AWAITING_ENTRY;
          if(settings.Enable_Logging) Print("سناریو ۱ تأیید شد، Temporary_High شکسته شد در ", high[1]);
@@ -452,19 +452,19 @@ void CHipoFibonacci::ProcessBuyLogic() {
       double extensionLow = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_LowerLevel);
       double extensionHigh = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_UpperLevel);
       if(high[1] >= extensionLow) {
-         if(high[1] > final.price) {
-            final.price = high[1];
-            final.time = time[1];
-            final.position = 1;
-            if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, final.price, anchor.time, final.time, settings.IntermediateFibo_Color, "Scenario2");
-            if(settings.Enable_Logging && final.price > 0) Print("آپدیت سقف نهایی سناریو ۲ در قیمت ", final.price, " در ", TimeToString(final.time));
+         if(high[1] > finalPoint.price) {
+            finalPoint.price = high[1];
+            finalPoint.time = time[1];
+            finalPoint.position = 1;
+            if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.IntermediateFibo_Color, "Scenario2");
+            if(settings.Enable_Logging && finalPoint.price > 0) Print("آپدیت سقف نهایی سناریو ۲ در قیمت ", finalPoint.price, " در ", TimeToString(finalPoint.time));
          }
-         if(high[1] < final.price && final.price > 0) {
+         if(high[1] < finalPoint.price && finalPoint.price > 0) {
             isPullbackStarted = true;
-            if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, final.price, anchor.time, final.time, settings.BuyEntryFibo_Color, "Scenario2");
+            if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.BuyEntryFibo_Color, "Scenario2");
             finalFiboScenario = "Scenario2";
             currentStatus = SCENARIO_2_CONFIRMED_AWAITING_ENTRY;
-            if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از سقف نهایی ", final.price, " شروع شد");
+            if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از سقف نهایی ", finalPoint.price, " شروع شد");
          }
       }
    }
@@ -534,9 +534,9 @@ void CHipoFibonacci::ProcessSellLogic() {
       if(low[1] < mother.price) {
          currentStatus = SCENARIO_2_ACTIVE_TARGETING_EXTENSION;
          isPullbackStarted = false;
-         final.price = 0;
-         final.time = 0;
-         final.position = 0;
+         finalPoint.price = 0;
+         finalPoint.time = 0;
+         finalPoint.position = 0;
          if(settings.Enable_Logging) Print("ورود به سناریو ۲: شکست Mother_Low در ", low[1]);
          return;
       }
@@ -561,9 +561,9 @@ void CHipoFibonacci::ProcessSellLogic() {
       }
       if(low[1] < temporary.price) {
          if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, low[1], anchor.time, time[1], settings.SellEntryFibo_Color, "Scenario1");
-         final.price = low[1];
-         final.time = time[1];
-         final.position = 1;
+         finalPoint.price = low[1];
+         finalPoint.time = time[1];
+         finalPoint.position = 1;
          finalFiboScenario = "Scenario1";
          currentStatus = SCENARIO_1_CONFIRMED_AWAITING_ENTRY;
          if(settings.Enable_Logging) Print("سناریو ۱ تأیید شد، Temporary_Low شکسته شد در ", low[1]);
@@ -595,19 +595,19 @@ void CHipoFibonacci::ProcessSellLogic() {
       double extensionLow = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_LowerLevel);
       double extensionHigh = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_UpperLevel);
       if(low[1] <= extensionLow) {
-         if(low[1] < final.price || final.price == 0) {
-            final.price = low[1];
-            final.time = time[1];
-            final.position = 1;
-            if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, final.price, anchor.time, final.time, settings.IntermediateFibo_Color, "Scenario2");
-            if(settings.Enable_Logging && final.price > 0) Print("آپدیت کف نهایی سناریو ۲ در قیمت ", final.price, " در ", TimeToString(final.time));
+         if(low[1] < finalPoint.price || finalPoint.price == 0) {
+            finalPoint.price = low[1];
+            finalPoint.time = time[1];
+            finalPoint.position = 1;
+            if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.IntermediateFibo_Color, "Scenario2");
+            if(settings.Enable_Logging && finalPoint.price > 0) Print("آپدیت کف نهایی سناریو ۲ در قیمت ", finalPoint.price, " در ", TimeToString(finalPoint.time));
          }
-         if(low[1] > final.price && final.price > 0) {
+         if(low[1] > finalPoint.price && finalPoint.price > 0) {
             isPullbackStarted = true;
-            if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, final.price, anchor.time, final.time, settings.SellEntryFibo_Color, "Scenario2");
+            if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.SellEntryFibo_Color, "Scenario2");
             finalFiboScenario = "Scenario2";
             currentStatus = SCENARIO_2_CONFIRMED_AWAITING_ENTRY;
-            if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از کف نهایی ", final.price, " شروع شد");
+            if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از کف نهایی ", finalPoint.price, " شروع شد");
          }
       }
    }
@@ -1017,9 +1017,9 @@ double CHipoFibonacci::CalculateFiboLevelPrice(E_FiboType type, double level) {
    } else if(type == FIBO_INTERMEDIATE && temporary.price != 0) {
       price1 = anchor.price;
       price2 = temporary.price;
-   } else if(type == FIBO_FINAL && final.price != 0) {
+   } else if(type == FIBO_FINAL && finalPoint.price != 0) {
       price1 = anchor.price;
-      price2 = final.price;
+      price2 = finalPoint.price;
    } else {
       return 0;
    }
