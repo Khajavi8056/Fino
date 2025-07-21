@@ -2,13 +2,13 @@
 //| HipoFibonacci.mqh                                                |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 1.6                                                        |
+//| نسخه: 1.7                                                        |
 //| توضیحات: این فایل شامل کلاس CHipoFibonacci است که برای شناسایی نقاط چرخش بازار با استفاده از اندیکاتور Fineflow، رسم سطوح فیبوناچی و مدیریت استراتژی‌های معاملاتی در متاتریدر 5 طراحی شده است. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.6"
+#property version   "1.7"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -132,8 +132,8 @@ private:
    double CalculateFiboLevelPrice(E_FiboType type, double level); // محاسبه قیمت سطح فیبوناچی
    void ProcessBuyLogic(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]); // پردازش منطق خرید
    void ProcessSellLogic(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]); // پردازش منطق فروش
-   bool FindValley(datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], int startPosition = -1); // یافتن دره
-   bool FindPeak(datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], int startPosition = -1); // یافتن قله
+   bool FindValley(const int rates_total, datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], int startPosition = -1); // یافتن دره
+   bool FindPeak(const int rates_total, datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], int startPosition = -1); // یافتن قله
 
 public:
    CHipoFibonacci();                  // سازنده
@@ -349,7 +349,7 @@ void CHipoFibonacci::OnNewCandle(const int rates_total, const datetime &time[], 
 //| حرکت از جدید به قدیم و یافتن اولین دره معتبر از موقعیت شروع.     |
 //+------------------------------------------------------------------+
 
-bool CHipoFibonacci::FindValley(datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], int startPosition) {
+bool CHipoFibonacci::FindValley(const int rates_total, datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], int startPosition) {
    int startIdx = (startPosition >= 0) ? startPosition : MathMin(rates_total - 1, settings.MaxCandles - settings.Lookback - 1);
    for(int i = startIdx; i >= 0; i--) {
       if(valleyBuffer[i] > 0) {
@@ -368,7 +368,7 @@ bool CHipoFibonacci::FindValley(datetime &localTime, double &localPrice, int &lo
 //| حرکت از جدید به قدیم و یافتن اولین قله معتبر از موقعیت شروع.     |
 //+------------------------------------------------------------------+
 
-bool CHipoFibonacci::FindPeak(datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], int startPosition) {
+bool CHipoFibonacci::FindPeak(const int rates_total, datetime &localTime, double &localPrice, int &localPosition, const datetime &time[], int startPosition) {
    int startIdx = (startPosition >= 0) ? startPosition : MathMin(rates_total - 1, settings.MaxCandles - settings.Lookback - 1);
    for(int i = startIdx; i >= 0; i--) {
       if(peakBuffer[i] > 0) {
@@ -391,7 +391,7 @@ void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time
       datetime localTime;
       double localPrice;
       int localPosition;
-      if(FindValley(localTime, localPrice, localPosition, time)) {
+      if(FindValley(rates_total, localTime, localPrice, localPosition, time)) {
          anchor.price = localPrice;
          anchor.time = localTime;
          anchor.position = localPosition;
@@ -399,7 +399,7 @@ void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time
          datetime peakTime;
          double peakPrice;
          int peakPosition;
-         if(FindPeak(peakTime, peakPrice, peakPosition, time, localPosition - 1)) {
+         if(FindPeak(rates_total, peakTime, peakPrice, peakPosition, time, localPosition - 1)) {
             mother.price = peakPrice;
             mother.time = peakTime;
             mother.position = peakPosition;
@@ -533,7 +533,7 @@ void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &tim
       datetime localTime;
       double localPrice;
       int localPosition;
-      if(FindPeak(localTime, localPrice, localPosition, time)) {
+      if(FindPeak(rates_total, localTime, localPrice, localPosition, time)) {
          anchor.price = localPrice;
          anchor.time = localTime;
          anchor.position = localPosition;
@@ -541,7 +541,7 @@ void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &tim
          datetime valleyTime;
          double valleyPrice;
          int valleyPosition;
-         if(FindValley(valleyTime, valleyPrice, valleyPosition, time, localPosition - 1)) {
+         if(FindValley(rates_total, valleyTime, valleyPrice, valleyPosition, time, localPosition - 1)) {
             mother.price = valleyPrice;
             mother.time = valleyTime;
             mother.position = valleyPosition;
