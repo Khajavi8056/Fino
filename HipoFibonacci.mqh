@@ -2,102 +2,107 @@
 //| HipoFibonacci.mqh                                                |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
+//| نسخه: 1.3                                                        |
+//| توضیحات: این فایل شامل کلاس CHipoFibonacci است که برای شناسایی نقاط چرخش بازار، رسم سطوح فیبوناچی و مدیریت استراتژی‌های معاملاتی در متاتریدر 5 طراحی شده است. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.2"
+#property version   "1.3"
 #property strict
 
 //+------------------------------------------------------------------+
-//| Enums                                                            |
+//| تعریف انوم‌ها (Enums)                                            |
+//| این بخش شامل انوم‌هایی است که برای دسته‌بندی نوع سیگنال‌ها، وضعیت‌ها، نوع فیبوناچی و روش‌های تشخیص استفاده می‌شوند. |
 //+------------------------------------------------------------------+
 
 enum E_SignalType {
-   SIGNAL_BUY,
-   SIGNAL_SELL,
-   STOP_SEARCH
+   SIGNAL_BUY,          // سیگنال خرید
+   SIGNAL_SELL,         // سیگنال فروش
+   STOP_SEARCH          // توقف جستجو
 };
 
 enum E_Status {
-   WAITING_FOR_COMMAND,
-   SEARCHING_FOR_ANCHOR_LOW,
-   SEARCHING_FOR_ANCHOR_HIGH,
-   MONITORING_SCENARIO_1_PROGRESS,
-   SCENARIO_1_AWAITING_PULLBACK,
-   SCENARIO_1_AWAITING_BREAKOUT,
-   SCENARIO_1_CONFIRMED_AWAITING_ENTRY,
-   SCENARIO_2_ACTIVE_TARGETING_EXTENSION,
-   SCENARIO_2_CONFIRMED_AWAITING_ENTRY,
-   ENTRY_ZONE_ACTIVE
+   WAITING_FOR_COMMAND,            // منتظر دریافت دستور
+   SEARCHING_FOR_ANCHOR_LOW,       // جستجوی نقطه پایین لنگرگاه
+   SEARCHING_FOR_ANCHOR_HIGH,      // جستجوی نقطه بالای لنگرگاه
+   MONITORING_SCENARIO_1_PROGRESS, // پایش پیشرفت سناریو 1
+   SCENARIO_1_AWAITING_PULLBACK,   // سناریو 1 - انتظار برای پولبک
+   SCENARIO_1_AWAITING_BREAKOUT,   // سناریو 1 - انتظار برای شکست
+   SCENARIO_1_CONFIRMED_AWAITING_ENTRY, // سناریو 1 - انتظار برای ورود تأیید شده
+   SCENARIO_2_ACTIVE_TARGETING_EXTENSION, // پایش سناریو 2 و هدف‌گذاری اکستنشن
+   SCENARIO_2_CONFIRMED_AWAITING_ENTRY,  // سناریو 2 - انتظار برای ورود تأیید شده
+   ENTRY_ZONE_ACTIVE                 // ناحیه ورود فعال
 };
 
 enum E_FiboType {
-   FIBO_MOTHER,
-   FIBO_INTERMEDIATE,
-   FIBO_FINAL
+   FIBO_MOTHER,        // سطح فیبوناچی مادر
+   FIBO_INTERMEDIATE,  // سطح فیبوناچی میانی
+   FIBO_FINAL          // سطح فیبوناچی نهایی
 };
 
 enum E_DetectionMethod {
-   METHOD_SIMPLE,
-   METHOD_SEQUENTIAL,
-   METHOD_POWER_SWING,
-   METHOD_ZIGZAG,
-   METHOD_BREAK_OF_STRUCTURE,
-   METHOD_MARKET_STRUCTURE_SHIFT
+   METHOD_SIMPLE,                // روش ساده
+   METHOD_SEQUENTIAL,            // روش ترتیبی
+   METHOD_POWER_SWING,           // روش نوسان قدرتی
+   METHOD_ZIGZAG,                // روش زیگزاگ
+   METHOD_BREAK_OF_STRUCTURE,    // روش شکست ساختار
+   METHOD_MARKET_STRUCTURE_SHIFT // روش تغییر ساختار بازار
 };
 
 enum E_SequentialCriterion {
-   CRITERION_HIGH,
-   CRITERION_LOW,
-   CRITERION_OPEN,
-   CRITERION_CLOSE
+   CRITERION_HIGH,  // معیار بالا
+   CRITERION_LOW,   // معیار پایین
+   CRITERION_OPEN,  // معیار باز
+   CRITERION_CLOSE  // معیار بسته
 };
 
 //+------------------------------------------------------------------+
-//| Structures                                                       |
+//| تعریف ساختارها (Structures)                                       |
+//| این بخش شامل ساختارهایی برای ذخیره تنظیمات و نقاط چرخش است.       |
 //+------------------------------------------------------------------+
 
 struct PeakValley {
-   double price;
-   datetime time;
-   int position;
+   double price;    // قیمت نقطه
+   datetime time;   // زمان نقطه
+   int position;    // موقعیت در آرایه
 };
 
 struct HipoSettings {
-   ENUM_TIMEFRAMES CalculationTimeframe;
-   bool Enable_Drawing;
-   bool Enable_Logging;
-   bool Enable_Status_Panel;
-   int MaxCandles;
-   double MarginPips;
+   ENUM_TIMEFRAMES CalculationTimeframe; // تایم‌فریم محاسبات
+   bool Enable_Drawing;                  // فعال‌سازی رسم
+   bool Enable_Logging;                  // فعال‌سازی لاگ
+   bool Enable_Status_Panel;             // فعال‌سازی پنل وضعیت
+   int MaxCandles;                       // حداکثر تعداد کندل‌ها
+   double MarginPips;                    // حاشیه به پیپ
 
-   bool EnforceStrictSequence;
-   E_DetectionMethod DetectionMethod;
-   int Lookback;
-   int SequentialLookback;
-   bool UseStrictSequential;
-   E_SequentialCriterion SequentialCriterion;
-   int AtrPeriod;
-   double AtrMultiplier;
-   int ZigZagDepth;
-   double ZigZagDeviation;
+   bool EnforceStrictSequence;           // اجبار به ترتیب دقیق
+   E_DetectionMethod DetectionMethod;    // روش تشخیص
+   int Lookback;                         // بازه نگاه به عقب
+   int SequentialLookback;               // بازه نگاه به عقب ترتیبی
+   bool UseStrictSequential;             // استفاده از ترتیب دقیق
+   E_SequentialCriterion SequentialCriterion; // معیار ترتیبی
+   int AtrPeriod;                        // دوره ATR
+   double AtrMultiplier;                 // ضریب ATR
+   int ZigZagDepth;                      // عمق زیگزاگ
+   double ZigZagDeviation;               // انحراف زیgzاگ
 
-   double EntryZone_LowerLevel;
-   double EntryZone_UpperLevel;
-   double ExtensionZone_LowerLevel;
-   double ExtensionZone_UpperLevel;
-   double FibonacciLevels[10];
-   int FibonacciLevelsCount;
+   double EntryZone_LowerLevel;          // سطح پایین ناحیه ورود
+   double EntryZone_UpperLevel;          // سطح بالا ناحیه ورود
+   double ExtensionZone_LowerLevel;      // سطح پایین ناحیه اکستنشن
+   double ExtensionZone_UpperLevel;      // سطح بالا ناحیه اکستنشن
+   double FibonacciLevels[10];           // سطوح فیبوناچی
+   int FibonacciLevelsCount;             // تعداد سطوح فیبوناچی
 
-   color MotherFibo_Color;
-   color IntermediateFibo_Color;
-   color BuyEntryFibo_Color;
-   color SellEntryFibo_Color;
+   color MotherFibo_Color;               // رنگ فیبوناچی مادر
+   color IntermediateFibo_Color;         // رنگ فیبوناچی میانی
+   color BuyEntryFibo_Color;             // رنگ ناحیه ورود خرید
+   color SellEntryFibo_Color;            // رنگ ناحیه ورود فروش
 };
 
 //+------------------------------------------------------------------+
-//| Class CHipoFibonacci                                             |
+//| کلاس CHipoFibonacci                                              |
+//| این کلاس اصلی برای مدیریت منطق تشخیص نقاط و رسم سطوح است.        |
 //+------------------------------------------------------------------+
 
 class CHipoFibonacci {
@@ -132,40 +137,41 @@ private:
    datetime time[];
    int rates_total;
 
-   bool FindValley(datetime &localTime, double &localPrice, int &localPosition);
-   bool FindPeak(datetime &localTime, double &localPrice, int &localPosition);
-   bool IsSequential(int i, bool isPeak);
-   bool CheckSequential(int i, bool isPeak, const double &values[]);
-   bool HasEnoughPower(int i, bool isPeak, double price, datetime localTime);
-   bool IsZigZag(int i, bool isPeak);
-   void IdentifySwingPoints(int i, bool &isSwingHigh, bool &isSwingLow);
-   void IdentifyMSS(int i, bool &isFinalPeak, bool &isFinalValley);
-   void UpdateSwingArray(double &array[], datetime &timeArray[], double price, datetime localTime);
+   bool FindValley(datetime &localTime, double &localPrice, int &localPosition); // یافتن دره
+   bool FindPeak(datetime &localTime, double &localPrice, int &localPosition);  // یافتن قله
+   bool IsSequential(int i, bool isPeak);                                      // بررسی ترتیب
+   bool CheckSequential(int i, bool isPeak, const double &values[]);           // بررسی ترتیبی
+   bool HasEnoughPower(int i, bool isPeak, double price, datetime localTime);  // بررسی قدرت
+   bool IsZigZag(int i, bool isPeak);                                         // بررسی زیgzاگ
+   void IdentifySwingPoints(int i, bool &isSwingHigh, bool &isSwingLow);       // شناسایی نقاط چرخش
+   void IdentifyMSS(int i, bool &isFinalPeak, bool &isFinalValley);            // شناسایی تغییر ساختار
+   void UpdateSwingArray(double &array[], datetime &timeArray[], double price, datetime localTime); // به‌روزرسانی آرایه نقاط
 
-   void CreateStatusPanel();
-   void UpdateStatusPanel();
-   void DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario = "");
-   void DeleteFiboObjects();
-   double CalculateFiboLevelPrice(E_FiboType type, double level);
-   void ProcessBuyLogic();
-   void ProcessSellLogic();
+   void CreateStatusPanel();          // ایجاد پنل وضعیت
+   void UpdateStatusPanel();          // به‌روزرسانی پنل وضعیت
+   void DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario = ""); // رسم فیبوناچی
+   void DeleteFiboObjects();          // حذف اشیاء فیبوناچی
+   double CalculateFiboLevelPrice(E_FiboType type, double level); // محاسبه قیمت سطح فیبوناچی
+   void ProcessBuyLogic();            // پردازش منطق خرید
+   void ProcessSellLogic();           // پردازش منطق فروش
 
 public:
-   CHipoFibonacci();
-   ~CHipoFibonacci();
+   CHipoFibonacci();                  // سازنده
+   ~CHipoFibonacci();                 // نابودگر
 
-   void Init(HipoSettings &inputSettings);
-   void ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe);
-   void OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]);
-   bool IsEntryZoneActive() { return isEntryZoneActive; }
-   datetime GetEntryZoneActivationTime() { return entryZoneActivationTime; }
-   string GetFinalFiboScenario() { return finalFiboScenario; }
-   E_Status GetCurrentStatus() { return currentStatus; }
-   double GetFiboLevelPrice(E_FiboType type, double level) { return CalculateFiboLevelPrice(type, level); }
+   void Init(HipoSettings &inputSettings); // تنظیم اولیه
+   void ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe); // دریافت دستور
+   void OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]); // پردازش کندل جدید
+   bool IsEntryZoneActive() { return isEntryZoneActive; } // بررسی فعال بودن ناحیه ورود
+   datetime GetEntryZoneActivationTime() { return entryZoneActivationTime; } // دریافت زمان فعال‌سازی ناحیه ورود
+   string GetFinalFiboScenario() { return finalFiboScenario; } // دریافت سناریوی نهایی
+   E_Status GetCurrentStatus() { return currentStatus; } // دریافت وضعیت فعلی
+   double GetFiboLevelPrice(E_FiboType type, double level) { return CalculateFiboLevelPrice(type, level); } // دریافت قیمت سطح فیبوناچی
 };
 
 //+------------------------------------------------------------------+
-//| Constructor                                                      |
+//| سازنده (Constructor)                                             |
+//| این تابع برای راه‌اندازی اولیه شیء استفاده می‌شود.               |
 //+------------------------------------------------------------------+
 
 CHipoFibonacci::CHipoFibonacci() {
@@ -200,7 +206,8 @@ CHipoFibonacci::CHipoFibonacci() {
 }
 
 //+------------------------------------------------------------------+
-//| Destructor                                                       |
+//| نابودگر (Destructor)                                             |
+//| این تابع برای آزادسازی منابع هنگام نابودی شیء استفاده می‌شود.    |
 //+------------------------------------------------------------------+
 
 CHipoFibonacci::~CHipoFibonacci() {
@@ -210,7 +217,8 @@ CHipoFibonacci::~CHipoFibonacci() {
 }
 
 //+------------------------------------------------------------------+
-//| Initialization                                                   |
+//| تنظیم اولیه (Initialization)                                     |
+//| این تابع تنظیمات اولیه را بر اساس ورودی‌ها اعمال می‌کند.         |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::Init(HipoSettings &inputSettings) {
@@ -266,7 +274,8 @@ void CHipoFibonacci::Init(HipoSettings &inputSettings) {
 }
 
 //+------------------------------------------------------------------+
-//| Receive Command                                                  |
+//| دریافت دستور (Receive Command)                                   |
+//| این تابع دستورهای خرید، فروش یا توقف را دریافت و پردازش می‌کند.  |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe) {
@@ -320,7 +329,8 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
 }
 
 //+------------------------------------------------------------------+
-//| On New Candle                                                    |
+//| پردازش کندل جدید (On New Candle)                                 |
+//| این تابع با دریافت داده‌های جدید کندل، منطق را به‌روزرسانی می‌کند. |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]) {
@@ -352,7 +362,8 @@ void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &ti
 }
 
 //+------------------------------------------------------------------+
-//| Process Buy Logic                                                |
+//| پردازش منطق خرید (Process Buy Logic)                             |
+//| این تابع منطق مربوط به استراتژی خرید را مدیریت می‌کند.           |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::ProcessBuyLogic() {
@@ -495,7 +506,8 @@ void CHipoFibonacci::ProcessBuyLogic() {
 }
 
 //+------------------------------------------------------------------+
-//| Process Sell Logic                                               |
+//| پردازش منطق فروش (Process Sell Logic)                            |
+//| این تابع منطق مربوط به استراتژی فروش را مدیریت می‌کند.           |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::ProcessSellLogic() {
@@ -638,7 +650,8 @@ void CHipoFibonacci::ProcessSellLogic() {
 }
 
 //+------------------------------------------------------------------+
-//| Find Valley                                                      |
+//| یافتن دره (Find Valley)                                          |
+//| این تابع نقاط پایین (دره) را در داده‌ها شناسایی می‌کند.          |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::FindValley(datetime &localTime, double &localPrice, int &localPosition) {
@@ -666,13 +679,16 @@ bool CHipoFibonacci::FindValley(datetime &localTime, double &localPrice, int &lo
          case METHOD_ZIGZAG:
             isFinalValley = IsZigZag(i, false);
             break;
-         case METHOD_BREAK_OF_STRUCTURE:
+         case METHOD_BREAK_OF_STRUCTURE: {
             bool dummy;
             IdentifySwingPoints(i, dummy, isFinalValley);
             break;
-         case METHOD_MARKET_STRUCTURE_SHIFT:
+         }
+         case METHOD_MARKET_STRUCTURE_SHIFT: {
+            bool dummy;
             IdentifyMSS(i, dummy, isFinalValley);
             break;
+         }
       }
       if(isFinalValley) {
          localPrice = low[i];
@@ -688,7 +704,8 @@ bool CHipoFibonacci::FindValley(datetime &localTime, double &localPrice, int &lo
 }
 
 //+------------------------------------------------------------------+
-//| Find Peak                                                        |
+//| یافتن قله (Find Peak)                                            |
+//| این تابع نقاط بالا (قله) را در داده‌ها شناسایی می‌کند.           |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::FindPeak(datetime &localTime, double &localPrice, int &localPosition) {
@@ -716,13 +733,16 @@ bool CHipoFibonacci::FindPeak(datetime &localTime, double &localPrice, int &loca
          case METHOD_ZIGZAG:
             isFinalPeak = IsZigZag(i, true);
             break;
-         case METHOD_BREAK_OF_STRUCTURE:
+         case METHOD_BREAK_OF_STRUCTURE: {
             bool dummy;
             IdentifySwingPoints(i, isFinalPeak, dummy);
             break;
-         case METHOD_MARKET_STRUCTURE_SHIFT:
+         }
+         case METHOD_MARKET_STRUCTURE_SHIFT: {
+            bool dummy;
             IdentifyMSS(i, isFinalPeak, dummy);
             break;
+         }
       }
       if(isFinalPeak) {
          localPrice = high[i];
@@ -738,7 +758,8 @@ bool CHipoFibonacci::FindPeak(datetime &localTime, double &localPrice, int &loca
 }
 
 //+------------------------------------------------------------------+
-//| Is Sequential                                                    |
+//| بررسی ترتیب (Is Sequential)                                      |
+//| این تابع ترتیب ترتیبی نقاط را بررسی می‌کند.                      |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::IsSequential(int i, bool isPeak) {
@@ -765,7 +786,8 @@ bool CHipoFibonacci::IsSequential(int i, bool isPeak) {
 }
 
 //+------------------------------------------------------------------+
-//| Check Sequential                                                 |
+//| بررسی ترتیبی (Check Sequential)                                  |
+//| این تابع ترتیب دقیق نقاط را بر اساس آرایه داده‌ها بررسی می‌کند.  |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::CheckSequential(int i, bool isPeak, const double &values[]) {
@@ -793,7 +815,8 @@ bool CHipoFibonacci::CheckSequential(int i, bool isPeak, const double &values[])
 }
 
 //+------------------------------------------------------------------+
-//| Has Enough Power                                                 |
+//| بررسی قدرت (Has Enough Power)                                    |
+//| این تابع قدرت نقاط بر اساس شاخص ATR را بررسی می‌کند.             |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::HasEnoughPower(int i, bool isPeak, double price, datetime localTime) {
@@ -822,7 +845,8 @@ bool CHipoFibonacci::HasEnoughPower(int i, bool isPeak, double price, datetime l
 }
 
 //+------------------------------------------------------------------+
-//| Is ZigZag                                                        |
+//| بررسی زیgzاگ (Is ZigZag)                                        |
+//| این تابع نقاط زیgzاگ را بر اساس انحراف و عمق بررسی می‌کند.      |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::IsZigZag(int i, bool isPeak) {
@@ -832,7 +856,7 @@ bool CHipoFibonacci::IsZigZag(int i, bool isPeak) {
       if(lastConfirmedValley.price > 0 && time[i] > lastConfirmedValley.time) {
          double distance = high[i] - lastConfirmedValley.price;
          if(distance > settings.ZigZagDeviation * _Point && i - lastConfirmedValley.position >= settings.ZigZagDepth) {
-            if(settings.Enable_Logging) Print("قله زیگزاگ تأیید شد - فاصله: ", distance, " کندل‌ها: ", i - lastConfirmedValley.position);
+            if(settings.Enable_Logging) Print("قله زیgzاگ تأیید شد - فاصله: ", distance, " کندل‌ها: ", i - lastConfirmedValley.position);
             return true;
          }
       } else {
@@ -842,7 +866,7 @@ bool CHipoFibonacci::IsZigZag(int i, bool isPeak) {
       if(lastConfirmedPeak.price > 0 && time[i] > lastConfirmedPeak.time) {
          double distance = lastConfirmedPeak.price - low[i];
          if(distance > settings.ZigZagDeviation * _Point && i - lastConfirmedPeak.position >= settings.ZigZagDepth) {
-            if(settings.Enable_Logging) Print("دره زیگزاگ تأیید شد - فاصله: ", distance, " کندل‌ها: ", i - lastConfirmedValley.position);
+            if(settings.Enable_Logging) Print("دره زیgzاگ تأیید شد - فاصله: ", distance, " کندل‌ها: ", i - lastConfirmedValley.position);
             return true;
          }
       } else {
@@ -853,7 +877,8 @@ bool CHipoFibonacci::IsZigZag(int i, bool isPeak) {
 }
 
 //+------------------------------------------------------------------+
-//| Identify Swing Points                                            |
+//| شناسایی نقاط چرخش (Identify Swing Points)                        |
+//| این تابع نقاط چرخش بالا و پایین را شناسایی می‌کند.              |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::IdentifySwingPoints(int i, bool &isSwingHigh, bool &isSwingLow) {
@@ -874,7 +899,8 @@ void CHipoFibonacci::IdentifySwingPoints(int i, bool &isSwingHigh, bool &isSwing
 }
 
 //+------------------------------------------------------------------+
-//| Identify Market Structure Shift                                  |
+//| شناسایی تغییر ساختار بازار (Identify MSS)                         |
+//| این تابع تغییرات ساختار بازار را شناسایی می‌کند.                 |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::IdentifyMSS(int i, bool &isFinalPeak, bool &isFinalValley) {
@@ -907,7 +933,8 @@ void CHipoFibonacci::IdentifyMSS(int i, bool &isFinalPeak, bool &isFinalValley) 
 }
 
 //+------------------------------------------------------------------+
-//| Update Swing Array                                               |
+//| به‌روزرسانی آرایه نقاط (Update Swing Array)                     |
+//| این تابع آرایه نقاط چرخش را به‌روزرسانی می‌کند.                |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::UpdateSwingArray(double &array[], datetime &timeArray[], double price, datetime localTime) {
@@ -928,7 +955,8 @@ void CHipoFibonacci::UpdateSwingArray(double &array[], datetime &timeArray[], do
 }
 
 //+------------------------------------------------------------------+
-//| Create Status Panel                                              |
+//| ایجاد پنل وضعیت (Create Status Panel)                            |
+//| این تابع یک پنل وضعیت روی چارت ایجاد می‌کند.                     |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::CreateStatusPanel() {
@@ -943,7 +971,8 @@ void CHipoFibonacci::CreateStatusPanel() {
 }
 
 //+------------------------------------------------------------------+
-//| Update Status Panel                                              |
+//| به‌روزرسانی پنل وضعیت (Update Status Panel)                     |
+//| این تابع اطلاعات پنل وضعیت را به‌روزرسانی می‌کند.               |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::UpdateStatusPanel() {
@@ -974,7 +1003,8 @@ void CHipoFibonacci::UpdateStatusPanel() {
 }
 
 //+------------------------------------------------------------------+
-//| Draw Fibonacci                                                   |
+//| رسم فیبوناچی (Draw Fibonacci)                                    |
+//| این تابع سطوح فیبوناچی را روی چارت رسم می‌کند.                  |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario) {
@@ -994,7 +1024,8 @@ void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, dat
 }
 
 //+------------------------------------------------------------------+
-//| Delete Fibonacci Objects                                         |
+//| حذف اشیاء فیبوناچی (Delete Fibonacci Objects)                   |
+//| این تابع اشیاء فیبوناچی را از چارت حذف می‌کند.                 |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::DeleteFiboObjects() {
@@ -1006,7 +1037,8 @@ void CHipoFibonacci::DeleteFiboObjects() {
 }
 
 //+------------------------------------------------------------------+
-//| Calculate Fibonacci Level Price                                  |
+//| محاسبه قیمت سطح فیبوناچی (Calculate Fibonacci Level Price)      |
+//| این تابع قیمت یک سطح فیبوناچی را بر اساس نوع و سطح محاسبه می‌کند. |
 //+------------------------------------------------------------------+
 
 double CHipoFibonacci::CalculateFiboLevelPrice(E_FiboType type, double level) {
