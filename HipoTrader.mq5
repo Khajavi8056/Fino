@@ -181,24 +181,30 @@ void OnTick() {
 }
 
 //+------------------------------------------------------------------+
-//| تابع پردازش زمان‌بندی (OnTimer)                                  |
-//| این تابع هر ثانیه اجرا شده و منطق اصلی اکسپرت را مدیریت می‌کند. |
+//| تابع پردازش زمان‌بندی (نسخه اصلاح شده)                            |
+//| این تابع با ارسال صحیح داده‌ها به کتابخانه، مشکل نبود کندل را حل می‌کند. |
 //+------------------------------------------------------------------+
 
 void OnTimer() {
    CoreProcessing();
+
    if(OnNewBar()) {
+      // به تعداد کافی کندل درخواست بده (مثلا به اندازه نگاه به عقب + 5 کندل اضافه)
+      int bars_to_copy = fiboSettings.KingPeakLookback + 5;
       MqlRates rates[];
+      
+      // مهم: قبل از کپی، آرایه را به صورت سری تنظیم کن
       ArraySetAsSeries(rates, true);
-      if(CopyRates(_Symbol, PERIOD_CURRENT, 0, 2, rates) >= 2) {
-         datetime times[2] = {rates[0].time, rates[1].time};
-         double opens[2] = {rates[0].open, rates[1].open};
-         double highs[2] = {rates[0].high, rates[1].high};
-         double lows[2] = {rates[0].low, rates[1].low};
-         double closes[2] = {rates[0].close, rates[1].close};
-         HipoFibo.OnNewCandle(2, times, opens, highs, lows, closes);
+      
+      if(CopyRates(_Symbol, PERIOD_CURRENT, 0, bars_to_copy, rates) >= bars_to_copy) {
+         // حالا کل آرایه rates را به تابع جدید کتابخانه پاس بده
+         HipoFibo.OnNewCandle(rates);
+      } else {
+         lastError = "تعداد کندل‌های کافی در تاریخچه برای تحلیل وجود ندارد.";
+         Print(lastError); // این لاگ برای دیباگ کردن خیلی مهمه
       }
    }
+   
    UpdateTraderPanel();
    ExecuteTradeIfReady();
 }
