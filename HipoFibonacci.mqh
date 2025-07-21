@@ -2,12 +2,13 @@
 //| HipoFibonacci.mqh                                                |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 2.4 (با تابع DrawFibo ضدضربه برای حل باگ رنگ متاتریدر)     |
+//| نسخه: 3.0                                                        |
+//| توضیحات: کتابخانه مدیریت فیبوناچی برای شناسایی لگ‌های حرکتی با منطق فراکتال و پشتیبانی از تایم‌فریم‌های چندگانه. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "2.4"
+#property version   "3.0"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -54,15 +55,15 @@ struct HipoSettings {
    bool Enable_Status_Panel;             // فعال‌سازی پنل وضعیت
    int MaxCandles;                       // حداکثر تعداد کندل‌ها
    double MarginPips;                    // حاشیه به پیپ
-   int KingPeakLookback;                 // بازه نگاه به عقب برای قله/دره پادشاه
-
+   int SearchWindow;                     // بازه نگاه به عقب برای قله/دره
+   int Fractal_Lookback;                 // تعداد کندل‌های سمت چپ و راست برای فراکتال
+   double Min_Leg_Size_Pips;             // حداقل اندازه لگ به پیپ
    double EntryZone_LowerLevel;          // سطح پایین ناحیه ورود
    double EntryZone_UpperLevel;          // سطح بالا ناحیه ورود
    double ExtensionZone_LowerLevel;      // سطح پایین ناحیه اکستنشن
    double ExtensionZone_UpperLevel;      // سطح بالا ناحیه اکستنشن
    double FibonacciLevels[10];           // سطوح فیبوناچی
    int FibonacciLevelsCount;             // تعداد سطوح فیبوناچی
-
    color MotherFibo_Color;               // رنگ فیبوناچی مادر
    color IntermediateFibo_Color;         // رنگ فیبوناچی میانی
    color BuyEntryFibo_Color;             // رنگ ناحیه ورود خرید
@@ -88,17 +89,18 @@ private:
    datetime time[];
    int rates_total;
 
-   void ResetState(); // تابع مرکزی برای ریست کردن و پاکسازی
+   void ResetState();
    bool FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out);
    void CreateStatusPanel();
    void UpdateStatusPanel();
    void DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario = "");
-   void DrawLegPoints(); // رسم نقاط به‌جای خطوط
+   void DrawLegPoints();
    void DeleteFiboObjects();
-   void DeleteLegPoints(); // حذف نقاط
+   void DeleteLegPoints();
    double CalculateFiboLevelPrice(E_FiboType type, double level);
    void ProcessBuyLogic();
    void ProcessSellLogic();
+   void CleanOldObjects(int max_candles);
 
 public:
    CHipoFibonacci();
@@ -107,7 +109,7 @@ public:
    void Init(HipoSettings &inputSettings);
    void ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe);
    void OnNewCandle(const MqlRates &rates[]);
-   void OnTradePerformed(); // مدیریت بعد از معامله
+   void OnTradePerformed();
    bool IsEntryZoneActive() { return isEntryZoneActive; }
    datetime GetEntryZoneActivationTime() { return entryZoneActivationTime; }
    string GetFinalFiboScenario() { return finalFiboScenario; }
@@ -147,7 +149,9 @@ void CHipoFibonacci::Init(HipoSettings &inputSettings) {
    settings.Enable_Status_Panel = inputSettings.Enable_Status_Panel;
    settings.MaxCandles = inputSettings.MaxCandles > 0 ? inputSettings.MaxCandles : 500;
    settings.MarginPips = inputSettings.MarginPips > 0 ? inputSettings.MarginPips : 1.0;
-   settings.KingPeakLookback = inputSettings.KingPeakLookback > 0 ? inputSettings.KingPeakLookback : 100;
+   settings.SearchWindow = inputSettings.SearchWindow > 0 ? inputSettings.SearchWindow : 200;
+   settings.Fractal_Lookback = inputSettings.Fractal_Lookback > 0 ? inputSettings.Fractal_Lookback : 10;
+   settings.Min_Leg_Size_Pips = inputSettings.Min_Leg_Size_Pips > 0 ? inputSettings.Min_Leg_Size_Pips : 15.0;
 
    settings.EntryZone_LowerLevel = inputSettings.EntryZone_LowerLevel > 0 ? inputSettings.EntryZone_LowerLevel : 50.0;
    settings.EntryZone_UpperLevel = inputSettings.EntryZone_UpperLevel > settings.EntryZone_LowerLevel ? inputSettings.EntryZone_UpperLevel : 68.0;
@@ -181,12 +185,11 @@ void CHipoFibonacci::Init(HipoSettings &inputSettings) {
 
 void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe) {
    if(isInFocusMode && type != STOP_SEARCH) {
-      if(settings.Enable_Logging) Print("[HipoFibo] New command ignored due to Focus Mode.");
+      if(settings.Enable_Logging) Print("[HipoFibo] دستور جدید به دلیل حالت فوکوس نادیده گرفته شد.");
       return;
    }
 
-   ResetState(); // تمیزکاری قبل از هر دستور جدید
-
+   ResetState();
    if(type != STOP_SEARCH) {
       signalType = type;
       settings.CalculationTimeframe = timeframe == 0 ? PERIOD_CURRENT : timeframe;
@@ -226,6 +229,7 @@ void CHipoFibonacci::OnNewCandle(const MqlRates &rates[]) {
    ArraySetAsSeries(close, true);
    ArraySetAsSeries(time, true);
 
+   CleanOldObjects(300);
    if(signalType == SIGNAL_BUY) ProcessBuyLogic();
    else if(signalType == SIGNAL_SELL) ProcessSellLogic();
 
@@ -244,6 +248,140 @@ void CHipoFibonacci::OnTradePerformed() {
 }
 
 //+------------------------------------------------------------------+
+//| یافتن لگ حرکتی (FindHipoLeg)                                    |
+//+------------------------------------------------------------------+
+
+bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out) {
+   int required_candles = settings.SearchWindow + 2 * settings.Fractal_Lookback + 1;
+   if(rates_total < required_candles) {
+      if(settings.Enable_Logging) Print("[HipoFibo] تعداد کندل‌های کافی برای یافتن لگ وجود ندارد. نیاز: ", required_candles, "، موجود: ", rates_total);
+      return false;
+   }
+
+   if(signalType == SIGNAL_BUY) {
+      int mother_index = -1;
+      for(int i = 1 + settings.Fractal_Lookback; i < settings.SearchWindow + settings.Fractal_Lookback && i < rates_total - settings.Fractal_Lookback; i++) {
+         bool is_fractal = true;
+         for(int j = 1; j <= settings.Fractal_Lookback; j++) {
+            if(high[i] <= high[i - j] || high[i] <= high[i + j]) {
+               is_fractal = false;
+               break;
+            }
+         }
+         if(is_fractal) {
+            mother_index = i;
+            break;
+         }
+      }
+      if(mother_index == -1) {
+         if(settings.Enable_Logging) Print("[HipoFibo] قله فراکتالی یافت نشد در بازه ", settings.SearchWindow, " کندل.");
+         return false;
+      }
+
+      mother_out.price = high[mother_index];
+      mother_out.time = time[mother_index];
+      mother_out.position = mother_index;
+
+      if(settings.Enable_Logging) Print("[HipoFibo] قله فراکتالی یافت شد: قیمت ", mother_out.price, ", زمان ", TimeToString(mother_out.time), ", ایندکس ", mother_out.position);
+
+      int anchor_index = ArrayMinimum(low, 1, mother_index);
+      if(anchor_index == -1) {
+         if(settings.Enable_Logging) Print("[HipoFibo] کف لنگرگاه یافت نشد.");
+         return false;
+      }
+
+      anchor_out.price = low[anchor_index];
+      anchor_out.time = time[anchor_index];
+      anchor_out.position = anchor_index;
+
+      if(settings.Enable_Logging) Print("[HipoFibo] کف لنگرگاه یافت شد: قیمت ", anchor_out.price, ", زمان ", TimeToString(anchor_out.time), ", ایندکس ", anchor_out.position);
+
+      double leg_size = (mother_out.price - anchor_out.price) / _Point;
+      if(leg_size < settings.Min_Leg_Size_Pips) {
+         if(settings.Enable_Logging) Print("[HipoFibo] لگ خیلی کوچک است: ", leg_size, " پیپ < ", settings.Min_Leg_Size_Pips, " پیپ.");
+         return false;
+      }
+
+      for(int i = anchor_index + 1; i < mother_index; i++) {
+         bool is_new_fractal = true;
+         for(int j = 1; j <= settings.Fractal_Lookback; j++) {
+            if(i - j < 0 || i + j >= rates_total || high[i] <= high[i - j] || high[i] <= high[i + j]) {
+               is_new_fractal = false;
+               break;
+            }
+         }
+         if(is_new_fractal && time[i] > mother_out.time) {
+            if(settings.Enable_Logging) Print("[HipoFibo] قله فراکتالی جدیدتر یافت شد در ایندکس ", i, ", لگ نامعتبر است.");
+            return false;
+         }
+      }
+
+      return true;
+   } else if(signalType == SIGNAL_SELL) {
+      int mother_index = -1;
+      for(int i = 1 + settings.Fractal_Lookback; i < settings.SearchWindow + settings.Fractal_Lookback && i < rates_total - settings.Fractal_Lookback; i++) {
+         bool is_fractal = true;
+         for(int j = 1; j <= settings.Fractal_Lookback; j++) {
+            if(low[i] >= low[i - j] || low[i] >= low[i + j]) {
+               is_fractal = false;
+               break;
+            }
+         }
+         if(is_fractal) {
+            mother_index = i;
+            break;
+         }
+      }
+      if(mother_index == -1) {
+         if(settings.Enable_Logging) Print("[HipoFibo] دره فراکتالی یافت نشد در بازه ", settings.SearchWindow, " کندل.");
+         return false;
+      }
+
+      mother_out.price = low[mother_index];
+      mother_out.time = time[mother_index];
+      mother_out.position = mother_index;
+
+      if(settings.Enable_Logging) Print("[HipoFibo] دره فراکتالی یافت شد: قیمت ", mother_out.price, ", زمان ", TimeToString(mother_out.time), ", ایندکس ", mother_out.position);
+
+      int anchor_index = ArrayMaximum(high, 1, mother_index);
+      if(anchor_index == -1) {
+         if(settings.Enable_Logging) Print("[HipoFibo] سقف لنگرگاه یافت نشد.");
+         return false;
+      }
+
+      anchor_out.price = high[anchor_index];
+      anchor_out.time = time[anchor_index];
+      anchor_out.position = anchor_index;
+
+      if(settings.Enable_Logging) Print("[HipoFibo] سقف لنگرگاه یافت شد: قیمت ", anchor_out.price, ", زمان ", TimeToString(anchor_out.time), ", ایندکس ", anchor_out.position);
+
+      double leg_size = (anchor_out.price - mother_out.price) / _Point;
+      if(leg_size < settings.Min_Leg_Size_Pips) {
+         if(settings.Enable_Logging) Print("[HipoFibo] لگ خیلی کوچک است: ", leg_size, " پیپ < ", settings.Min_Leg_Size_Pips, " پیپ.");
+         return false;
+      }
+
+      for(int i = anchor_index + 1; i < mother_index; i++) {
+         bool is_new_fractal = true;
+         for(int j = 1; j <= settings.Fractal_Lookback; j++) {
+            if(i - j < 0 || i + j >= rates_total || low[i] >= low[i - j] || low[i] >= low[i + j]) {
+               is_new_fractal = false;
+               break;
+            }
+         }
+         if(is_new_fractal && time[i] > mother_out.time) {
+            if(settings.Enable_Logging) Print("[HipoFibo] دره فراکتالی جدیدتر یافت شد در ایندکس ", i, ", لگ نامعتبر است.");
+            return false;
+         }
+      }
+
+      return true;
+   }
+
+   return false;
+}
+
+//+------------------------------------------------------------------+
 //| پردازش منطق خرید (ProcessBuyLogic)                               |
 //+------------------------------------------------------------------+
 
@@ -259,10 +397,10 @@ void CHipoFibonacci::ProcessBuyLogic() {
             DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
             DrawLegPoints();
          }
-         if(settings.Enable_Logging) Print("لگ خرید یافت شد: Mother_High در قیمت ", mother.price, " در ", TimeToString(mother.time), ", Anchor_Low در ", anchor.price);
+         if(settings.Enable_Logging) Print("لگ خرید یافت شد: Mother_High در قیمت ", mother.price, ", زمان ", TimeToString(mother.time), ", Anchor_Low در ", anchor.price, ", زمان ", TimeToString(anchor.time));
          currentStatus = MONITORING_SCENARIO_1_PROGRESS;
       } else {
-         if(settings.Enable_Logging) Print("[HipoFibo] Not enough candle data to find a leg");
+         if(settings.Enable_Logging) Print("[HipoFibo] لگ معتبر یافت نشد.");
       }
    }
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
@@ -325,7 +463,7 @@ void CHipoFibonacci::ProcessBuyLogic() {
          isEntryZoneActive = true;
          entryZoneActivationTime = time[1];
          currentStatus = ENTRY_ZONE_ACTIVE;
-         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], " در ", TimeToString(time[1]));
+         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], ", زمان ", TimeToString(time[1]));
       }
    }
    else if(currentStatus == SCENARIO_2_ACTIVE_TARGETING_EXTENSION) {
@@ -375,7 +513,7 @@ void CHipoFibonacci::ProcessBuyLogic() {
          isEntryZoneActive = true;
          entryZoneActivationTime = time[1];
          currentStatus = ENTRY_ZONE_ACTIVE;
-         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], " در ", TimeToString(time[1]));
+         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], ", زمان ", TimeToString(time[1]));
       }
    }
 }
@@ -396,10 +534,10 @@ void CHipoFibonacci::ProcessSellLogic() {
             DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
             DrawLegPoints();
          }
-         if(settings.Enable_Logging) Print("لگ فروش یافت شد: Mother_Low در قیمت ", mother.price, " در ", TimeToString(mother.time), ", Anchor_High در ", anchor.price);
+         if(settings.Enable_Logging) Print("لگ فروش یافت شد: Mother_Low در قیمت ", mother.price, ", زمان ", TimeToString(mother.time), ", Anchor_High در ", anchor.price, ", زمان ", TimeToString(anchor.time));
          currentStatus = MONITORING_SCENARIO_1_PROGRESS;
       } else {
-         if(settings.Enable_Logging) Print("[HipoFibo] Not enough candle data to find a leg");
+         if(settings.Enable_Logging) Print("[HipoFibo] لگ معتبر یافت نشد.");
       }
    }
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
@@ -462,7 +600,7 @@ void CHipoFibonacci::ProcessSellLogic() {
          isEntryZoneActive = true;
          entryZoneActivationTime = time[1];
          currentStatus = ENTRY_ZONE_ACTIVE;
-         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], " در ", TimeToString(time[1]));
+         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], ", زمان ", TimeToString(time[1]));
       }
    }
    else if(currentStatus == SCENARIO_2_ACTIVE_TARGETING_EXTENSION) {
@@ -512,61 +650,9 @@ void CHipoFibonacci::ProcessSellLogic() {
          isEntryZoneActive = true;
          entryZoneActivationTime = time[1];
          currentStatus = ENTRY_ZONE_ACTIVE;
-         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], " در ", TimeToString(time[1]));
+         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], ", زمان ", TimeToString(time[1]));
       }
    }
-}
-
-//+------------------------------------------------------------------+
-//| یافتن لگ حرکتی (FindHipoLeg)                                    |
-//+------------------------------------------------------------------+
-
-bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out) {
-   int lookback = settings.KingPeakLookback;
-   if(rates_total < lookback) {
-      if(settings.Enable_Logging) Print("[HipoFibo] Not enough candle data to find a leg");
-      return false;
-   }
-
-   if(signalType == SIGNAL_BUY) {
-      int kingPeakIndex = ArrayMaximum(high, 1, lookback);
-      if(kingPeakIndex == -1) return false;
-
-      mother_out.price = high[kingPeakIndex];
-      mother_out.time = time[kingPeakIndex];
-      mother_out.position = kingPeakIndex;
-
-      int liveValleyIndex = ArrayMinimum(low, 1, kingPeakIndex);
-      if(liveValleyIndex == -1) return false;
-
-      anchor_out.price = low[liveValleyIndex];
-      anchor_out.time = time[liveValleyIndex];
-      anchor_out.position = liveValleyIndex;
-
-      if(mother_out.position > anchor_out.position && (mother_out.position - anchor_out.position) > 2) {
-         return true;
-      }
-   } else if(signalType == SIGNAL_SELL) {
-      int kingValleyIndex = ArrayMinimum(low, 1, lookback);
-      if(kingValleyIndex == -1) return false;
-
-      mother_out.price = low[kingValleyIndex];
-      mother_out.time = time[kingValleyIndex];
-      mother_out.position = kingValleyIndex;
-
-      int livePeakIndex = ArrayMaximum(high, 1, kingValleyIndex);
-      if(livePeakIndex == -1) return false;
-
-      anchor_out.price = high[livePeakIndex];
-      anchor_out.time = time[livePeakIndex];
-      anchor_out.position = livePeakIndex;
-
-      if(mother_out.position > anchor_out.position && (mother_out.position - anchor_out.position) > 2) {
-         return true;
-      }
-   }
-
-   return false;
 }
 
 //+------------------------------------------------------------------+
@@ -576,9 +662,8 @@ bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out)
 void CHipoFibonacci::DrawLegPoints() {
    string mother_name = "HipoPoint_Mother_" + TimeToString(anchorID);
    string anchor_name = "HipoPoint_Anchor_" + TimeToString(anchorID);
-   double offset = 5.0 * _Point; // فاصله استاندارد 5 پیپ
+   double offset = 5.0 * _Point;
 
-   // نقطه برای Mother (سقف برای BUY، کف برای SELL)
    ObjectCreate(0, mother_name, OBJ_ARROW, 0, mother.time, signalType == SIGNAL_BUY ? mother.price + offset : mother.price - offset);
    ObjectSetInteger(0, mother_name, OBJPROP_COLOR, signalType == SIGNAL_BUY ? clrGreen : clrRed);
    ObjectSetInteger(0, mother_name, OBJPROP_STYLE, STYLE_SOLID);
@@ -586,7 +671,6 @@ void CHipoFibonacci::DrawLegPoints() {
    ObjectSetInteger(0, mother_name, OBJPROP_ARROWCODE, 108);
    ObjectSetString(0, mother_name, OBJPROP_TEXT, "Mother");
 
-   // نقطه برای Anchor (کف برای BUY، سقف برای SELL)
    ObjectCreate(0, anchor_name, OBJ_ARROW, 0, anchor.time, signalType == SIGNAL_BUY ? anchor.price - offset : anchor.price + offset);
    ObjectSetInteger(0, anchor_name, OBJPROP_COLOR, signalType == SIGNAL_BUY ? clrRed : clrGreen);
    ObjectSetInteger(0, anchor_name, OBJPROP_STYLE, STYLE_SOLID);
@@ -693,21 +777,18 @@ void CHipoFibonacci::UpdateStatusPanel() {
 }
 
 //+------------------------------------------------------------------+
-//| رسم فیبوناچی (نسخه نهایی و ضدضربه برای حل باگ رنگ متاتریدر)      |
+//| رسم فیبوناچی (DrawFibo)                                         |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario) {
    string name = "HipoFibo_" + EnumToString(type) + "_" + TimeToString(anchorID);
    if(scenario != "") name += "_" + scenario;
 
-   // مرحله ۱: ساخت آبجکت با مختصات موقت (هر دو نقطه در شروع)
    if(!ObjectCreate(0, name, OBJ_FIBO, 0, time1, price1, time1, price1)) {
-      // اگر ساخت ناموفق بود، سعی کن مشخصاتش رو تغییر بدی
       ObjectSetInteger(0, name, OBJPROP_TIME, 0, time1);
       ObjectSetDouble(0, name, OBJPROP_PRICE, 0, price1);
    }
 
-   // مرحله ۲: تنظیم تمام مشخصات (رنگ، استایل، سطوح و ...)
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
@@ -720,7 +801,6 @@ void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, dat
       ObjectSetString(0, name, OBJPROP_LEVELTEXT, i, DoubleToString(settings.FibonacciLevels[i], 1) + "%");
    }
 
-   // مرحله ۳: حالا که همه چیز تنظیم شد، نقطه دوم را به مکان نهایی منتقل کن
    ObjectMove(0, name, 1, time2, price2);
 }
 
@@ -763,11 +843,30 @@ double CHipoFibonacci::CalculateFiboLevelPrice(E_FiboType type, double level) {
 }
 
 //+------------------------------------------------------------------+
+//| پاکسازی اشیاء قدیمی (CleanOldObjects)                           |
+//+------------------------------------------------------------------+
+
+void CHipoFibonacci::CleanOldObjects(int max_candles) {
+   if(!settings.Enable_Drawing) return;
+   for(int i = ObjectsTotal(0, 0, -1) - 1; i >= 0; i--) {
+      string name = ObjectName(0, i);
+      if(StringFind(name, "HipoFibo_") >= 0 || StringFind(name, "HipoPoint_") >= 0) {
+         datetime obj_time = (datetime)ObjectGetInteger(0, name, OBJPROP_TIME);
+         int bar_index = iBarShift(_Symbol, settings.CalculationTimeframe, obj_time);
+         if(bar_index > max_candles) {
+            ObjectDelete(0, name);
+            if(settings.Enable_Logging) Print("پاکسازی آبجکت قدیمی: ", name, ", ایندکس: ", bar_index);
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
 //| تابع مرکزی برای ریست کردن (ResetState)                           |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::ResetState() {
-   if(anchorID != 0) { // فقط اگر ساختار فعالی وجود داشت پاک کن
+   if(anchorID != 0) {
       DeleteFiboObjects();
       DeleteLegPoints();
    }
