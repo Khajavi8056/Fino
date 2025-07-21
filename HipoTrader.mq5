@@ -2,14 +2,14 @@
 //| HipoTrader.mq5                                                  |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 1.3                                                        |
+//| نسخه: 1.4                                                        |
 //| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 1.3) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ریسک، رابط کاربری، و تنظیمات چارت به‌صورت استاندارد و بهینه پیاده‌سازی شده است.
 //| هماهنگی: این کد با آخرین نسخه کتابخانه HipoFibonacci.mqh (1.3) طراحی شده و از ساختارها و توابع آن به‌صورت دقیق استفاده می‌کند.
 //+------------------------------------------------------------------*/
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.3"
+#property version   "1.4"
 #property strict
 
 // شامل کردن کتابخانه‌های مورد نیاز
@@ -359,10 +359,14 @@ void ExecuteTrade() {
       }
    }
 
-   // تأیید موفقیت معامله و پاک‌سازی
+   // ریست کردن کتابخانه پس از هر تلاش (چه موفق باشد چه ناموفق)
+   HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
+
+   // بررسی نتیجه و لاگ‌گذاری
    if(trade.ResultRetcode() == TRADE_RETCODE_DONE) {
-      HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT); // توقف جستجو پس از ورود
       Print("معامله با موفقیت اجرا شد - حجم: ", volume, "، SL: ", final_sl_price, "، TP: ", take_profit);
+   } else {
+      Print("تلاش برای ورود به معامله انجام شد اما با خطا مواجه شد: ", lastError);
    }
 }
 
