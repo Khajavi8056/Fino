@@ -139,20 +139,23 @@ private:
    bool isPullbackStarted;               // نشانگر شروع پولبک در سناریو ۲
 
    //--- آرایه‌های داده برای بهینه‌سازی
-   double high[], low[], open[], close[];
+   double high[];
+   double low[];
+   double open[];
+   double close[];
    datetime time[];
    int rates_total;
 
    //--- توابع کمکی Fineflow
-   bool FindValley(datetime &time, double &price, int &position);
-   bool FindPeak(datetime &time, double &price, int &position);
+   bool FindValley(datetime &localTime, double &localPrice, int &localPosition);
+   bool FindPeak(datetime &localTime, double &localPrice, int &localPosition);
    bool IsSequential(int i, bool isPeak);
    bool CheckSequential(int i, bool isPeak, const double &values[]);
-   bool HasEnoughPower(int i, bool isPeak, double price, datetime time);
+   bool HasEnoughPower(int i, bool isPeak, double price, datetime localTime);
    bool IsZigZag(int i, bool isPeak);
    void IdentifySwingPoints(int i, bool &isSwingHigh, bool &isSwingLow);
    void IdentifyMSS(int i, bool &isFinalPeak, bool &isFinalValley);
-   void UpdateSwingArray(double &array[], datetime &timeArray[], double price, datetime time);
+   void UpdateSwingArray(double &array[], datetime &timeArray[], double price, datetime localTime);
 
    //--- توابع کمکی گرافیکی و محاسباتی
    void CreateStatusPanel();
@@ -171,7 +174,7 @@ public:
    //--- توابع اصلی
    void Init(HipoSettings &inputSettings);
    void ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe);
-   void OnNewCandle(const int rates_total, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[]);
+   void OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]);
    bool IsEntryZoneActive() { return isEntryZoneActive; }
    datetime GetEntryZoneActivationTime() { return entryZoneActivationTime; }
    string GetFinalFiboScenario() { return finalFiboScenario; }
@@ -299,18 +302,18 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
       signalType = STOP_SEARCH;
       currentStatus = WAITING_FOR_COMMAND;
       anchorID = 0;
-      anchor.price = 0;
-      anchor.time = 0;
-      anchor.position = 0;
-      mother.price = 0;
-      mother.time = 0;
-      mother.position = 0;
-      temporary.price = 0;
-      temporary.time = 0;
-      temporary.position = 0;
-      final.price = 0;
-      final.time = 0;
-      final.position = 0;
+      this->anchor.price = 0;
+      this->anchor.time = 0;
+      this->anchor.position = 0;
+      this->mother.price = 0;
+      this->mother.time = 0;
+      this->mother.position = 0;
+      this->temporary.price = 0;
+      this->temporary.time = 0;
+      this->temporary.position = 0;
+      this->final.price = 0;
+      this->final.time = 0;
+      this->final.position = 0;
       isEntryZoneActive = false;
       entryZoneActivationTime = 0;
       finalFiboScenario = "";
@@ -321,18 +324,18 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
       settings.CalculationTimeframe = timeframe == 0 ? PERIOD_CURRENT : timeframe;
       currentStatus = (type == SIGNAL_BUY) ? SEARCHING_FOR_ANCHOR_LOW : SEARCHING_FOR_ANCHOR_HIGH;
       anchorID = 0;
-      anchor.price = 0;
-      anchor.time = 0;
-      anchor.position = 0;
-      mother.price = 0;
-      mother.time = 0;
-      mother.position = 0;
-      temporary.price = 0;
-      temporary.time = 0;
-      temporary.position = 0;
-      final.price = 0;
-      final.time = 0;
-      final.position = 0;
+      this->anchor.price = 0;
+      this->anchor.time = 0;
+      this->anchor.position = 0;
+      this->mother.price = 0;
+      this->mother.time = 0;
+      this->mother.position = 0;
+      this->temporary.price = 0;
+      this->temporary.time = 0;
+      this->temporary.position = 0;
+      this->final.price = 0;
+      this->final.time = 0;
+      this->final.position = 0;
       isEntryZoneActive = false;
       entryZoneActivationTime = 0;
       finalFiboScenario = "";
@@ -350,16 +353,16 @@ void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &ti
 
    //--- کپی داده‌ها برای بهینه‌سازی
    rates_total = rates_total_input;
-   ArrayResize(high, rates_total);
-   ArrayResize(low, rates_total);
-   ArrayResize(open, rates_total);
-   ArrayResize(close, rates_total);
-   ArrayResize(time, rates_total);
-   ArrayCopy(high, high_input, 0, 0, rates_total);
-   ArrayCopy(low, low_input, 0, 0, rates_total);
-   ArrayCopy(open, open_input, 0, 0, rates_total);
-   ArrayCopy(close, close_input, 0, 0, rates_total);
-   ArrayCopy(time, time_input, 0, 0, rates_total);
+   ArrayResize(this->high, rates_total);
+   ArrayResize(this->low, rates_total);
+   ArrayResize(this->open, rates_total);
+   ArrayResize(this->close, rates_total);
+   ArrayResize(this->time, rates_total);
+   ArrayCopy(this->high, high_input, 0, 0, rates_total);
+   ArrayCopy(this->low, low_input, 0, 0, rates_total);
+   ArrayCopy(this->open, open_input, 0, 0, rates_total);
+   ArrayCopy(this->close, close_input, 0, 0, rates_total);
+   ArrayCopy(this->time, time_input, 0, 0, rates_total);
 
    //--- کپی مقادیر ATR
    if(settings.DetectionMethod == METHOD_POWER_SWING && handleATR != INVALID_HANDLE) {
@@ -387,26 +390,26 @@ void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &ti
 void CHipoFibonacci::ProcessBuyLogic() {
    //--- مرحله ۱: جستجوی Anchor_Low
    if(currentStatus == SEARCHING_FOR_ANCHOR_LOW) {
-      datetime valleyTime;
-      double valleyPrice;
-      int valleyPosition;
-      if(FindValley(valleyTime, valleyPrice, valleyPosition)) {
-         anchor.price = valleyPrice;
-         anchor.time = valleyTime;
-         anchor.position = valleyPosition;
-         anchorID = valleyTime;
+      datetime localTime;
+      double localPrice;
+      int localPosition;
+      if(FindValley(localTime, localPrice, localPosition)) {
+         this->anchor.price = localPrice;
+         this->anchor.time = localTime;
+         this->anchor.position = localPosition;
+         anchorID = localTime;
          datetime peakTime;
          double peakPrice;
          int peakPosition;
-         if(FindPeak(peakTime, peakPrice, peakPosition) && peakTime < valleyTime) {
-            mother.price = peakPrice;
-            mother.time = peakTime;
-            mother.position = peakPosition;
+         if(FindPeak(peakTime, peakPrice, peakPosition) && peakTime < localTime) {
+            this->mother.price = peakPrice;
+            this->mother.time = peakTime;
+            this->mother.position = peakPosition;
             if(settings.Enable_Drawing) {
-               DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
+               DrawFibo(FIBO_MOTHER, this->anchor.price, this->mother.price, this->anchor.time, this->mother.time, settings.MotherFibo_Color);
             }
             if(settings.Enable_Logging) {
-               Print("Anchor_Low یافت شد در قیمت ", valleyPrice, " در ", TimeToString(valleyTime), ", Mother_High در ", peakPrice);
+               Print("Anchor_Low یافت شد در قیمت ", localPrice, " در ", TimeToString(localTime), ", Mother_High در ", peakPrice);
             }
             currentStatus = MONITORING_SCENARIO_1_PROGRESS;
          }
@@ -417,127 +420,127 @@ void CHipoFibonacci::ProcessBuyLogic() {
    //--- مرحله ۲: پایش سناریو ۱
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
       if(settings.Enable_Drawing) {
-         DrawFibo(FIBO_INTERMEDIATE, anchor.price, high[1], anchor.time, time[1], settings.IntermediateFibo_Color);
+         DrawFibo(FIBO_INTERMEDIATE, this->anchor.price, this->high[1], this->anchor.time, this->time[1], settings.IntermediateFibo_Color);
       }
-      if(low[1] < anchor.price - settings.MarginPips * _Point) {
-         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
+      if(this->low[1] < this->anchor.price - settings.MarginPips * _Point) {
+         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", this->low[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
          return;
       }
-      if(high[1] > mother.price) {
+      if(this->high[1] > this->mother.price) {
          currentStatus = SCENARIO_2_ACTIVE_TARGETING_EXTENSION;
          isPullbackStarted = false;
-         final.price = 0;
-         final.time = 0;
-         final.position = 0;
-         if(settings.Enable_Logging) Print("ورود به سناریو ۲: شکست Mother_High در ", high[1]);
+         this->final.price = 0;
+         this->final.time = 0;
+         this->final.position = 0;
+         if(settings.Enable_Logging) Print("ورود به سناریو ۲: شکست Mother_High در ", this->high[1]);
          return;
       }
       //--- ثبت سقف موقت
-      if(high[1] > temporary.price) {
-         temporary.price = high[1];
-         temporary.time = time[1];
-         temporary.position = 1;
+      if(this->high[1] > this->temporary.price) {
+         this->temporary.price = this->high[1];
+         this->temporary.time = this->time[1];
+         this->temporary.position = 1;
       }
       double goldenZoneLow = CalculateFiboLevelPrice(FIBO_INTERMEDIATE, settings.EntryZone_LowerLevel);
       double goldenZoneHigh = CalculateFiboLevelPrice(FIBO_INTERMEDIATE, settings.EntryZone_UpperLevel);
-      if(close[1] >= goldenZoneLow && close[1] <= goldenZoneHigh && temporary.price > 0) {
+      if(this->close[1] >= goldenZoneLow && this->close[1] <= goldenZoneHigh && this->temporary.price > 0) {
          currentStatus = SCENARIO_1_AWAITING_BREAKOUT;
-         if(settings.Enable_Logging) Print("پولبک به ناحیه طلایی در قیمت ", close[1], "، انتظار شکست Temporary_High در ", temporary.price);
+         if(settings.Enable_Logging) Print("پولبک به ناحیه طلایی در قیمت ", this->close[1], "، انتظار شکست Temporary_High در ", this->temporary.price);
       }
    }
    //--- مرحله ۳: انتظار شکست Temporary_High
    else if(currentStatus == SCENARIO_1_AWAITING_BREAKOUT) {
-      if(low[1] < anchor.price - settings.MarginPips * _Point) {
-         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
+      if(this->low[1] < this->anchor.price - settings.MarginPips * _Point) {
+         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", this->low[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
          return;
       }
-      if(high[1] > temporary.price) {
+      if(this->high[1] > this->temporary.price) {
          if(settings.Enable_Drawing) {
-            DrawFibo(FIBO_FINAL, anchor.price, high[1], anchor.time, time[1], settings.BuyEntryFibo_Color, "Scenario1");
+            DrawFibo(FIBO_FINAL, this->anchor.price, this->high[1], this->anchor.time, this->time[1], settings.BuyEntryFibo_Color, "Scenario1");
          }
-         final.price = high[1];
-         final.time = time[1];
-         final.position = 1;
+         this->final.price = this->high[1];
+         this->final.time = this->time[1];
+         this->final.position = 1;
          finalFiboScenario = "Scenario1";
          currentStatus = SCENARIO_1_CONFIRMED_AWAITING_ENTRY;
-         if(settings.Enable_Logging) Print("سناریو ۱ تأیید شد، Temporary_High شکسته شد در ", high[1]);
+         if(settings.Enable_Logging) Print("سناریو ۱ تأیید شد، Temporary_High شکسته شد در ", this->high[1]);
       }
    }
    //--- مرحله ۴: انتظار ورود سناریو ۱
    else if(currentStatus == SCENARIO_1_CONFIRMED_AWAITING_ENTRY) {
       double goldenZoneLow = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_LowerLevel);
       double goldenZoneHigh = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_UpperLevel);
-      if(close[1] >= goldenZoneLow && close[1] <= goldenZoneHigh) {
+      if(this->close[1] >= goldenZoneLow && this->close[1] <= goldenZoneHigh) {
          isEntryZoneActive = true;
-         entryZoneActivationTime = time[1];
+         entryZoneActivationTime = this->time[1];
          currentStatus = ENTRY_ZONE_ACTIVE;
-         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], " در ", TimeToString(time[1]));
+         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", this->close[1], " در ", TimeToString(this->time[1]));
       }
    }
    //--- مرحله ۵: پایش سناریو ۲
    else if(currentStatus == SCENARIO_2_ACTIVE_TARGETING_EXTENSION) {
-      if(low[1] < anchor.price - settings.MarginPips * _Point) {
-         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
+      if(this->low[1] < this->anchor.price - settings.MarginPips * _Point) {
+         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", this->low[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
          return;
       }
-      if(high[1] > CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
-         if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", high[1]);
+      if(this->high[1] > CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
+         if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", this->high[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
          return;
       }
       double extensionLow = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_LowerLevel);
       double extensionHigh = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_UpperLevel);
-      if(high[1] >= extensionLow) {
-         if(high[1] > final.price) {
-            final.price = high[1];
-            final.time = time[1];
-            final.position = 1;
+      if(this->high[1] >= extensionLow) {
+         if(this->high[1] > this->final.price) {
+            this->final.price = this->high[1];
+            this->final.time = this->time[1];
+            this->final.position = 1;
             if(settings.Enable_Drawing) {
-               DrawFibo(FIBO_FINAL, anchor.price, final.price, anchor.time, final.time, settings.IntermediateFibo_Color, "Scenario2");
+               DrawFibo(FIBO_FINAL, this->anchor.price, this->final.price, this->anchor.time, this->final.time, settings.IntermediateFibo_Color, "Scenario2");
             }
-            if(settings.Enable_Logging && final.price > 0) {
-               Print("آپدیت سقف نهایی سناریو ۲ در قیمت ", final.price, " در ", TimeToString(final.time));
+            if(settings.Enable_Logging && this->final.price > 0) {
+               Print("آپدیت سقف نهایی سناریو ۲ در قیمت ", this->final.price, " در ", TimeToString(this->final.time));
             }
          }
-         if(high[1] < final.price && final.price > 0) {
+         if(this->high[1] < this->final.price && this->final.price > 0) {
             isPullbackStarted = true;
             if(settings.Enable_Drawing) {
-               DrawFibo(FIBO_FINAL, anchor.price, final.price, anchor.time, final.time, settings.BuyEntryFibo_Color, "Scenario2");
+               DrawFibo(FIBO_FINAL, this->anchor.price, this->final.price, this->anchor.time, this->final.time, settings.BuyEntryFibo_Color, "Scenario2");
             }
             finalFiboScenario = "Scenario2";
             currentStatus = SCENARIO_2_CONFIRMED_AWAITING_ENTRY;
-            if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از سقف نهایی ", final.price, " شروع شد");
+            if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از سقف نهایی ", this->final.price, " شروع شد");
          }
       }
    }
    //--- مرحله ۶: انتظار ورود سناریو ۲
    else if(currentStatus == SCENARIO_2_CONFIRMED_AWAITING_ENTRY) {
-      if(low[1] < anchor.price - settings.MarginPips * _Point) {
-         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
+      if(this->low[1] < this->anchor.price - settings.MarginPips * _Point) {
+         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", this->low[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
          return;
       }
-      if(high[1] > CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
-         if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", high[1]);
+      if(this->high[1] > CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
+         if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", this->high[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_LOW : WAITING_FOR_COMMAND;
          return;
       }
       double goldenZoneLow = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_LowerLevel);
       double goldenZoneHigh = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_UpperLevel);
-      if(close[1] >= goldenZoneLow && close[1] <= goldenZoneHigh) {
+      if(this->close[1] >= goldenZoneLow && this->close[1] <= goldenZoneHigh) {
          isEntryZoneActive = true;
-         entryZoneActivationTime = time[1];
+         entryZoneActivationTime = this->time[1];
          currentStatus = ENTRY_ZONE_ACTIVE;
-         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], " در ", TimeToString(time[1]));
+         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", this->close[1], " در ", TimeToString(this->time[1]));
       }
    }
    //--- مرحله ۷: ناحیه ورود فعال
@@ -552,26 +555,26 @@ void CHipoFibonacci::ProcessBuyLogic() {
 void CHipoFibonacci::ProcessSellLogic() {
    //--- مرحله ۱: جستجوی Anchor_High
    if(currentStatus == SEARCHING_FOR_ANCHOR_HIGH) {
-      datetime peakTime;
-      double peakPrice;
-      int peakPosition;
-      if(FindPeak(peakTime, peakPrice, peakPosition)) {
-         anchor.price = peakPrice;
-         anchor.time = peakTime;
-         anchor.position = peakPosition;
-         anchorID = peakTime;
+      datetime localTime;
+      double localPrice;
+      int localPosition;
+      if(FindPeak(localTime, localPrice, localPosition)) {
+         this->anchor.price = localPrice;
+         this->anchor.time = localTime;
+         this->anchor.position = localPosition;
+         anchorID = localTime;
          datetime valleyTime;
          double valleyPrice;
          int valleyPosition;
-         if(FindValley(valleyTime, valleyPrice, valleyPosition) && valleyTime < peakTime) {
-            mother.price = valleyPrice;
-            mother.time = valleyTime;
-            mother.position = valleyPosition;
+         if(FindValley(valleyTime, valleyPrice, valleyPosition) && valleyTime < localTime) {
+            this->mother.price = valleyPrice;
+            this->mother.time = valleyTime;
+            this->mother.position = valleyPosition;
             if(settings.Enable_Drawing) {
-               DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
+               DrawFibo(FIBO_MOTHER, this->anchor.price, this->mother.price, this->anchor.time, this->mother.time, settings.MotherFibo_Color);
             }
             if(settings.Enable_Logging) {
-               Print("Anchor_High یافت شد در قیمت ", peakPrice, " در ", TimeToString(peakTime), ", Mother_Low در ", valleyPrice);
+               Print("Anchor_High یافت شد در قیمت ", localPrice, " در ", TimeToString(localTime), ", Mother_Low در ", valleyPrice);
             }
             currentStatus = MONITORING_SCENARIO_1_PROGRESS;
          }
@@ -582,127 +585,127 @@ void CHipoFibonacci::ProcessSellLogic() {
    //--- مرحله ۲: پایش سناریو ۱
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
       if(settings.Enable_Drawing) {
-         DrawFibo(FIBO_INTERMEDIATE, anchor.price, low[1], anchor.time, time[1], settings.IntermediateFibo_Color);
+         DrawFibo(FIBO_INTERMEDIATE, this->anchor.price, this->low[1], this->anchor.time, this->time[1], settings.IntermediateFibo_Color);
       }
-      if(high[1] > anchor.price + settings.MarginPips * _Point) {
-         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
+      if(this->high[1] > this->anchor.price + settings.MarginPips * _Point) {
+         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", this->high[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
          return;
       }
-      if(low[1] < mother.price) {
+      if(this->low[1] < this->mother.price) {
          currentStatus = SCENARIO_2_ACTIVE_TARGETING_EXTENSION;
          isPullbackStarted = false;
-         final.price = 0;
-         final.time = 0;
-         final.position = 0;
-         if(settings.Enable_Logging) Print("ورود به سناریو ۲: شکست Mother_Low در ", low[1]);
+         this->final.price = 0;
+         this->final.time = 0;
+         this->final.position = 0;
+         if(settings.Enable_Logging) Print("ورود به سناریو ۲: شکست Mother_Low در ", this->low[1]);
          return;
       }
       //--- ثبت کف موقت
-      if(low[1] < temporary.price || temporary.price == 0) {
-         temporary.price = low[1];
-         temporary.time = time[1];
-         temporary.position = 1;
+      if(this->low[1] < this->temporary.price || this->temporary.price == 0) {
+         this->temporary.price = this->low[1];
+         this->temporary.time = this->time[1];
+         this->temporary.position = 1;
       }
       double goldenZoneLow = CalculateFiboLevelPrice(FIBO_INTERMEDIATE, settings.EntryZone_LowerLevel);
       double goldenZoneHigh = CalculateFiboLevelPrice(FIBO_INTERMEDIATE, settings.EntryZone_UpperLevel);
-      if(close[1] >= goldenZoneLow && close[1] <= goldenZoneHigh && temporary.price > 0) {
+      if(this->close[1] >= goldenZoneLow && this->close[1] <= goldenZoneHigh && this->temporary.price > 0) {
          currentStatus = SCENARIO_1_AWAITING_BREAKOUT;
-         if(settings.Enable_Logging) Print("پولبک به ناحیه طلایی در قیمت ", close[1], "، انتظار شکست Temporary_Low در ", temporary.price);
+         if(settings.Enable_Logging) Print("پولبک به ناحیه طلایی در قیمت ", this->close[1], "، انتظار شکست Temporary_Low در ", this->temporary.price);
       }
    }
    //--- مرحله ۳: انتظار شکست Temporary_Low
    else if(currentStatus == SCENARIO_1_AWAITING_BREAKOUT) {
-      if(high[1] > anchor.price + settings.MarginPips * _Point) {
-         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
+      if(this->high[1] > this->anchor.price + settings.MarginPips * _Point) {
+         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", this->high[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
          return;
       }
-      if(low[1] < temporary.price) {
+      if(this->low[1] < this->temporary.price) {
          if(settings.Enable_Drawing) {
-            DrawFibo(FIBO_FINAL, anchor.price, low[1], anchor.time, time[1], settings.SellEntryFibo_Color, "Scenario1");
+            DrawFibo(FIBO_FINAL, this->anchor.price, this->low[1], this->anchor.time, this->time[1], settings.SellEntryFibo_Color, "Scenario1");
          }
-         final.price = low[1];
-         final.time = time[1];
-         final.position = 1;
+         this->final.price = this->low[1];
+         this->final.time = this->time[1];
+         this->final.position = 1;
          finalFiboScenario = "Scenario1";
          currentStatus = SCENARIO_1_CONFIRMED_AWAITING_ENTRY;
-         if(settings.Enable_Logging) Print("سناریو ۱ تأیید شد، Temporary_Low شکسته شد در ", low[1]);
+         if(settings.Enable_Logging) Print("سناریو ۱ تأیید شد، Temporary_Low شکسته شد در ", this->low[1]);
       }
    }
    //--- مرحله ۴: انتظار ورود سناریو ۱
    else if(currentStatus == SCENARIO_1_CONFIRMED_AWAITING_ENTRY) {
       double goldenZoneLow = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_LowerLevel);
       double goldenZoneHigh = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_UpperLevel);
-      if(close[1] >= goldenZoneLow && close[1] <= goldenZoneHigh) {
+      if(this->close[1] >= goldenZoneLow && this->close[1] <= goldenZoneHigh) {
          isEntryZoneActive = true;
-         entryZoneActivationTime = time[1];
+         entryZoneActivationTime = this->time[1];
          currentStatus = ENTRY_ZONE_ACTIVE;
-         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], " در ", TimeToString(time[1]));
+         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", this->close[1], " در ", TimeToString(this->time[1]));
       }
    }
    //--- مرحله ۵: پایش سناریو ۲
    else if(currentStatus == SCENARIO_2_ACTIVE_TARGETING_EXTENSION) {
-      if(high[1] > anchor.price + settings.MarginPips * _Point) {
-         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
+      if(this->high[1] > this->anchor.price + settings.MarginPips * _Point) {
+         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", this->high[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
          return;
       }
-      if(low[1] < CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
-         if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", low[1]);
+      if(this->low[1] < CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
+         if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", this->low[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
          return;
       }
       double extensionLow = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_LowerLevel);
       double extensionHigh = CalculateFiboLevelPrice(FIBO_MOTHER, settings.ExtensionZone_UpperLevel);
-      if(low[1] <= extensionLow) {
-         if(low[1] < final.price || final.price == 0) {
-            final.price = low[1];
-            final.time = time[1];
-            final.position = 1;
+      if(this->low[1] <= extensionLow) {
+         if(this->low[1] < this->final.price || this->final.price == 0) {
+            this->final.price = this->low[1];
+            this->final.time = this->time[1];
+            this->final.position = 1;
             if(settings.Enable_Drawing) {
-               DrawFibo(FIBO_FINAL, anchor.price, final.price, anchor.time, final.time, settings.IntermediateFibo_Color, "Scenario2");
+               DrawFibo(FIBO_FINAL, this->anchor.price, this->final.price, this->anchor.time, this->final.time, settings.IntermediateFibo_Color, "Scenario2");
             }
-            if(settings.Enable_Logging && final.price > 0) {
-               Print("آپدیت کف نهایی سناریو ۲ در قیمت ", final.price, " در ", TimeToString(final.time));
+            if(settings.Enable_Logging && this->final.price > 0) {
+               Print("آپدیت کف نهایی سناریو ۲ در قیمت ", this->final.price, " در ", TimeToString(this->final.time));
             }
          }
-         if(low[1] > final.price && final.price > 0) {
+         if(this->low[1] > this->final.price && this->final.price > 0) {
             isPullbackStarted = true;
             if(settings.Enable_Drawing) {
-               DrawFibo(FIBO_FINAL, anchor.price, final.price, anchor.time, final.time, settings.SellEntryFibo_Color, "Scenario2");
+               DrawFibo(FIBO_FINAL, this->anchor.price, this->final.price, this->anchor.time, this->final.time, settings.SellEntryFibo_Color, "Scenario2");
             }
             finalFiboScenario = "Scenario2";
             currentStatus = SCENARIO_2_CONFIRMED_AWAITING_ENTRY;
-            if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از کف نهایی ", final.price, " شروع شد");
+            if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از کف نهایی ", this->final.price, " شروع شد");
          }
       }
    }
    //--- مرحله ۶: انتظار ورود سناریو ۲
    else if(currentStatus == SCENARIO_2_CONFIRMED_AWAITING_ENTRY) {
-      if(high[1] > anchor.price + settings.MarginPips * _Point) {
-         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
+      if(this->high[1] > this->anchor.price + settings.MarginPips * _Point) {
+         if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", this->high[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
          return;
       }
-      if(low[1] < CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
-         if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", low[1]);
+      if(this->low[1] < CalculateFiboLevelPrice(FIBO_MOTHER, 200.0)) {
+         if(settings.Enable_Logging) Print("شکست ساختار: اکستنشن شکسته در قیمت ", this->low[1]);
          DeleteFiboObjects();
          currentStatus = (signalType != STOP_SEARCH) ? SEARCHING_FOR_ANCHOR_HIGH : WAITING_FOR_COMMAND;
          return;
       }
       double goldenZoneLow = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_LowerLevel);
       double goldenZoneHigh = CalculateFiboLevelPrice(FIBO_FINAL, settings.EntryZone_UpperLevel);
-      if(close[1] >= goldenZoneLow && close[1] <= goldenZoneHigh) {
+      if(this->close[1] >= goldenZoneLow && this->close[1] <= goldenZoneHigh) {
          isEntryZoneActive = true;
-         entryZoneActivationTime = time[1];
+         entryZoneActivationTime = this->time[1];
          currentStatus = ENTRY_ZONE_ACTIVE;
-         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], " در ", TimeToString(time[1]));
+         if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", this->close[1], " در ", TimeToString(this->time[1]));
       }
    }
    //--- مرحله ۷: ناحیه ورود فعال
@@ -714,15 +717,15 @@ void CHipoFibonacci::ProcessSellLogic() {
 //+------------------------------------------------------------------+
 //| تابع پیدا کردن دره (از Fineflow)                                |
 //+------------------------------------------------------------------+
-bool CHipoFibonacci::FindValley(datetime &time, double &price, int &position) {
+bool CHipoFibonacci::FindValley(datetime &localTime, double &localPrice, int &localPosition) {
    if(rates_total < 2 * settings.Lookback + 1) return false;
 
    for(int i = MathMin(rates_total - settings.Lookback - 1, settings.MaxCandles - settings.Lookback - 1); i >= settings.Lookback; i--) {
       bool isValleyCandidate = true;
       if(settings.DetectionMethod != METHOD_ZIGZAG && settings.DetectionMethod != METHOD_BREAK_OF_STRUCTURE && settings.DetectionMethod != METHOD_MARKET_STRUCTURE_SHIFT) {
          for(int j = 1; j <= settings.Lookback; j++) {
-            if(i - j >= 0 && low[i] >= low[i - j]) isValleyCandidate = false;
-            if(i + j < rates_total && low[i] >= low[i + j]) isValleyCandidate = false;
+            if(i - j >= 0 && this->low[i] >= this->low[i - j]) isValleyCandidate = false;
+            if(i + j < rates_total && this->low[i] >= this->low[i + j]) isValleyCandidate = false;
          }
       }
       bool isFinalValley = false;
@@ -734,7 +737,7 @@ bool CHipoFibonacci::FindValley(datetime &time, double &price, int &position) {
             isFinalValley = IsSequential(i, false);
             break;
          case METHOD_POWER_SWING:
-            isFinalValley = HasEnoughPower(i, false, low[i], time[i]);
+            isFinalValley = HasEnoughPower(i, false, this->low[i], this->time[i]);
             break;
          case METHOD_ZIGZAG:
             isFinalValley = IsZigZag(i, false);
@@ -748,12 +751,12 @@ bool CHipoFibonacci::FindValley(datetime &time, double &price, int &position) {
             break;
       }
       if(isFinalValley) {
-         price = low[i];
-         time = time[i];
-         position = i;
-         lastConfirmedValley.price = price;
-         lastConfirmedValley.time = time;
-         lastConfirmedValley.position = position;
+         localPrice = this->low[i];
+         localTime = this->time[i];
+         localPosition = i;
+         this->lastConfirmedValley.price = localPrice;
+         this->lastConfirmedValley.time = localTime;
+         this->lastConfirmedValley.position = localPosition;
          return true;
       }
    }
@@ -763,15 +766,15 @@ bool CHipoFibonacci::FindValley(datetime &time, double &price, int &position) {
 //+------------------------------------------------------------------+
 //| تابع پیدا کردن قله (از Fineflow)                                |
 //+------------------------------------------------------------------+
-bool CHipoFibonacci::FindPeak(datetime &time, double &price, int &position) {
+bool CHipoFibonacci::FindPeak(datetime &localTime, double &localPrice, int &localPosition) {
    if(rates_total < 2 * settings.Lookback + 1) return false;
 
    for(int i = MathMin(rates_total - settings.Lookback - 1, settings.MaxCandles - settings.Lookback - 1); i >= settings.Lookback; i--) {
       bool isPeakCandidate = true;
       if(settings.DetectionMethod != METHOD_ZIGZAG && settings.DetectionMethod != METHOD_BREAK_OF_STRUCTURE && settings.DetectionMethod != METHOD_MARKET_STRUCTURE_SHIFT) {
          for(int j = 1; j <= settings.Lookback; j++) {
-            if(i - j >= 0 && high[i] <= high[i - j]) isPeakCandidate = false;
-            if(i + j < rates_total && high[i] <= high[i + j]) isPeakCandidate = false;
+            if(i - j >= 0 && this->high[i] <= this->high[i - j]) isPeakCandidate = false;
+            if(i + j < rates_total && this->high[i] <= this->high[i + j]) isPeakCandidate = false;
          }
       }
       bool isFinalPeak = false;
@@ -783,7 +786,7 @@ bool CHipoFibonacci::FindPeak(datetime &time, double &price, int &position) {
             isFinalPeak = IsSequential(i, true);
             break;
          case METHOD_POWER_SWING:
-            isFinalPeak = HasEnoughPower(i, true, high[i], time[i]);
+            isFinalPeak = HasEnoughPower(i, true, this->high[i], this->time[i]);
             break;
          case METHOD_ZIGZAG:
             isFinalPeak = IsZigZag(i, true);
@@ -797,12 +800,12 @@ bool CHipoFibonacci::FindPeak(datetime &time, double &price, int &position) {
             break;
       }
       if(isFinalPeak) {
-         price = high[i];
-         time = time[i];
-         position = i;
-         lastConfirmedPeak.price = price;
-         lastConfirmedPeak.time = time;
-         lastConfirmedPeak.position = position;
+         localPrice = this->high[i];
+         localTime = this->time[i];
+         localPosition = i;
+         this->lastConfirmedPeak.price = localPrice;
+         this->lastConfirmedPeak.time = localTime;
+         this->lastConfirmedPeak.position = localPosition;
          return true;
       }
    }
@@ -818,19 +821,19 @@ bool CHipoFibonacci::IsSequential(int i, bool isPeak) {
    if(settings.UseStrictSequential) {
       switch(settings.SequentialCriterion) {
          case CRITERION_HIGH:
-            return CheckSequential(i, isPeak, high);
+            return CheckSequential(i, isPeak, this->high);
          case CRITERION_LOW:
-            return CheckSequential(i, isPeak, low);
+            return CheckSequential(i, isPeak, this->low);
          case CRITERION_OPEN:
-            return CheckSequential(i, isPeak, open);
+            return CheckSequential(i, isPeak, this->open);
          case CRITERION_CLOSE:
-            return CheckSequential(i, isPeak, close);
+            return CheckSequential(i, isPeak, this->close);
       }
    } else {
-      if(CheckSequential(i, isPeak, high)) return true;
-      if(CheckSequential(i, isPeak, low)) return true;
-      if(CheckSequential(i, isPeak, open)) return true;
-      if(CheckSequential(i, isPeak, close)) return true;
+      if(CheckSequential(i, isPeak, this->high)) return true;
+      if(CheckSequential(i, isPeak, this->low)) return true;
+      if(CheckSequential(i, isPeak, this->open)) return true;
+      if(CheckSequential(i, isPeak, this->close)) return true;
    }
    return false;
 }
@@ -859,10 +862,10 @@ bool CHipoFibonacci::CheckSequential(int i, bool isPeak, const double &values[])
    }
 }
 
-bool CHipoFibonacci::HasEnoughPower(int i, bool isPeak, double price, datetime time) {
+bool CHipoFibonacci::HasEnoughPower(int i, bool isPeak, double price, datetime localTime) {
    if(isPeak) {
-      if(lastConfirmedValley.price > 0 && time > lastConfirmedValley.time) {
-         double distance = price - lastConfirmedValley.price;
+      if(this->lastConfirmedValley.price > 0 && localTime > this->lastConfirmedValley.time) {
+         double distance = price - this->lastConfirmedValley.price;
          if(distance > settings.AtrMultiplier * atrBuffer[i]) {
             if(settings.Enable_Logging) Print("قله تأیید شد - فاصله: ", distance, " > ", settings.AtrMultiplier * atrBuffer[i]);
             return true;
@@ -871,8 +874,8 @@ bool CHipoFibonacci::HasEnoughPower(int i, bool isPeak, double price, datetime t
          return true;
       }
    } else {
-      if(lastConfirmedPeak.price > 0 && time > lastConfirmedPeak.time) {
-         double distance = lastConfirmedPeak.price - price;
+      if(this->lastConfirmedPeak.price > 0 && localTime > this->lastConfirmedPeak.time) {
+         double distance = this->lastConfirmedPeak.price - price;
          if(distance > settings.AtrMultiplier * atrBuffer[i]) {
             if(settings.Enable_Logging) Print("دره تأیید شد - فاصله: ", distance, " > ", settings.AtrMultiplier * atrBuffer[i]);
             return true;
@@ -888,20 +891,20 @@ bool CHipoFibonacci::IsZigZag(int i, bool isPeak) {
    if(i + settings.ZigZagDepth >= rates_total) return false;
 
    if(isPeak) {
-      if(lastConfirmedValley.price > 0 && time[i] > lastConfirmedValley.time) {
-         double distance = high[i] - lastConfirmedValley.price;
-         if(distance > settings.ZigZagDeviation * _Point && i - lastConfirmedValley.position >= settings.ZigZagDepth) {
-            if(settings.Enable_Logging) Print("قله زیگزاگ تأیید شد - فاصله: ", distance, " کندل‌ها: ", i - lastConfirmedValley.position);
+      if(this->lastConfirmedValley.price > 0 && this->time[i] > this->lastConfirmedValley.time) {
+         double distance = this->high[i] - this->lastConfirmedValley.price;
+         if(distance > settings.ZigZagDeviation * _Point && i - this->lastConfirmedValley.position >= settings.ZigZagDepth) {
+            if(settings.Enable_Logging) Print("قله زیگزاگ تأیید شد - فاصله: ", distance, " کندل‌ها: ", i - this->lastConfirmedValley.position);
             return true;
          }
       } else {
          return true;
       }
    } else {
-      if(lastConfirmedPeak.price > 0 && time[i] > lastConfirmedPeak.time) {
-         double distance = lastConfirmedPeak.price - low[i];
-         if(distance > settings.ZigZagDeviation * _Point && i - lastConfirmedPeak.position >= settings.ZigZagDepth) {
-            if(settings.Enable_Logging) Print("دره زیگزاگ تأیید شد - فاصله: ", distance, " کندل‌ها: ", i - lastConfirmedValley.position);
+      if(this->lastConfirmedPeak.price > 0 && this->time[i] > this->lastConfirmedPeak.time) {
+         double distance = this->lastConfirmedPeak.price - this->low[i];
+         if(distance > settings.ZigZagDeviation * _Point && i - this->lastConfirmedPeak.position >= settings.ZigZagDepth) {
+            if(settings.Enable_Logging) Print("دره زیگزاگ تأیید شد - فاصله: ", distance, " کندل‌ها: ", i - this->lastConfirmedValley.position);
             return true;
          }
       } else {
@@ -918,19 +921,19 @@ void CHipoFibonacci::IdentifySwingPoints(int i, bool &isSwingHigh, bool &isSwing
    isSwingLow = true;
 
    for(int j = 1; j <= settings.Lookback; j++) {
-      if(i - j >= 0 && high[i] <= high[i - j]) isSwingHigh = false;
-      if(i + j < rates_total && high[i] <= high[i + j]) isSwingHigh = false;
-      if(i - j >= 0 && low[i] >= low[i - j]) isSwingLow = false;
-      if(i + j < rates_total && low[i] >= low[i + j]) isSwingLow = false;
+      if(i - j >= 0 && this->high[i] <= this->high[i - j]) isSwingHigh = false;
+      if(i + j < rates_total && this->high[i] <= this->high[i + j]) isSwingHigh = false;
+      if(i - j >= 0 && this->low[i] >= this->low[i - j]) isSwingLow = false;
+      if(i + j < rates_total && this->low[i] >= this->low[i + j]) isSwingLow = false;
    }
 
    if(isSwingHigh) {
-      UpdateSwingArray(swingHighs_Array, swingHighs_Time, high[i], time[i]);
-      if(settings.Enable_Logging) Print("سقف سوینگ در کندل ", i, " با قیمت ", high[i]);
+      UpdateSwingArray(swingHighs_Array, swingHighs_Time, this->high[i], this->time[i]);
+      if(settings.Enable_Logging) Print("سقف سوینگ در کندل ", i, " با قیمت ", this->high[i]);
    }
    if(isSwingLow) {
-      UpdateSwingArray(swingLows_Array, swingLows_Time, low[i], time[i]);
-      if(settings.Enable_Logging) Print("کف سوینگ در کندل ", i, " با قیمت ", low[i]);
+      UpdateSwingArray(swingLows_Array, swingLows_Time, this->low[i], this->time[i]);
+      if(settings.Enable_Logging) Print("کف سوینگ در کندل ", i, " با قیمت ", this->low[i]);
    }
 }
 
@@ -941,50 +944,50 @@ void CHipoFibonacci::IdentifyMSS(int i, bool &isFinalPeak, bool &isFinalValley) 
    bool isSwingLow = true;
 
    for(int j = 1; j <= settings.Lookback; j++) {
-      if(i - j >= 0 && high[i] <= high[i - j]) isSwingHigh = false;
-      if(i + j < rates_total && high[i] <= high[i + j]) isSwingHigh = false;
-      if(i - j >= 0 && low[i] >= low[i - j]) isSwingLow = false;
-      if(i + j < rates_total && low[i] >= low[i + j]) isSwingLow = false;
+      if(i - j >= 0 && this->high[i] <= this->high[i - j]) isSwingHigh = false;
+      if(i + j < rates_total && this->high[i] <= this->high[i + j]) isSwingHigh = false;
+      if(i - j >= 0 && this->low[i] >= this->low[i - j]) isSwingLow = false;
+      if(i + j < rates_total && this->low[i] >= this->low[i + j]) isSwingLow = false;
    }
 
    if(isSwingHigh) {
-      UpdateSwingArray(swingHighs_Array, swingHighs_Time, high[i], time[i]);
-      if(settings.Enable_Logging) Print("سقف سوینگ در کندل ", i, " با قیمت ", high[i]);
+      UpdateSwingArray(swingHighs_Array, swingHighs_Time, this->high[i], this->time[i]);
+      if(settings.Enable_Logging) Print("سقف سوینگ در کندل ", i, " با قیمت ", this->high[i]);
    }
    if(isSwingLow) {
-      UpdateSwingArray(swingLows_Array, swingLows_Time, low[i], time[i]);
-      if(settings.Enable_Logging) Print("کف سوینگ در کندل ", i, " با قیمت ", low[i]);
+      UpdateSwingArray(swingLows_Array, swingLows_Time, this->low[i], this->time[i]);
+      if(settings.Enable_Logging) Print("کف سوینگ در کندل ", i, " با قیمت ", this->low[i]);
    }
 
    if(isSwingHigh && ArraySize(swingHighs_Array) >= 2 && ArraySize(swingLows_Array) >= 2) {
       if(swingHighs_Array[1] > swingHighs_Array[0] && swingLows_Array[1] > swingLows_Array[0]) {
          isFinalPeak = true;
-         if(settings.Enable_Logging) Print("MSS صعودی در کندل ", i, " با سقف ", high[i]);
+         if(settings.Enable_Logging) Print("MSS صعودی در کندل ", i, " با سقف ", this->high[i]);
       }
    }
 
    if(isSwingLow && ArraySize(swingHighs_Array) >= 2 && ArraySize(swingLows_Array) >= 2) {
       if(swingHighs_Array[1] < swingHighs_Array[0] && swingLows_Array[1] < swingLows_Array[0]) {
          isFinalValley = true;
-         if(settings.Enable_Logging) Print("MSS نزولی در کندل ", i, " با کف ", low[i]);
+         if(settings.Enable_Logging) Print("MSS نزولی در کندل ", i, " با کف ", this->low[i]);
       }
    }
 }
 
-void CHipoFibonacci::UpdateSwingArray(double &array[], datetime &timeArray[], double price, datetime time) {
+void CHipoFibonacci::UpdateSwingArray(double &array[], datetime &timeArray[], double price, datetime localTime) {
    int size = ArraySize(array);
    if(size < 2) {
       ArrayResize(array, size + 1);
       ArrayResize(timeArray, size + 1);
       array[size] = price;
-      timeArray[size] = time;
+      timeArray[size] = localTime;
    } else {
       ArrayRemove(array, 0, 1);
       ArrayRemove(timeArray, 0, 1);
       ArrayResize(array, 2);
       ArrayResize(timeArray, 2);
       array[1] = price;
-      timeArray[1] = time;
+      timeArray[1] = localTime;
    }
 }
 
@@ -1029,8 +1032,8 @@ void CHipoFibonacci::UpdateStatusPanel() {
    ObjectSetInteger(0, "HipoFibonacci_Panel", OBJPROP_COLOR, textColor);
 }
 
-void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario = "") {
-   string name = "HipoFibo_" + EnumToString(type) + "_" + TimeToString(anchorID);
+void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario) {
+   string name = "HipoFibo_" + EnumToString(type) + "_" + TimeToString(this->anchorID);
    if(scenario != "") name += "_" + scenario;
    ObjectCreate(0, name, OBJ_FIBO, 0, time1, price1, time2, price2);
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
@@ -1046,7 +1049,7 @@ void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, dat
 }
 
 void CHipoFibonacci::DeleteFiboObjects() {
-   string prefix = "HipoFibo_" + TimeToString(anchorID);
+   string prefix = "HipoFibo_" + TimeToString(this->anchorID);
    for(int i = ObjectsTotal(0, 0, -1) - 1; i >= 0; i--) {
       string name = ObjectName(0, i);
       if(StringFind(name, prefix) >= 0) {
@@ -1057,15 +1060,15 @@ void CHipoFibonacci::DeleteFiboObjects() {
 
 double CHipoFibonacci::CalculateFiboLevelPrice(E_FiboType type, double level) {
    double price1 = 0, price2 = 0;
-   if(type == FIBO_MOTHER && mother.price != 0) {
-      price1 = anchor.price;
-      price2 = mother.price;
-   } else if(type == FIBO_INTERMEDIATE && temporary.price != 0) {
-      price1 = anchor.price;
-      price2 = temporary.price;
-   } else if(type == FIBO_FINAL && final.price != 0) {
-      price1 = anchor.price;
-      price2 = final.price;
+   if(type == FIBO_MOTHER && this->mother.price != 0) {
+      price1 = this->anchor.price;
+      price2 = this->mother.price;
+   } else if(type == FIBO_INTERMEDIATE && this->temporary.price != 0) {
+      price1 = this->anchor.price;
+      price2 = this->temporary.price;
+   } else if(type == FIBO_FINAL && this->final.price != 0) {
+      price1 = this->anchor.price;
+      price2 = this->final.price;
    } else {
       return 0;
    }
