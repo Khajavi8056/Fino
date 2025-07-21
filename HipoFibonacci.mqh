@@ -269,7 +269,11 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]) {
-   if(currentStatus == WAITING_FOR_COMMAND) return;
+   ArraySetAsSeries(high, true);
+   ArraySetAsSeries(low, true);
+   ArraySetAsSeries(open, true);
+   ArraySetAsSeries(close, true);
+   ArraySetAsSeries(time, true);
 
    rates_total = rates_total_input;
    ArrayResize(high, rates_total);
@@ -590,85 +594,62 @@ void CHipoFibonacci::ProcessSellLogic() {
 }
 
 //+------------------------------------------------------------------+
-//| یافتن لگ حرکتی (Find Hipo Leg)                                  |
-//| این تابع لگ حرکتی (قله/دره پادشاه و لنگرگاه) را شناسایی می‌کند. |
+//| یافتن لگ حرکتی (نسخه بهینه و حرفه‌ای)                             |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out) {
-   if(rates_total < settings.KingPeakLookback) {
-      if(settings.Enable_Logging) Print("[HipoFibo] Not enough candle data to find a leg");
-      return false;
-   }
+    int lookback = settings.KingPeakLookback;
+    if (rates_total < lookback) {
+        if(settings.Enable_Logging) Print("[HipoFibo] Not enough candle data to find a leg");
+        return false;
+    }
 
-   int start = MathMin(rates_total - 1, settings.MaxCandles - 1);
-   int end = MathMax(1, start - settings.KingPeakLookback + 1);
+    if (signalType == SIGNAL_BUY) {
+        // 1. یافتن قله پادشاه در X کندل اخیر (از کندل 1 تا X)
+        int kingPeakIndex = ArrayMaximum(high, 1, lookback);
+        if (kingPeakIndex == -1) return false;
 
-   if(signalType == SIGNAL_BUY) {
-      // یافتن Mother_High
-      double highest = high[end];
-      int highest_idx = end;
-      for(int i = end + 1; i <= start; i++) {
-         if(high[i] > highest) {
-            highest = high[i];
-            highest_idx = i;
-         }
-      }
-      mother_out.price = highest;
-      mother_out.time = time[highest_idx];
-      mother_out.position = highest_idx;
+        mother_out.price = high[kingPeakIndex];
+        mother_out.time = time[kingPeakIndex];
+        mother_out.position = kingPeakIndex;
 
-      // یافتن Anchor_Low
-      double lowest = low[highest_idx];
-      int lowest_idx = highest_idx;
-      for(int i = highest_idx; i >= 1; i--) {
-         if(low[i] < lowest) {
-            lowest = low[i];
-            lowest_idx = i;
-         }
-      }
-      anchor_out.price = lowest;
-      anchor_out.time = time[lowest_idx];
-      anchor_out.position = lowest_idx;
+        // 2. یافتن دره زنده از قله پادشاه تا کندل فعلی
+        int liveValleyIndex = ArrayMinimum(low, 1, kingPeakIndex);
+        if (liveValleyIndex == -1) return false;
 
-      // اعتبارسنجی
-      if(mother_out.position > anchor_out.position && mother_out.position - anchor_out.position > 2) {
-         return true;
-      }
-      return false;
-   } else if(signalType == SIGNAL_SELL) {
-      // یافتن Mother_Low
-      double lowest = low[end];
-      int lowest_idx = end;
-      for(int i = end + 1; i <= start; i++) {
-         if(low[i] < lowest) {
-            lowest = low[i];
-            lowest_idx = i;
-         }
-      }
-      mother_out.price = lowest;
-      mother_out.time = time[lowest_idx];
-      mother_out.position = lowest_idx;
+        anchor_out.price = low[liveValleyIndex];
+        anchor_out.time = time[liveValleyIndex];
+        anchor_out.position = liveValleyIndex;
 
-      // یافتن Anchor_High
-      double highest = high[lowest_idx];
-      int highest_idx = lowest_idx;
-      for(int i = lowest_idx; i >= 1; i--) {
-         if(high[i] > highest) {
-            highest = high[i];
-            highest_idx = i;
-         }
-      }
-      anchor_out.price = highest;
-      anchor_out.time = time[highest_idx];
-      anchor_out.position = highest_idx;
+        // 3. اعتبارسنجی لگ
+        if (mother_out.position > anchor_out.position && (mother_out.position - anchor_out.position) > 2) {
+            return true;
+        }
 
-      // اعتبارسنجی
-      if(mother_out.position > anchor_out.position && mother_out.position - anchor_out.position > 2) {
-         return true;
-      }
-      return false;
-   }
-   return false;
+    } else if (signalType == SIGNAL_SELL) {
+        // 1. یافتن دره پادشاه
+        int kingValleyIndex = ArrayMinimum(low, 1, lookback);
+        if (kingValleyIndex == -1) return false;
+
+        mother_out.price = low[kingValleyIndex];
+        mother_out.time = time[kingValleyIndex];
+        mother_out.position = kingValleyIndex;
+
+        // 2. یافتن قله زنده
+        int livePeakIndex = ArrayMaximum(high, 1, kingValleyIndex);
+        if (livePeakIndex == -1) return false;
+
+        anchor_out.price = high[livePeakIndex];
+        anchor_out.time = time[livePeakIndex];
+        anchor_out.position = livePeakIndex;
+
+        // 3. اعتبارسنجی لگ
+        if (mother_out.position > anchor_out.position && (mother_out.position - anchor_out.position) > 2) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 //+------------------------------------------------------------------+
