@@ -2,12 +2,12 @@
 //| HipoFibonacci.mqh                                                |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 2.2 (با مدیریت چرخه عمر آبجکت و رنگ‌بندی اصلاح شده)        |
+//| نسخه: 2.4 (با تابع DrawFibo ضدضربه برای حل باگ رنگ متاتریدر)     |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "2.2"
+#property version   "2.4"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -93,9 +93,9 @@ private:
    void CreateStatusPanel();
    void UpdateStatusPanel();
    void DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario = "");
-   void DrawLegLines();
+   void DrawLegPoints(); // رسم نقاط به‌جای خطوط
    void DeleteFiboObjects();
-   void DeleteLegLines();
+   void DeleteLegPoints(); // حذف نقاط
    double CalculateFiboLevelPrice(E_FiboType type, double level);
    void ProcessBuyLogic();
    void ProcessSellLogic();
@@ -107,6 +107,7 @@ public:
    void Init(HipoSettings &inputSettings);
    void ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe);
    void OnNewCandle(const MqlRates &rates[]);
+   void OnTradePerformed(); // مدیریت بعد از معامله
    bool IsEntryZoneActive() { return isEntryZoneActive; }
    datetime GetEntryZoneActivationTime() { return entryZoneActivationTime; }
    string GetFinalFiboScenario() { return finalFiboScenario; }
@@ -232,6 +233,17 @@ void CHipoFibonacci::OnNewCandle(const MqlRates &rates[]) {
 }
 
 //+------------------------------------------------------------------+
+//| پردازش بعد از معامله (OnTradePerformed)                          |
+//+------------------------------------------------------------------+
+
+void CHipoFibonacci::OnTradePerformed() {
+   if(isEntryZoneActive) {
+      ResetState();
+      if(settings.Enable_Logging) Print("معامله انجام شد، ساختار ریست شد.");
+   }
+}
+
+//+------------------------------------------------------------------+
 //| پردازش منطق خرید (ProcessBuyLogic)                               |
 //+------------------------------------------------------------------+
 
@@ -245,7 +257,7 @@ void CHipoFibonacci::ProcessBuyLogic() {
          isInFocusMode = true;
          if(settings.Enable_Drawing) {
             DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
-            DrawLegLines();
+            DrawLegPoints();
          }
          if(settings.Enable_Logging) Print("لگ خرید یافت شد: Mother_High در قیمت ", mother.price, " در ", TimeToString(mother.time), ", Anchor_Low در ", anchor.price);
          currentStatus = MONITORING_SCENARIO_1_PROGRESS;
@@ -254,7 +266,6 @@ void CHipoFibonacci::ProcessBuyLogic() {
       }
    }
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
-      ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
       DrawFibo(FIBO_INTERMEDIATE, anchor.price, high[1], anchor.time, time[1], settings.IntermediateFibo_Color);
       
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
@@ -383,7 +394,7 @@ void CHipoFibonacci::ProcessSellLogic() {
          isInFocusMode = true;
          if(settings.Enable_Drawing) {
             DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
-            DrawLegLines();
+            DrawLegPoints();
          }
          if(settings.Enable_Logging) Print("لگ فروش یافت شد: Mother_Low در قیمت ", mother.price, " در ", TimeToString(mother.time), ", Anchor_High در ", anchor.price);
          currentStatus = MONITORING_SCENARIO_1_PROGRESS;
@@ -392,7 +403,6 @@ void CHipoFibonacci::ProcessSellLogic() {
       }
    }
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
-      ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
       DrawFibo(FIBO_INTERMEDIATE, anchor.price, low[1], anchor.time, time[1], settings.IntermediateFibo_Color);
       
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
@@ -560,35 +570,37 @@ bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out)
 }
 
 //+------------------------------------------------------------------+
-//| رسم خطوط لگ (DrawLegLines)                                      |
+//| رسم نقاط لگ (DrawLegPoints)                                      |
 //+------------------------------------------------------------------+
 
-void CHipoFibonacci::DrawLegLines() {
-   string mother_name = "HipoLine_Mother_" + TimeToString(anchorID);
-   string anchor_name = "HipoLine_Anchor_" + TimeToString(anchorID);
-   color anchor_color = (signalType == SIGNAL_BUY) ? settings.BuyEntryFibo_Color : settings.SellEntryFibo_Color;
+void CHipoFibonacci::DrawLegPoints() {
+   string mother_name = "HipoPoint_Mother_" + TimeToString(anchorID);
+   string anchor_name = "HipoPoint_Anchor_" + TimeToString(anchorID);
+   double offset = 5.0 * _Point; // فاصله استاندارد 5 پیپ
 
-   ObjectCreate(0, mother_name, OBJ_HLINE, 0, 0, mother.price);
-   ObjectSetInteger(0, mother_name, OBJPROP_COLOR, settings.MotherFibo_Color);
-   ObjectSetInteger(0, mother_name, OBJPROP_STYLE, STYLE_DOT);
-   ObjectSetInteger(0, mother_name, OBJPROP_WIDTH, 1);
-   ObjectSetInteger(0, mother_name, OBJPROP_RAY, true);
-   ObjectSetString(0, mother_name, OBJPROP_TEXT, "Mother Level");
+   // نقطه برای Mother (سقف برای BUY، کف برای SELL)
+   ObjectCreate(0, mother_name, OBJ_ARROW, 0, mother.time, signalType == SIGNAL_BUY ? mother.price + offset : mother.price - offset);
+   ObjectSetInteger(0, mother_name, OBJPROP_COLOR, signalType == SIGNAL_BUY ? clrGreen : clrRed);
+   ObjectSetInteger(0, mother_name, OBJPROP_STYLE, STYLE_SOLID);
+   ObjectSetInteger(0, mother_name, OBJPROP_WIDTH, 2);
+   ObjectSetInteger(0, mother_name, OBJPROP_ARROWCODE, 108);
+   ObjectSetString(0, mother_name, OBJPROP_TEXT, "Mother");
 
-   ObjectCreate(0, anchor_name, OBJ_HLINE, 0, 0, anchor.price);
-   ObjectSetInteger(0, anchor_name, OBJPROP_COLOR, anchor_color);
-   ObjectSetInteger(0, anchor_name, OBJPROP_STYLE, STYLE_DOT);
-   ObjectSetInteger(0, anchor_name, OBJPROP_WIDTH, 1);
-   ObjectSetInteger(0, anchor_name, OBJPROP_RAY, true);
-   ObjectSetString(0, anchor_name, OBJPROP_TEXT, "Anchor Level");
+   // نقطه برای Anchor (کف برای BUY، سقف برای SELL)
+   ObjectCreate(0, anchor_name, OBJ_ARROW, 0, anchor.time, signalType == SIGNAL_BUY ? anchor.price - offset : anchor.price + offset);
+   ObjectSetInteger(0, anchor_name, OBJPROP_COLOR, signalType == SIGNAL_BUY ? clrRed : clrGreen);
+   ObjectSetInteger(0, anchor_name, OBJPROP_STYLE, STYLE_SOLID);
+   ObjectSetInteger(0, anchor_name, OBJPROP_WIDTH, 2);
+   ObjectSetInteger(0, anchor_name, OBJPROP_ARROWCODE, 108);
+   ObjectSetString(0, anchor_name, OBJPROP_TEXT, "Anchor");
 }
 
 //+------------------------------------------------------------------+
-//| حذف خطوط لگ (DeleteLegLines)                                    |
+//| حذف نقاط لگ (DeleteLegPoints)                                    |
 //+------------------------------------------------------------------+
 
-void CHipoFibonacci::DeleteLegLines() {
-   string prefix = "HipoLine_" + TimeToString(anchorID);
+void CHipoFibonacci::DeleteLegPoints() {
+   string prefix = "HipoPoint_" + TimeToString(anchorID);
    for(int i = ObjectsTotal(0, 0, -1) - 1; i >= 0; i--) {
       string name = ObjectName(0, i);
       if(StringFind(name, prefix) >= 0) ObjectDelete(0, name);
@@ -681,27 +693,35 @@ void CHipoFibonacci::UpdateStatusPanel() {
 }
 
 //+------------------------------------------------------------------+
-//| رسم فیبوناچی (DrawFibo)                                         |
+//| رسم فیبوناچی (نسخه نهایی و ضدضربه برای حل باگ رنگ متاتریدر)      |
 //+------------------------------------------------------------------+
 
 void CHipoFibonacci::DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario) {
    string name = "HipoFibo_" + EnumToString(type) + "_" + TimeToString(anchorID);
    if(scenario != "") name += "_" + scenario;
 
-   // حذف فیبوی قبلی با همون نوع قبل از رسم جدید
-   ObjectDelete(0, "HipoFibo_" + EnumToString(type) + "_" + TimeToString(anchorID));
+   // مرحله ۱: ساخت آبجکت با مختصات موقت (هر دو نقطه در شروع)
+   if(!ObjectCreate(0, name, OBJ_FIBO, 0, time1, price1, time1, price1)) {
+      // اگر ساخت ناموفق بود، سعی کن مشخصاتش رو تغییر بدی
+      ObjectSetInteger(0, name, OBJPROP_TIME, 0, time1);
+      ObjectSetDouble(0, name, OBJPROP_PRICE, 0, price1);
+   }
 
-   ObjectCreate(0, name, OBJ_FIBO, 0, time1, price1, time2, price2);
+   // مرحله ۲: تنظیم تمام مشخصات (رنگ، استایل، سطوح و ...)
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
    ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
    ObjectSetString(0, name, OBJPROP_TEXT, scenario != "" ? scenario : EnumToString(type));
+   
+   ObjectSetInteger(0, name, OBJPROP_LEVELS, settings.FibonacciLevelsCount);
    for(int i = 0; i < settings.FibonacciLevelsCount; i++) {
       ObjectSetDouble(0, name, OBJPROP_LEVELVALUE, i, settings.FibonacciLevels[i] / 100.0);
       ObjectSetString(0, name, OBJPROP_LEVELTEXT, i, DoubleToString(settings.FibonacciLevels[i], 1) + "%");
    }
-   ObjectSetInteger(0, name, OBJPROP_LEVELS, settings.FibonacciLevelsCount);
+
+   // مرحله ۳: حالا که همه چیز تنظیم شد، نقطه دوم را به مکان نهایی منتقل کن
+   ObjectMove(0, name, 1, time2, price2);
 }
 
 //+------------------------------------------------------------------+
@@ -749,7 +769,7 @@ double CHipoFibonacci::CalculateFiboLevelPrice(E_FiboType type, double level) {
 void CHipoFibonacci::ResetState() {
    if(anchorID != 0) { // فقط اگر ساختار فعالی وجود داشت پاک کن
       DeleteFiboObjects();
-      DeleteLegLines();
+      DeleteLegPoints();
    }
    signalType = STOP_SEARCH;
    currentStatus = WAITING_FOR_COMMAND;
