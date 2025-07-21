@@ -3,7 +3,7 @@
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
 //| نسخه: 2.4                                                        |
-//| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 2.4) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ورود به معامله و توقف ساختار بهبود یافته است. |
+//| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 2.4) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ساختار و ورود به معامله بهبود یافته است. |
 //| هماهنگی: این کد با نسخه 2.4 کتابخانه HipoFibonacci.mqh طراحی شده است. |
 //+------------------------------------------------------------------+
 
@@ -28,11 +28,11 @@ int macd_mtf_handle;                    // هندل برای اندیکاتور 
 enum E_Trend { TREND_UP, TREND_DOWN, NEUTRAL }; // تعریف انوم برای وضعیت روند
 E_Trend currentTrend = NEUTRAL;         // وضعیت فعلی روند بازار
 bool isCommandSent = false;             // وضعیت ارسال دستور به کتابخانه (قفل)
+bool isStructureComplete = false;       // وضعیت اتمام ساختار بعد از ناحیه طلایی
 HipoSettings fiboSettings;              // ساختار تنظیمات کتابخانه HipoFibonacci
 datetime lastBarTime = 0;               // زمان آخرین کندل پردازش‌شده
 string lastError = "";                  // ذخیره آخرین خطا برای گزارش‌دهی
-datetime lastTradeTime = 0;             // زمان آخرین معامله
-datetime lastEntryZoneTime = 0;         // زمان آخرین فعال شدن ناحیه طلایی
+datetime lastTradeTime = 0;             // زمان آخرین معامله برای جلوگیری از ورود تند تند
 
 //+------------------------------------------------------------------+
 //| پارامترهای ورودی                                                 |
@@ -205,7 +205,7 @@ void OnTimer() {
    }
 
    // بخش ۲: منطق اصلی - این بخش فقط باید روی کندل جدید اجرا بشه تا سیگنال پایدار باشه
-   if(OnNewBar()) {
+   if(OnNewBar() && !isStructureComplete) {
       // اول روند را بر اساس کندل بسته شده تشخیص بده
       CoreProcessing();
       
@@ -243,7 +243,7 @@ bool OnNewBar() {
 }
 
 //+------------------------------------------------------------------+
-//| تابع پردازش اصلی (نسخه جدید با منطق درخواست/پاسخ و کنترل ورود)   |
+//| تابع پردازش اصلی (نسخه جدید با منطق درخواست/پاسخ و مدیریت ساختار) |
 //| این تابع منطق اصلی تحلیل و ارسال دستور به کتابخانه را اجرا می‌کند. |
 //+------------------------------------------------------------------+
 
@@ -273,17 +273,17 @@ void CoreProcessing() {
    // چک وضعیت فعلی کتابخونه
    E_Status currentStatus = HipoFibo.GetCurrentStatus();
 
-   // شرط توقف بر اساس تغییر HTF یا خنثی شدن
-   if((newTrend != currentTrend && isCommandSent) || (newTrend == NEUTRAL && isCommandSent)) {
+   // شرط توقف بر اساس تغییر HTF یا اتمام ساختار
+   if((newTrend != currentTrend && isCommandSent) || (newTrend == NEUTRAL && isCommandSent) || isStructureComplete) {
       currentTrend = newTrend;
       HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
       isCommandSent = false;
-      Print("روند در اکسپرت تغییر کرد یا خنثی شد. دستور توقف به کتابخانه ارسال شد.");
+      Print("روند تغییر کرد، خنثی شد، یا ساختار تموم شد. دستور توقف به کتابخانه ارسال شد.");
       return;
    }
 
-   // ارسال سیگنال جدید فقط اگر قبلاً دستوری ارسال نشده باشه و معامله باز نباشه
-   if(newTrend != NEUTRAL && !isCommandSent && CountOpenTrades() == 0 && !HipoFibo.IsEntryZoneActive()) {
+   // ارسال سیگنال جدید فقط اگر ساختار قبلی تموم شده باشه و معامله باز نباشه
+   if(newTrend != NEUTRAL && !isCommandSent && !isStructureComplete && CountOpenTrades() == 0) {
       currentTrend = newTrend;
       if(newTrend == TREND_UP) {
          HipoFibo.ReceiveCommand(SIGNAL_BUY, PERIOD_CURRENT);
@@ -303,7 +303,7 @@ void CoreProcessing() {
 //+------------------------------------------------------------------+
 
 void ExecuteTrade() {
-   if(CountOpenTradesInZone() > 0 || TimeCurrent() - lastEntryZoneTime < 60) return; // جلوگیری از ورود تند تند
+   if(CountOpenTradesInZone() > 0 || TimeCurrent() - lastTradeTime < 60) return; // جلوگیری از ورود تند تند
 
    double sl_price = HipoFibo.GetFiboLevelPrice(FIBO_MOTHER, 0.0);
    if(sl_price == 0.0) {
@@ -353,14 +353,15 @@ void ExecuteTrade() {
       }
    }
 
-   // ثبت زمان معامله و توقف ساختار
+   // اتمام ساختار بعد از معامله
+   isStructureComplete = true;
    lastTradeTime = TimeCurrent();
-   lastEntryZoneTime = TimeCurrent();
    HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
    isCommandSent = false;
-   Print("معامله اجرا شد و ساختار متوقف شد - حجم: ", volume, "، SL: ", final_sl_price, "، TP: ", take_profit);
 
-   if(trade.ResultRetcode() != TRADE_RETCODE_DONE) {
+   if(trade.ResultRetcode() == TRADE_RETCODE_DONE) {
+      Print("معامله با موفقیت اجرا شد - حجم: ", volume, "، SL: ", final_sl_price, "، TP: ", take_profit);
+   } else {
       Print("تلاش برای ورود به معامله انجام شد اما با خطا مواجه شد: ", lastError);
    }
 }
@@ -371,10 +372,7 @@ void ExecuteTrade() {
 //+------------------------------------------------------------------+
 
 void ExecuteTradeIfReady() {
-   if(HipoFibo.IsEntryZoneActive() && CountOpenTrades() < Max_Open_Trades) {
-      lastEntryZoneTime = TimeCurrent(); // ثبت زمان فعال شدن ناحیه طلایی
-      ExecuteTrade();
-   }
+   if(HipoFibo.IsEntryZoneActive() && !isStructureComplete && CountOpenTrades() < Max_Open_Trades) ExecuteTrade();
 }
 
 //+------------------------------------------------------------------+
