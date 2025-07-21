@@ -2,14 +2,14 @@
 //| HipoTrader.mq5                                                  |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 2.0                                                        |
+//| نسخه: 2.1                                                        |
 //| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 2.0) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ریسک، رابط کاربری، و تنظیمات چارت به‌صورت استاندارد و بهینه پیاده‌سازی شده است. |
 //| هماهنگی: این کد با نسخه 2.0 کتابخانه HipoFibonacci.mqh طراحی شده و از ساختارها و توابع آن به‌صورت دقیق استفاده می‌کند. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "2.0"
+#property version   "2.1"
 #property strict
 
 // شامل کردن کتابخانه‌های مورد نیاز
@@ -163,8 +163,12 @@ int OnInit() {
 void OnDeinit(const int reason) {
    if(macd_htf_handle != INVALID_HANDLE) IndicatorRelease(macd_htf_handle);
    if(macd_mtf_handle != INVALID_HANDLE) IndicatorRelease(macd_mtf_handle);
-   ObjectDelete(0, "HipoTrader_Panel");
    ObjectDelete(0, "HipoTrader_Panel_BG");
+   ObjectDelete(0, "HipoTrader_Panel_Trend");
+   ObjectDelete(0, "HipoTrader_Panel_HTF");
+   ObjectDelete(0, "HipoTrader_Panel_MTF");
+   ObjectDelete(0, "HipoTrader_Panel_Fibo");
+   ObjectDelete(0, "HipoTrader_Panel_Status");
    if(Enable_MACD_Display) {
       ObjectDelete(0, "HTF_MACD");
       ObjectDelete(0, "MTF_MACD");
@@ -182,36 +186,37 @@ void OnTick() {
 }
 
 //+------------------------------------------------------------------+
-//| تابع پردازش زمان‌بندی (نسخه اصلاح شده)                            |
-//| این تابع با ارسال صحیح داده‌ها به کتابخانه، مشکل نبود کندل را حل می‌کند. |
+//| تابع پردازش زمان‌بندی (نسخه نهایی با معماری صحیح)                 |
+//| این تابع با ارسال صحیح داده‌ها به کتابخانه و بررسی پایدار روند، مشکل ناپایداری را حل می‌کند. |
 //+------------------------------------------------------------------+
 
 void OnTimer() {
-   // بررسی پاسخ کتابخانه برای آزادسازی قفل
+   // بخش ۱: شنونده پاسخ - این بخش باید هر ثانیه اجرا بشه تا سریع واکنش بده
    if(isCommandSent && HipoFibo.GetCurrentStatus() == SEARCHING_FOR_LEG) {
       isCommandSent = false; // کتابخانه کارش تمام شده، قفل آزاد می‌شود
       Print("کتابخانه ساختار قبلی را تمام کرده. اکسپرت آماده ارسال دستور جدید است.");
    }
 
-   CoreProcessing();
-
+   // بخش ۲: منطق اصلی - این بخش فقط باید روی کندل جدید اجرا بشه تا سیگنال پایدار باشه
    if(OnNewBar()) {
-      // به تعداد کافی کندل درخواست بده (مثلا به اندازه نگاه به عقب + 5 کندل اضافه)
+      // اول روند را بر اساس کندل بسته شده تشخیص بده
+      CoreProcessing();
+      
+      // سپس داده‌های جدید را به کتابخانه ارسال کن
       int bars_to_copy = fiboSettings.KingPeakLookback + 5;
       MqlRates rates[];
       
-      // مهم: قبل از کپی، آرایه را به صورت سری تنظیم کن
       ArraySetAsSeries(rates, true);
       
       if(CopyRates(_Symbol, PERIOD_CURRENT, 0, bars_to_copy, rates) >= bars_to_copy) {
-         // حالا کل آرایه rates را به تابع جدید کتابخانه پاس بده
          HipoFibo.OnNewCandle(rates);
       } else {
          lastError = "تعداد کندل‌های کافی در تاریخچه برای تحلیل وجود ندارد.";
-         Print(lastError); // این لاگ برای دیباگ کردن خیلی مهمه
+         Print(lastError);
       }
    }
    
+   // بخش ۳: آپدیت پنل و بررسی ورود - اینها می‌توانند هر ثانیه اجرا شوند
    UpdateTraderPanel();
    ExecuteTradeIfReady();
 }
@@ -414,60 +419,122 @@ void CreateTraderPanel() {
    ObjectCreate(0, "HipoTrader_Panel_BG", OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_XDISTANCE, 10);
    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_YDISTANCE, 100);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_XSIZE, 200);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_YSIZE, 100);
+   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_XSIZE, 220);
+   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_YSIZE, 140);
    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_BGCOLOR, clrBlack);
    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_COLOR, clrWhite);
    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_CORNER, CORNER_LEFT_UPPER);
 
-   // ایجاد متن پنل
-   ObjectCreate(0, "HipoTrader_Panel", OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_XDISTANCE, 15);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_YDISTANCE, 105);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_ZORDER, 1);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_FONTSIZE, 12);
-   ObjectSetString(0, "HipoTrader_Panel", OBJPROP_FONT, "Arial");
+   // ایجاد لیبل‌های جداگانه برای هر خط متن
+   string labels[] = {"HipoTrader_Panel_Trend", "HipoTrader_Panel_HTF", "HipoTrader_Panel_MTF", "HipoTrader_Panel_Fibo", "HipoTrader_Panel_Status"};
+   int y_positions[] = {105, 125, 145, 165, 185};
+   
+   for(int i = 0; i < ArraySize(labels); i++) {
+      ObjectCreate(0, labels[i], OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, labels[i], OBJPROP_XDISTANCE, 15);
+      ObjectSetInteger(0, labels[i], OBJPROP_YDISTANCE, y_positions[i]);
+      ObjectSetInteger(0, labels[i], OBJPROP_ZORDER, 1);
+      ObjectSetInteger(0, labels[i], OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, labels[i], OBJPROP_FONTSIZE, 10);
+      ObjectSetString(0, labels[i], OBJPROP_FONT, "Arial");
+      ObjectSetInteger(0, labels[i], OBJPROP_COLOR, clrWhite); // رنگ متن ثابت سفید
+   }
    UpdateTraderPanel();
 }
 
 //+------------------------------------------------------------------+
 //| تابع به‌روزرسانی پنل رابط کاربری (UpdateTraderPanel)            |
-//| این تابع اطلاعات پنل را به‌روز می‌کند.                          |
+//| این تابع اطلاعات پنل را به‌روز می‌کند با دایره‌های رنگی.        |
 //+------------------------------------------------------------------+
 
 void UpdateTraderPanel() {
-   string statusText = "HipoTrader v2.0\n";
-   statusText += "روند: ";
-   color trendColor = clrGray;
+   // خط اول: روند کلی
+   string trend_text = "● روند: ";
+   color trend_color = clrGray;
    switch(currentTrend) {
-      case TREND_UP: statusText += "صعودی"; trendColor = clrGreen; break;
-      case TREND_DOWN: statusText += "نزولی"; trendColor = clrRed; break;
-      case NEUTRAL: statusText += "خنثی"; break;
+      case TREND_UP: trend_text += "صعودی"; trend_color = clrGreen; break;
+      case TREND_DOWN: trend_text += "نزولی"; trend_color = clrRed; break;
+      case NEUTRAL: trend_text += "خنثی"; break;
    }
-   statusText += "\nHTF MACD: ";
+   ObjectSetString(0, "HipoTrader_Panel_Trend", OBJPROP_TEXT, trend_text);
+   ObjectSetInteger(0, "HipoTrader_Panel_Trend", OBJPROP_COLOR, clrWhite);
+   ObjectSetString(0, "HipoTrader_Panel_Trend", OBJPROP_TEXT, StringSubstr(trend_text, 2)); // متن بدون دایره
+   ObjectSetString(0, "HipoTrader_Panel_Trend", OBJPROP_TEXT, "●"); // دایره رنگی
+   ObjectSetInteger(0, "HipoTrader_Panel_Trend", OBJPROP_COLOR, trend_color); // رنگ دایره
+   ObjectSetInteger(0, "HipoTrader_Panel_Trend", OBJPROP_XDISTANCE, 15);
+   ObjectSetString(0, "HipoTrader_Panel_Trend", OBJPROP_TEXT, trend_text);
+
+   // خط دوم: HTF MACD
+   string htf_text = "● HTF MACD: ";
+   color htf_color = clrGray;
    double htf_main[], htf_signal[];
    if(CopyBuffer(macd_htf_handle, 0, 1, 1, htf_main) >= 1 && CopyBuffer(macd_htf_handle, 1, 1, 1, htf_signal) >= 1) {
-      statusText += (htf_main[0] > htf_signal[0]) ? "صعودی" : "نزولی";
+      htf_text += (htf_main[0] > htf_signal[0]) ? "صعودی" : "نزولی";
+      htf_color = (htf_main[0] > htf_signal[0]) ? clrGreen : clrRed;
    } else {
-      statusText += "نامشخص";
+      htf_text += "نامشخص";
    }
-   statusText += "\nMTF MACD: ";
+   ObjectSetString(0, "HipoTrader_Panel_HTF", OBJPROP_TEXT, htf_text);
+   ObjectSetInteger(0, "HipoTrader_Panel_HTF", OBJPROP_COLOR, clrWhite);
+   ObjectSetString(0, "HipoTrader_Panel_HTF", OBJPROP_TEXT, StringSubstr(htf_text, 2));
+   ObjectSetString(0, "HipoTrader_Panel_HTF", OBJPROP_TEXT, "●");
+   ObjectSetInteger(0, "HipoTrader_Panel_HTF", OBJPROP_COLOR, htf_color);
+   ObjectSetInteger(0, "HipoTrader_Panel_HTF", OBJPROP_XDISTANCE, 15);
+   ObjectSetString(0, "HipoTrader_Panel_HTF", OBJPROP_TEXT, htf_text);
+
+   // خط سوم: MTF MACD
+   string mtf_text = "● MTF MACD: ";
+   color mtf_color = clrGray;
    double mtf_main[], mtf_signal[];
    if(CopyBuffer(macd_mtf_handle, 0, 1, 1, mtf_main) >= 1 && CopyBuffer(macd_mtf_handle, 1, 1, 1, mtf_signal) >= 1) {
-      statusText += (mtf_main[0] < 0) ? "صعودی" : "نزولی";
+      mtf_text += (mtf_main[0] < 0) ? "صعودی" : "نزولی";
+      mtf_color = (mtf_main[0] < 0) ? clrGreen : clrRed;
    } else {
-      statusText += "نامشخص";
+      mtf_text += "نامشخص";
    }
-   statusText += "\nHipoFibo: " + EnumToString(HipoFibo.GetCurrentStatus());
-   statusText += "\nوضعیت: ";
-   if(HipoFibo.IsEntryZoneActive()) statusText += "ناحیه طلایی فعال";
-   else if(CountOpenTrades() > 0) statusText += "معامله باز";
-   else statusText += isCommandSent ? "در انتظار پاسخ کتابخانه" : "جستجوی سیگنال";
+   ObjectSetString(0, "HipoTrader_Panel_MTF", OBJPROP_TEXT, mtf_text);
+   ObjectSetInteger(0, "HipoTrader_Panel_MTF", OBJPROP_COLOR, clrWhite);
+   ObjectSetString(0, "HipoTrader_Panel_MTF", OBJPROP_TEXT, StringSubstr(mtf_text, 2));
+   ObjectSetString(0, "HipoTrader_Panel_MTF", OBJPROP_TEXT, "●");
+   ObjectSetInteger(0, "HipoTrader_Panel_MTF", OBJPROP_COLOR, mtf_color);
+   ObjectSetInteger(0, "HipoTrader_Panel_MTF", OBJPROP_XDISTANCE, 15);
+   ObjectSetString(0, "HipoTrader_Panel_MTF", OBJPROP_TEXT, mtf_text);
 
-   ObjectSetString(0, "HipoTrader_Panel", OBJPROP_TEXT, statusText);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_COLOR, trendColor);
+   // خط چهارم: وضعیت HipoFibo
+   string fibo_text = "● HipoFibo: " + EnumToString(HipoFibo.GetCurrentStatus());
+   color fibo_color = clrGray;
+   if(HipoFibo.GetCurrentStatus() == ENTRY_ZONE_ACTIVE) fibo_color = clrGreen;
+   else if(HipoFibo.GetCurrentStatus() == SEARCHING_FOR_LEG) fibo_color = clrGray;
+   else fibo_color = clrYellow; // برای حالت‌های میانی مثل MONITORING یا AWAITING
+   ObjectSetString(0, "HipoTrader_Panel_Fibo", OBJPROP_TEXT, fibo_text);
+   ObjectSetInteger(0, "HipoTrader_Panel_Fibo", OBJPROP_COLOR, clrWhite);
+   ObjectSetString(0, "HipoTrader_Panel_Fibo", OBJPROP_TEXT, StringSubstr(fibo_text, 2));
+   ObjectSetString(0, "HipoTrader_Panel_Fibo", OBJPROP_TEXT, "●");
+   ObjectSetInteger(0, "HipoTrader_Panel_Fibo", OBJPROP_COLOR, fibo_color);
+   ObjectSetInteger(0, "HipoTrader_Panel_Fibo", OBJPROP_XDISTANCE, 15);
+   ObjectSetString(0, "HipoTrader_Panel_Fibo", OBJPROP_TEXT, fibo_text);
+
+   // خط پنجم: وضعیت کلی
+   string status_text = "● وضعیت: ";
+   color status_color = clrGray;
+   if(HipoFibo.IsEntryZoneActive()) {
+      status_text += "ناحیه طلایی فعال";
+      status_color = clrGreen;
+   } else if(CountOpenTrades() > 0) {
+      status_text += "معامله باز";
+      status_color = clrYellow;
+   } else {
+      status_text += isCommandSent ? "در انتظار پاسخ کتابخانه" : "جستجوی سیگنال";
+      status_color = isCommandSent ? clrYellow : clrGray;
+   }
+   ObjectSetString(0, "HipoTrader_Panel_Status", OBJPROP_TEXT, status_text);
+   ObjectSetInteger(0, "HipoTrader_Panel_Status", OBJPROP_COLOR, clrWhite);
+   ObjectSetString(0, "HipoTrader_Panel_Status", OBJPROP_TEXT, StringSubstr(status_text, 2));
+   ObjectSetString(0, "HipoTrader_Panel_Status", OBJPROP_TEXT, "●");
+   ObjectSetInteger(0, "HipoTrader_Panel_Status", OBJPROP_COLOR, status_color);
+   ObjectSetInteger(0, "HipoTrader_Panel_Status", OBJPROP_XDISTANCE, 15);
+   ObjectSetString(0, "HipoTrader_Panel_Status", OBJPROP_TEXT, status_text);
 }
 
 //+------------------------------------------------------------------+
