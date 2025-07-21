@@ -2,13 +2,13 @@
 //| HipoFibonacci.mqh                                                |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 3.0                                                        |
-//| توضیحات: کتابخانه مدیریت فیبوناچی برای شناسایی لگ‌های حرکتی با منطق فراکتال و پشتیبانی از تایم‌فریم‌های چندگانه. |
+//| نسخه: 3.1                                                        |
+//| توضیحات: کتابخانه مدیریت فیبوناچی با منطق لنگرگاه دینامیک و پشتیبانی از تایم‌فریم‌های چندگانه. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "3.0"
+#property version   "3.1"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -24,6 +24,7 @@ enum E_SignalType {
 enum E_Status {
    WAITING_FOR_COMMAND,            // منتظر دریافت دستور
    SEARCHING_FOR_LEG,              // جستجوی لگ حرکتی
+   SEARCHING_FOR_ANCHOR_DYNAMIC,   // در جستجوی لنگرگاه دینامیک
    MONITORING_SCENARIO_1_PROGRESS, // پایش پیشرفت سناریو 1
    SCENARIO_1_AWAITING_BREAKOUT,   // سناریو 1 - انتظار برای شکست
    SCENARIO_1_CONFIRMED_AWAITING_ENTRY, // سناریو 1 - انتظار برای ورود تأیید شده
@@ -85,12 +86,13 @@ private:
    string finalFiboScenario;
    bool isEntryZoneActive;
    bool isInFocusMode;
+   bool isAnchorLocked; // متغیر جدید برای قفل لنگرگاه
    double high[], low[], open[], close[];
    datetime time[];
    int rates_total;
 
    void ResetState();
-   bool FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out);
+   bool FindHipoLeg(PeakValley &mother_out);
    void CreateStatusPanel();
    void UpdateStatusPanel();
    void DrawFibo(E_FiboType type, double price1, double price2, datetime time1, datetime time2, color clr, string scenario = "");
@@ -251,7 +253,7 @@ void CHipoFibonacci::OnTradePerformed() {
 //| یافتن لگ حرکتی (FindHipoLeg)                                    |
 //+------------------------------------------------------------------+
 
-bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out) {
+bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out) {
    int required_candles = settings.SearchWindow + 2 * settings.Fractal_Lookback + 1;
    if(rates_total < required_candles) {
       if(settings.Enable_Logging) Print("[HipoFibo] تعداد کندل‌های کافی برای یافتن لگ وجود ندارد. نیاز: ", required_candles, "، موجود: ", rates_total);
@@ -270,7 +272,7 @@ bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out)
          }
          if(is_fractal) {
             mother_index = i;
-            break;
+            break; // جدیدترین قله فراکتالی را انتخاب می‌کنیم
          }
       }
       if(mother_index == -1) {
@@ -283,39 +285,6 @@ bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out)
       mother_out.position = mother_index;
 
       if(settings.Enable_Logging) Print("[HipoFibo] قله فراکتالی یافت شد: قیمت ", mother_out.price, ", زمان ", TimeToString(mother_out.time), ", ایندکس ", mother_out.position);
-
-      int anchor_index = ArrayMinimum(low, 1, mother_index);
-      if(anchor_index == -1) {
-         if(settings.Enable_Logging) Print("[HipoFibo] کف لنگرگاه یافت نشد.");
-         return false;
-      }
-
-      anchor_out.price = low[anchor_index];
-      anchor_out.time = time[anchor_index];
-      anchor_out.position = anchor_index;
-
-      if(settings.Enable_Logging) Print("[HipoFibo] کف لنگرگاه یافت شد: قیمت ", anchor_out.price, ", زمان ", TimeToString(anchor_out.time), ", ایندکس ", anchor_out.position);
-
-      double leg_size = (mother_out.price - anchor_out.price) / _Point;
-      if(leg_size < settings.Min_Leg_Size_Pips) {
-         if(settings.Enable_Logging) Print("[HipoFibo] لگ خیلی کوچک است: ", leg_size, " پیپ < ", settings.Min_Leg_Size_Pips, " پیپ.");
-         return false;
-      }
-
-      for(int i = anchor_index + 1; i < mother_index; i++) {
-         bool is_new_fractal = true;
-         for(int j = 1; j <= settings.Fractal_Lookback; j++) {
-            if(i - j < 0 || i + j >= rates_total || high[i] <= high[i - j] || high[i] <= high[i + j]) {
-               is_new_fractal = false;
-               break;
-            }
-         }
-         if(is_new_fractal && time[i] > mother_out.time) {
-            if(settings.Enable_Logging) Print("[HipoFibo] قله فراکتالی جدیدتر یافت شد در ایندکس ", i, ", لگ نامعتبر است.");
-            return false;
-         }
-      }
-
       return true;
    } else if(signalType == SIGNAL_SELL) {
       int mother_index = -1;
@@ -329,7 +298,7 @@ bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out)
          }
          if(is_fractal) {
             mother_index = i;
-            break;
+            break; // جدیدترین دره فراکتالی را انتخاب می‌کنیم
          }
       }
       if(mother_index == -1) {
@@ -342,39 +311,6 @@ bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out)
       mother_out.position = mother_index;
 
       if(settings.Enable_Logging) Print("[HipoFibo] دره فراکتالی یافت شد: قیمت ", mother_out.price, ", زمان ", TimeToString(mother_out.time), ", ایندکس ", mother_out.position);
-
-      int anchor_index = ArrayMaximum(high, 1, mother_index);
-      if(anchor_index == -1) {
-         if(settings.Enable_Logging) Print("[HipoFibo] سقف لنگرگاه یافت نشد.");
-         return false;
-      }
-
-      anchor_out.price = high[anchor_index];
-      anchor_out.time = time[anchor_index];
-      anchor_out.position = anchor_index;
-
-      if(settings.Enable_Logging) Print("[HipoFibo] سقف لنگرگاه یافت شد: قیمت ", anchor_out.price, ", زمان ", TimeToString(anchor_out.time), ", ایندکس ", anchor_out.position);
-
-      double leg_size = (anchor_out.price - mother_out.price) / _Point;
-      if(leg_size < settings.Min_Leg_Size_Pips) {
-         if(settings.Enable_Logging) Print("[HipoFibo] لگ خیلی کوچک است: ", leg_size, " پیپ < ", settings.Min_Leg_Size_Pips, " پیپ.");
-         return false;
-      }
-
-      for(int i = anchor_index + 1; i < mother_index; i++) {
-         bool is_new_fractal = true;
-         for(int j = 1; j <= settings.Fractal_Lookback; j++) {
-            if(i - j < 0 || i + j >= rates_total || low[i] >= low[i - j] || low[i] >= low[i + j]) {
-               is_new_fractal = false;
-               break;
-            }
-         }
-         if(is_new_fractal && time[i] > mother_out.time) {
-            if(settings.Enable_Logging) Print("[HipoFibo] دره فراکتالی جدیدتر یافت شد در ایندکس ", i, ", لگ نامعتبر است.");
-            return false;
-         }
-      }
-
       return true;
    }
 
@@ -382,29 +318,103 @@ bool CHipoFibonacci::FindHipoLeg(PeakValley &mother_out, PeakValley &anchor_out)
 }
 
 //+------------------------------------------------------------------+
-//| پردازش منطق خرید (ProcessBuyLogic)                               |
+//| پردازش منطق خرید (نسخه نهایی با پیاده‌سازی صحیح لنگرگاه دینامیک)   |
 //+------------------------------------------------------------------+
-
 void CHipoFibonacci::ProcessBuyLogic() {
+   // --- فاز ۱: جستجوی لگ و یافتن Mother ---
    if(currentStatus == SEARCHING_FOR_LEG && !isInFocusMode) {
-      PeakValley localMother, localAnchor;
-      if(FindHipoLeg(localMother, localAnchor)) {
+      PeakValley localMother;
+      if(FindHipoLeg(localMother)) {
          mother = localMother;
-         anchor = localAnchor;
-         anchorID = localAnchor.time;
+         
+         // یافتن Anchor اولیه
+         int anchor_index = ArrayMinimum(low, 1, mother.position);
+         if(anchor_index == -1) { 
+            if(settings.Enable_Logging) Print("[HipoFibo] کف لنگرگاه یافت نشد.");
+            ResetState(); 
+            return; 
+         }
+
+         anchor.price = low[anchor_index];
+         anchor.time = time[anchor_index];
+         anchor.position = anchor_index;
+         
+         // *** اصلاح کلیدی: anchorID فقط یک بار و بر اساس زمان لنگرگاه اولیه ست می‌شود ***
+         anchorID = anchor.time;
+
+         double leg_size = (mother.price - anchor.price) / _Point;
+         if(leg_size < settings.Min_Leg_Size_Pips) {
+            if(settings.Enable_Logging) Print("[HipoFibo] لگ اولیه خیلی کوچک است: ", leg_size, " پیپ.");
+            ResetState(); // ریست کامل چون ساختار معتبر نیست
+            return;
+         }
+
          isInFocusMode = true;
+         isAnchorLocked = false;
+         currentStatus = SEARCHING_FOR_ANCHOR_DYNAMIC;
          if(settings.Enable_Drawing) {
             DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
             DrawLegPoints();
          }
-         if(settings.Enable_Logging) Print("لگ خرید یافت شد: Mother_High در قیمت ", mother.price, ", زمان ", TimeToString(mother.time), ", Anchor_Low در ", anchor.price, ", زمان ", TimeToString(anchor.time));
-         currentStatus = MONITORING_SCENARIO_1_PROGRESS;
-      } else {
-         if(settings.Enable_Logging) Print("[HipoFibo] لگ معتبر یافت نشد.");
+         if(settings.Enable_Logging) Print("مادر یافت شد. ورود به فاز لنگرگاه دینامیک. لنگرگاه اولیه: ", anchor.price);
       }
    }
+   // --- فاز ۲: جستجوی شناور برای لنگرگاه نهایی ---
+   else if(currentStatus == SEARCHING_FOR_ANCHOR_DYNAMIC) {
+      // *** اصلاح کلیدی: همیشه آبجکت‌های قبلی را پاک کن تا فقط نسخه آخر بماند ***
+      if(settings.Enable_Drawing) {
+         DeleteFiboObjects(); 
+         DeleteLegPoints();
+      }
+
+      // آپدیت لنگرگاه اگر قیمت پایین‌تر رفته باشد و هنوز قفل نشده باشد
+      if(!isAnchorLocked) {
+         int new_anchor_index = ArrayMinimum(low, 1, mother.position);
+         if(new_anchor_index != -1 && low[new_anchor_index] < anchor.price) {
+            anchor.price = low[new_anchor_index];
+            anchor.time = time[new_anchor_index];
+            anchor.position = new_anchor_index;
+            if(settings.Enable_Logging) Print("لنگرگاه دینامیک آپدیت شد: ", anchor.price);
+         }
+      }
+
+      // بررسی اندازه لگ
+      double leg_size = (mother.price - anchor.price) / _Point;
+      if(leg_size < settings.Min_Leg_Size_Pips) {
+         if(settings.Enable_Logging) Print("[HipoFibo] لگ خیلی کوچک است: ", leg_size, " پیپ < ", settings.Min_Leg_Size_Pips, " پیپ.");
+         ResetState();
+         return;
+      }
+
+      // رسم مجدد آبجکت‌ها با موقعیت فعلی لنگرگاه
+      if(settings.Enable_Drawing) {
+         DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
+         DrawLegPoints();
+      }
+
+      // بررسی شرط ابطال: آیا قیمت از Mother_High عبور کرده است؟
+      if(high[1] > mother.price) {
+         if(settings.Enable_Logging) Print("ابطال ساختار: قیمت از Mother_High عبور کرد.");
+         ResetState();
+         return;
+      }
+
+      // بررسی شرط قفل شدن لنگرگاه
+      double fibo_50_level = CalculateFiboLevelPrice(FIBO_MOTHER, 50.0);
+      if(high[1] >= fibo_50_level && !isAnchorLocked) {
+         isAnchorLocked = true;
+         if(settings.Enable_Logging) Print("لنگرگاه در قیمت ", anchor.price, " قفل شد. ورود به فاز پایش.");
+         currentStatus = MONITORING_SCENARIO_1_PROGRESS;
+         // **نکته:** بعد از تغییر وضعیت، رسم فیبوی میانی به کندل بعدی موکول می‌شود که صحیح است.
+         return; 
+      }
+   }
+   // --- فاز ۳: پایش سناریو ۱ (بعد از قفل شدن لنگرگاه) ---
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
-      DrawFibo(FIBO_INTERMEDIATE, anchor.price, high[1], anchor.time, time[1], settings.IntermediateFibo_Color);
+      if(settings.Enable_Drawing) {
+         ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
+         DrawFibo(FIBO_INTERMEDIATE, anchor.price, high[1], anchor.time, time[1], settings.IntermediateFibo_Color);
+      }
       
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
@@ -434,6 +444,7 @@ void CHipoFibonacci::ProcessBuyLogic() {
          if(settings.Enable_Logging) Print("پولبک به ناحیه طلایی، انتظار شکست Temporary_High در ", temporary.price);
       }
    }
+   // --- فاز ۴: انتظار شکست برای سناریو ۱ ---
    else if(currentStatus == SCENARIO_1_AWAITING_BREAKOUT) {
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
@@ -441,8 +452,10 @@ void CHipoFibonacci::ProcessBuyLogic() {
          return;
       }
       if(high[1] > temporary.price) {
-         ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
-         DrawFibo(FIBO_FINAL, anchor.price, high[1], anchor.time, time[1], settings.BuyEntryFibo_Color, "Scenario1");
+         if(settings.Enable_Drawing) {
+            ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
+            DrawFibo(FIBO_FINAL, anchor.price, high[1], anchor.time, time[1], settings.BuyEntryFibo_Color, "Scenario1");
+         }
          finalPoint.price = high[1];
          finalPoint.time = time[1];
          finalPoint.position = 1;
@@ -451,6 +464,7 @@ void CHipoFibonacci::ProcessBuyLogic() {
          if(settings.Enable_Logging) Print("سناریو ۱ تأیید شد، Temporary_High شکسته شد.");
       }
    }
+   // --- فاز ۵: انتظار ورود برای سناریو ۱ ---
    else if(currentStatus == SCENARIO_1_CONFIRMED_AWAITING_ENTRY) {
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
@@ -466,6 +480,7 @@ void CHipoFibonacci::ProcessBuyLogic() {
          if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], ", زمان ", TimeToString(time[1]));
       }
    }
+   // --- فاز ۶: پایش سناریو ۲ و هدف‌گذاری اکستنشن ---
    else if(currentStatus == SCENARIO_2_ACTIVE_TARGETING_EXTENSION) {
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
@@ -483,19 +498,24 @@ void CHipoFibonacci::ProcessBuyLogic() {
             finalPoint.price = high[1];
             finalPoint.time = time[1];
             finalPoint.position = 1;
-            ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
-            DrawFibo(FIBO_INTERMEDIATE, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.IntermediateFibo_Color);
+            if(settings.Enable_Drawing) {
+               ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
+               DrawFibo(FIBO_INTERMEDIATE, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.IntermediateFibo_Color);
+            }
             if(settings.Enable_Logging) Print("آپدیت سقف نهایی سناریو ۲ در قیمت ", finalPoint.price);
          }
          if(high[1] < finalPoint.price && finalPoint.price > 0) {
-            ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
-            DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.BuyEntryFibo_Color, "Scenario2");
+            if(settings.Enable_Drawing) {
+               ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
+               DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.BuyEntryFibo_Color, "Scenario2");
+            }
             finalFiboScenario = "Scenario2";
             currentStatus = SCENARIO_2_CONFIRMED_AWAITING_ENTRY;
             if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از سقف نهایی ", finalPoint.price, " شروع شد");
          }
       }
    }
+   // --- فاز ۷: انتظار ورود برای سناریو ۲ ---
    else if(currentStatus == SCENARIO_2_CONFIRMED_AWAITING_ENTRY) {
       if(low[1] < anchor.price - settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", low[1]);
@@ -519,29 +539,101 @@ void CHipoFibonacci::ProcessBuyLogic() {
 }
 
 //+------------------------------------------------------------------+
-//| پردازش منطق فروش (ProcessSellLogic)                              |
+//| پردازش منطق فروش (نسخه نهایی با پیاده‌سازی صحیح لنگرگاه دینامیک)    |
 //+------------------------------------------------------------------+
-
 void CHipoFibonacci::ProcessSellLogic() {
+   // --- فاز ۱: جستجوی لگ و یافتن Mother ---
    if(currentStatus == SEARCHING_FOR_LEG && !isInFocusMode) {
-      PeakValley localMother, localAnchor;
-      if(FindHipoLeg(localMother, localAnchor)) {
+      PeakValley localMother;
+      if(FindHipoLeg(localMother)) {
          mother = localMother;
-         anchor = localAnchor;
-         anchorID = localAnchor.time;
+         
+         int anchor_index = ArrayMaximum(high, 1, mother.position);
+         if(anchor_index == -1) { 
+            if(settings.Enable_Logging) Print("[HipoFibo] سقف لنگرگاه یافت نشد.");
+            ResetState(); 
+            return; 
+         }
+
+         anchor.price = high[anchor_index];
+         anchor.time = time[anchor_index];
+         anchor.position = anchor_index;
+
+         // *** اصلاح کلیدی: anchorID فقط یک بار و بر اساس زمان لنگرگاه اولیه ست می‌شود ***
+         anchorID = anchor.time;
+
+         double leg_size = (anchor.price - mother.price) / _Point;
+         if(leg_size < settings.Min_Leg_Size_Pips) {
+            if(settings.Enable_Logging) Print("[HipoFibo] لگ اولیه خیلی کوچک است: ", leg_size, " پیپ.");
+            ResetState();
+            return;
+         }
+
          isInFocusMode = true;
+         isAnchorLocked = false;
+         currentStatus = SEARCHING_FOR_ANCHOR_DYNAMIC;
          if(settings.Enable_Drawing) {
             DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
             DrawLegPoints();
          }
-         if(settings.Enable_Logging) Print("لگ فروش یافت شد: Mother_Low در قیمت ", mother.price, ", زمان ", TimeToString(mother.time), ", Anchor_High در ", anchor.price, ", زمان ", TimeToString(anchor.time));
-         currentStatus = MONITORING_SCENARIO_1_PROGRESS;
-      } else {
-         if(settings.Enable_Logging) Print("[HipoFibo] لگ معتبر یافت نشد.");
+         if(settings.Enable_Logging) Print("مادر یافت شد. ورود به فاز لنگرگاه دینامیک. لنگرگاه اولیه: ", anchor.price);
       }
    }
+   // --- فاز ۲: جستجوی شناور برای لنگرگاه نهایی ---
+   else if(currentStatus == SEARCHING_FOR_ANCHOR_DYNAMIC) {
+      // *** اصلاح کلیدی: همیشه آبجکت‌های قبلی را پاک کن ***
+      if(settings.Enable_Drawing) {
+         DeleteFiboObjects();
+         DeleteLegPoints();
+      }
+
+      // آپدیت لنگرگاه اگر قیمت بالاتر رفته باشد و هنوز قفل نشده باشد
+      if(!isAnchorLocked) {
+         int new_anchor_index = ArrayMaximum(high, 1, mother.position);
+            if(new_anchor_index != -1 && high[new_anchor_index] > anchor.price) {
+            anchor.price = high[new_anchor_index];
+            anchor.time = time[new_anchor_index];
+            anchor.position = new_anchor_index;
+            if(settings.Enable_Logging) Print("لنگرگاه دینامیک آپدیت شد: ", anchor.price);
+         }
+      }
+
+      // بررسی اندازه لگ
+      double leg_size = (anchor.price - mother.price) / _Point;
+      if(leg_size < settings.Min_Leg_Size_Pips) {
+         if(settings.Enable_Logging) Print("[HipoFibo] لگ خیلی کوچک است: ", leg_size, " پیپ < ", settings.Min_Leg_Size_Pips, " پیپ.");
+         ResetState();
+         return;
+      }
+
+      // رسم مجدد آبجکت‌ها
+      if(settings.Enable_Drawing) {
+         DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
+         DrawLegPoints();
+      }
+
+      // بررسی شرط ابطال
+      if(low[1] < mother.price) {
+         if(settings.Enable_Logging) Print("ابطال ساختار: قیمت از Mother_Low عبور کرد.");
+         ResetState();
+         return;
+      }
+
+      // بررسی شرط قفل شدن
+      double fibo_50_level = CalculateFiboLevelPrice(FIBO_MOTHER, 50.0);
+      if(low[1] <= fibo_50_level && !isAnchorLocked) {
+         isAnchorLocked = true;
+         if(settings.Enable_Logging) Print("لنگرگاه در قیمت ", anchor.price, " قفل شد. ورود به فاز پایش.");
+         currentStatus = MONITORING_SCENARIO_1_PROGRESS;
+         return;
+      }
+   }
+   // --- فاز ۳: پایش سناریو ۱ (بعد از قفل شدن لنگرگاه) ---
    else if(currentStatus == MONITORING_SCENARIO_1_PROGRESS) {
-      DrawFibo(FIBO_INTERMEDIATE, anchor.price, low[1], anchor.time, time[1], settings.IntermediateFibo_Color);
+      if(settings.Enable_Drawing) {
+         ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
+         DrawFibo(FIBO_INTERMEDIATE, anchor.price, low[1], anchor.time, time[1], settings.IntermediateFibo_Color);
+      }
       
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
@@ -571,6 +663,7 @@ void CHipoFibonacci::ProcessSellLogic() {
          if(settings.Enable_Logging) Print("پولبک به ناحیه طلایی، انتظار شکست Temporary_Low در ", temporary.price);
       }
    }
+   // --- فاز ۴: انتظار شکست برای سناریو ۱ ---
    else if(currentStatus == SCENARIO_1_AWAITING_BREAKOUT) {
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
@@ -578,8 +671,10 @@ void CHipoFibonacci::ProcessSellLogic() {
          return;
       }
       if(low[1] < temporary.price) {
-         ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
-         DrawFibo(FIBO_FINAL, anchor.price, low[1], anchor.time, time[1], settings.SellEntryFibo_Color, "Scenario1");
+         if(settings.Enable_Drawing) {
+            ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
+            DrawFibo(FIBO_FINAL, anchor.price, low[1], anchor.time, time[1], settings.SellEntryFibo_Color, "Scenario1");
+         }
          finalPoint.price = low[1];
          finalPoint.time = time[1];
          finalPoint.position = 1;
@@ -588,6 +683,7 @@ void CHipoFibonacci::ProcessSellLogic() {
          if(settings.Enable_Logging) Print("سناریو ۱ تأیید شد، Temporary_Low شکسته شد.");
       }
    }
+   // --- فاز ۵: انتظار ورود برای سناریو ۱ ---
    else if(currentStatus == SCENARIO_1_CONFIRMED_AWAITING_ENTRY) {
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
@@ -603,6 +699,7 @@ void CHipoFibonacci::ProcessSellLogic() {
          if(settings.Enable_Logging) Print("ناحیه طلایی فعال در قیمت ", close[1], ", زمان ", TimeToString(time[1]));
       }
    }
+   // --- فاز ۶: پایش سناریو ۲ و هدف‌گذاری اکستنشن ---
    else if(currentStatus == SCENARIO_2_ACTIVE_TARGETING_EXTENSION) {
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
@@ -620,19 +717,24 @@ void CHipoFibonacci::ProcessSellLogic() {
             finalPoint.price = low[1];
             finalPoint.time = time[1];
             finalPoint.position = 1;
-            ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
-            DrawFibo(FIBO_INTERMEDIATE, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.IntermediateFibo_Color);
+            if(settings.Enable_Drawing) {
+               ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
+               DrawFibo(FIBO_INTERMEDIATE, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.IntermediateFibo_Color);
+            }
             if(settings.Enable_Logging) Print("آپدیت کف نهایی سناریو ۲ در قیمت ", finalPoint.price);
          }
          if(low[1] > finalPoint.price && finalPoint.price > 0) {
-            ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
-            DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.SellEntryFibo_Color, "Scenario2");
+            if(settings.Enable_Drawing) {
+               ObjectDelete(0, "HipoFibo_INTERMEDIATE_" + TimeToString(anchorID));
+               DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.SellEntryFibo_Color, "Scenario2");
+            }
             finalFiboScenario = "Scenario2";
             currentStatus = SCENARIO_2_CONFIRMED_AWAITING_ENTRY;
             if(settings.Enable_Logging) Print("سناریو ۲ تأیید شد، پولبک از کف نهایی ", finalPoint.price, " شروع شد");
          }
       }
    }
+   // --- فاز ۷: انتظار ورود برای سناریو ۲ ---
    else if(currentStatus == SCENARIO_2_CONFIRMED_AWAITING_ENTRY) {
       if(high[1] > anchor.price + settings.MarginPips * _Point) {
          if(settings.Enable_Logging) Print("شکست ساختار: لنگرگاه شکسته در قیمت ", high[1]);
@@ -671,7 +773,8 @@ void CHipoFibonacci::DrawLegPoints() {
    ObjectSetInteger(0, mother_name, OBJPROP_ARROWCODE, 108);
    ObjectSetString(0, mother_name, OBJPROP_TEXT, "Mother");
 
-   ObjectCreate(0, anchor_name, OBJ_ARROW, 0, anchor.time, signalType == SIGNAL_BUY ? anchor.price - offset : anchor.price + offset);
+   ObjectCreate(0, anchor_name, OBJ_ARROW, 0, anchor.time, signalType == SIGNAL Delphi:Delphi
+      SIGNAL_BUY ? anchor.price - offset : anchor.price + offset);
    ObjectSetInteger(0, anchor_name, OBJPROP_COLOR, signalType == SIGNAL_BUY ? clrRed : clrGreen);
    ObjectSetInteger(0, anchor_name, OBJPROP_STYLE, STYLE_SOLID);
    ObjectSetInteger(0, anchor_name, OBJPROP_WIDTH, 2);
@@ -755,6 +858,7 @@ void CHipoFibonacci::UpdateStatusPanel() {
    switch(currentStatus) {
       case WAITING_FOR_COMMAND: statusText += "منتظر دستور"; break;
       case SEARCHING_FOR_LEG: statusText += "جستجوی لگ حرکتی"; break;
+      case SEARCHING_FOR_ANCHOR_DYNAMIC: statusText += "جستجوی لنگرگاه دینامیک"; break;
       case MONITORING_SCENARIO_1_PROGRESS: statusText += "پایش سناریو ۱"; break;
       case SCENARIO_1_AWAITING_BREAKOUT: statusText += "سناریو ۱ - انتظار شکست"; break;
       case SCENARIO_1_CONFIRMED_AWAITING_ENTRY: statusText += "سناریو ۱ - انتظار ورود"; break;
@@ -878,6 +982,7 @@ void CHipoFibonacci::ResetState() {
    anchor.position = 0; mother.position = 0; temporary.position = 0; finalPoint.position = 0;
    isEntryZoneActive = false;
    isInFocusMode = false;
+   isAnchorLocked = false; // ریست متغیر جدید
    finalFiboScenario = "";
    entryZoneActivationTime = 0;
    UpdateStatusPanel();
