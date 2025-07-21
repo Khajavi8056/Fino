@@ -115,7 +115,7 @@ public:
 
    void Init(HipoSettings &inputSettings); // تنظیم اولیه
    void ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe); // دریافت دستور
-   void OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]); // پردازش کندل جدید
+   void OnNewCandle(const MqlRates &rates[]); // پردازش کندل جدید با دریافت آرایه MqlRates
    bool IsEntryZoneActive() { return isEntryZoneActive; } // بررسی فعال بودن ناحیه ورود
    datetime GetEntryZoneActivationTime() { return entryZoneActivationTime; } // دریافت زمان فعال‌سازی ناحیه ورود
    string GetFinalFiboScenario() { return finalFiboScenario; } // دریافت سناریوی نهایی
@@ -264,34 +264,40 @@ void CHipoFibonacci::ReceiveCommand(E_SignalType type, ENUM_TIMEFRAMES timeframe
 }
 
 //+------------------------------------------------------------------+
-//| پردازش کندل جدید (On New Candle)                                 |
-//| این تابع با دریافت داده‌های جدید کندل، منطق را به‌روزرسانی می‌کند. |
+//| پردازش کندل جدید (نسخه اصلاح شده با MqlRates)                     |
+//| این تابع با دریافت آرایه MqlRates، داده‌های داخلی را به‌روز می‌کند. |
 //+------------------------------------------------------------------+
 
-void CHipoFibonacci::OnNewCandle(const int rates_total_input, const datetime &time_input[], const double &open_input[], const double &high_input[], const double &low_input[], const double &close_input[]) {
+void CHipoFibonacci::OnNewCandle(const MqlRates &rates[]) {
    if(currentStatus == WAITING_FOR_COMMAND) return;
 
-   rates_total = rates_total_input;
+   rates_total = ArraySize(rates);
+   if (rates_total == 0) return; // اگر آرایه خالی بود، خارج شو
+
+   // تغییر اندازه آرایه‌های داخلی
    ArrayResize(high, rates_total);
    ArrayResize(low, rates_total);
    ArrayResize(open, rates_total);
    ArrayResize(close, rates_total);
    ArrayResize(time, rates_total);
 
-   // 1. اول داده‌ها را کپی کن
-   ArrayCopy(high, high_input, 0, 0, rates_total);
-   ArrayCopy(low, low_input, 0, 0, rates_total);
-   ArrayCopy(open, open_input, 0, 0, rates_total);
-   ArrayCopy(close, close_input, 0, 0, rates_total);
-   ArrayCopy(time, time_input, 0, 0, rates_total);
+   // کپی داده‌ها از آرایه MqlRates به آرایه‌های داخلی کلاس
+   for(int i = 0; i < rates_total; i++) {
+      time[i]  = rates[i].time;
+      open[i]  = rates[i].open;
+      high[i]  = rates[i].high;
+      low[i]   = rates[i].low;
+      close[i] = rates[i].close;
+   }
 
-   // 2. حالا که آرایه‌ها پر شدن، به متاتریدر بگو چطور بخوندشون
+   // حالا که آرایه‌ها پر شدن، اونها رو به صورت سری تنظیم کن
    ArraySetAsSeries(high, true);
    ArraySetAsSeries(low, true);
    ArraySetAsSeries(open, true);
    ArraySetAsSeries(close, true);
    ArraySetAsSeries(time, true);
 
+   // اجرای منطق اصلی
    if(signalType == SIGNAL_BUY) ProcessBuyLogic();
    else if(signalType == SIGNAL_SELL) ProcessSellLogic();
 
@@ -557,8 +563,8 @@ void CHipoFibonacci::ProcessSellLogic() {
             finalPoint.price = low[1];
             finalPoint.time = time[1];
             finalPoint.position = 1;
-            if(settings.Enable_Logging) Print("آپدیت کف نهایی سناریو ۲ در قیمت ", finalPoint.price, " در ", TimeToString(finalPoint.time));
             if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.IntermediateFibo_Color, "Scenario2");
+            if(settings.Enable_Logging && finalPoint.price > 0) Print("آپدیت کف نهایی سناریو ۲ در قیمت ", finalPoint.price, " در ", TimeToString(finalPoint.time));
          }
          if(low[1] > finalPoint.price && finalPoint.price > 0) {
             if(settings.Enable_Drawing) DrawFibo(FIBO_FINAL, anchor.price, finalPoint.price, anchor.time, finalPoint.time, settings.SellEntryFibo_Color, "Scenario2");
