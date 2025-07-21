@@ -2,14 +2,14 @@
 //| HipoTrader.mq5                                                  |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 1.2                                                        |
-//| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 1.3) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ریسک، رابط کاربری و تنظیمات چارت به‌صورت استاندارد و بهینه پیاده‌سازی شده است.
+//| نسخه: 1.1                                                        |
+//| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 1.3) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ریسک، رابط کاربری، و تنظیمات چارت به‌صورت استاندارد و بهینه پیاده‌سازی شده است.
 //| هماهنگی: این کد با آخرین نسخه کتابخانه HipoFibonacci.mqh (1.3) طراحی شده و از ساختارها و توابع آن به‌صورت دقیق استفاده می‌کند.
 //+------------------------------------------------------------------*/
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.2"
+#property version   "1.1"
 #property strict
 
 // شامل کردن کتابخانه‌های مورد نیاز
@@ -21,7 +21,8 @@
 //| این بخش شامل متغیرهای اصلی اکسپرت است که در کل برنامه استفاده می‌شوند.
 //| - HipoFibo: نمونه از کلاس CHipoFibonacci برای مدیریت سطوح فیبوناچی
 //| - trade: شیء برای مدیریت معاملات با استفاده از CTrade
-//| - macd_handles: هندل‌های اندیکاتور MACD برای دو تایم‌فریم
+//| - macd_htf_handle: هندل برای اندیکاتور MACD در تایم‌فریم بالا
+//| - macd_mtf_handle: هندل برای اندیکاتور MACD در تایم‌فریم میانی
 //| - currentTrend: وضعیت فعلی روند بازار (صعودی، نزولی، یا خنثی)
 //| - lastBarTime: زمان آخرین کندل برای تشخیص کندل جدید
 //| - lastError: ذخیره آخرین خطای رخ‌داده برای لاگ یا نمایش
@@ -33,7 +34,7 @@ int macd_htf_handle;                    // هندل برای اندیکاتور 
 int macd_mtf_handle;                    // هندل برای اندیکاتور MACD در تایم‌فریم میانی
 enum E_Trend { TREND_UP, TREND_DOWN, NEUTRAL }; // تعریف انوم برای وضعیت روند
 E_Trend currentTrend = NEUTRAL;         // وضعیت فعلی روند بازار
-HipoSettings fiboSettings;              // ساختار تنظیمات برای کتابخانه HipoFibonacci
+HipoSettings fiboSettings;              // ساختار تنظیمات کتابخانه HipoFibonacci
 datetime lastBarTime = 0;               // زمان آخرین کندل پردازش‌شده
 string lastError = "";                  // ذخیره آخرین خطا برای گزارش‌دهی
 
@@ -76,20 +77,26 @@ input bool Enable_Confirmation_Filter = false; // فعال‌سازی فیلتر
 //| تابع راه‌اندازی اولیه (OnInit)                                   |
 //| این تابع هنگام شروع اکسپرت اجرا شده و تنظیمات اولیه را اعمال می‌کند.
 //| - تنظیم ظاهر چارت (غیرفعال کردن گرید، تنظیم رنگ‌ها)
-//| - اعتبارسنجی پارامترهای ورودی
-//| - راه‌اندازی کتابخانه HipoFibonacci و اندیکاتورها
+//| - اعتبارسنجی پارامترهای ورودی برای جلوگیری از خطا
+//| - راه‌اندازی کتابخانه HipoFibonacci و اندیکاتورهای MACD
 //+------------------------------------------------------------------+
 
 int OnInit() {
    // غیرفعال کردن خطوط گرید چارت برای سادگی بصری
-   ChartSetInteger(ChartID(), CHART_SHOW_GRID, false);
+   if(!ChartSetInteger(ChartID(), CHART_SHOW_GRID, false)) {
+      lastError = "خطا در غیرفعال کردن گرید چارت";
+      return INIT_FAILED;
+   }
    
    // تنظیم رنگ پس‌زمینه و کندل‌ها برای ظاهر حرفه‌ای
-   ChartSetInteger(ChartID(), CHART_COLOR_BACKGROUND, clrBlack);
-   ChartSetInteger(ChartID(), CHART_COLOR_CANDLE_BULL, clrGreen);
-   ChartSetInteger(ChartID(), CHART_COLOR_CANDLE_BEAR, clrRed);
-   ChartSetInteger(ChartID(), CHART_COLOR_CHART_UP, clrGreen);
-   ChartSetInteger(ChartID(), CHART_COLOR_CHART_DOWN, clrRed);
+   if(!ChartSetInteger(ChartID(), CHART_COLOR_BACKGROUND, clrBlack) ||
+      !ChartSetInteger(ChartID(), CHART_COLOR_CANDLE_BULL, clrGreen) ||
+      !ChartSetInteger(ChartID(), CHART_COLOR_CANDLE_BEAR, clrRed) ||
+      !ChartSetInteger(ChartID(), CHART_COLOR_CHART_UP, clrGreen) ||
+      !ChartSetInteger(ChartID(), CHART_COLOR_CHART_DOWN, clrRed)) {
+      lastError = "خطا در تنظیم رنگ‌های چارت";
+      return INIT_FAILED;
+   }
 
    // اعتبارسنجی پارامترهای ورودی
    if(Risk_Percentage_Per_Trade <= 0.0 || Risk_Percentage_Per_Trade > 5.0) {
@@ -112,14 +119,14 @@ int OnInit() {
 
    // تنظیم اولیه کتابخانه HipoFibonacci
    fiboSettings.CalculationTimeframe = PERIOD_CURRENT; // تایم‌فریم محاسبات
-   fiboSettings.Enable_Drawing = true;                 // فعال‌سازی رسم سطوح
-   fiboSettings.Enable_Logging = true;                 // فعال‌سازی لاگ
+   fiboSettings.Enable_Drawing = true;                 // فعال‌سازی رسم سطوح فیبوناچی
+   fiboSettings.Enable_Logging = true;                 // فعال‌سازی لاگ‌گذاری
    fiboSettings.Enable_Status_Panel = true;            // فعال‌سازی پنل وضعیت
-   fiboSettings.MaxCandles = 500;                      // حداکثر کندل‌ها برای تحلیل
-   fiboSettings.MarginPips = 1.0;                      // حاشیه پیپ
+   fiboSettings.MaxCandles = 500;                      // حداکثر تعداد کندل‌ها برای تحلیل
+   fiboSettings.MarginPips = 1.0;                      // حاشیه پیپ برای محاسبات
    fiboSettings.DetectionMethod = METHOD_POWER_SWING;  // روش تشخیص پیش‌فرض
    fiboSettings.Lookback = 3;                          // بازه نگاه به عقب
-   fiboSettings.AtrPeriod = 14;                        // دوره ATR
+   fiboSettings.AtrPeriod = 14;                        // دوره ATR برای روش Power Swing
    fiboSettings.AtrMultiplier = 2.5;                   // ضریب ATR
    fiboSettings.EntryZone_LowerLevel = 50.0;           // سطح پایین ناحیه ورود
    fiboSettings.EntryZone_UpperLevel = 68.0;           // سطح بالا ناحیه ورود
@@ -151,16 +158,21 @@ int OnInit() {
 //+------------------------------------------------------------------+
 //| تابع آزادسازی منابع (OnDeinit)                                   |
 //| این تابع هنگام بسته شدن اکسپرت اجرا شده و منابع را آزاد می‌کند.
-//| - آزادسازی هندل‌ها و حذف اشیاء گرافیکی
+//| - آزادسازی هندل‌های اندیکاتور و حذف اشیاء گرافیکی از چارت
 //+------------------------------------------------------------------+
 
 void OnDeinit(const int reason) {
-   IndicatorRelease(macd_htf_handle);  // آزادسازی هندل MACD تایم‌فریم بالا
-   IndicatorRelease(macd_mtf_handle);  // آزادسازی هندل MACD تایم‌فریم میانی
-   ObjectDelete(0, "HipoTrader_Panel"); // حذف پنل رابط کاربری
+   // آزادسازی هندل‌های اندیکاتور MACD
+   if(macd_htf_handle != INVALID_HANDLE) IndicatorRelease(macd_htf_handle);
+   if(macd_mtf_handle != INVALID_HANDLE) IndicatorRelease(macd_mtf_handle);
+   
+   // حذف پنل رابط کاربری
+   ObjectDelete(0, "HipoTrader_Panel");
+   
+   // حذف اندیکاتورهای نمایشی اگر فعال باشند
    if(Enable_MACD_Display) {
-      ObjectDelete(0, "HTF_MACD");     // حذف اندیکاتور HTF
-      ObjectDelete(0, "MTF_MACD");     // حذف اندیکاتور MTF
+      ObjectDelete(0, "HTF_MACD");
+      ObjectDelete(0, "MTF_MACD");
    }
 }
 
@@ -168,30 +180,40 @@ void OnDeinit(const int reason) {
 //| تابع پردازش تیک (OnTick)                                         |
 //| این تابع در هر تیک بازار اجرا شده و عملیات سریع را مدیریت می‌کند.
 //| - بررسی محدودیت تعداد معاملات و ناحیه طلایی
-//| - به‌روزرسانی رابط کاربری و اجرای معاملات
+//| - به‌روزرسانی پنل رابط کاربری و اجرای معاملات
 //+------------------------------------------------------------------+
 
 void OnTick() {
-   if(CountOpenTrades() >= Max_Open_Trades) return; // بررسی حداکثر معاملات
-   if(HipoFibo.IsEntryZoneActive()) return;         // جلوگیری از پردازش در ناحیه طلایی
-   UpdateTraderPanel();                             // به‌روزرسانی پنل
-   if(PositionsTotal() > 0) return;                 // مدیریت معاملات باز
-   ExecuteTradeIfReady();                           // اجرای معامله اگر شرایط فراهم باشد
+   // بررسی حداکثر تعداد معاملات باز برای جلوگیری از اورترید
+   if(CountOpenTrades() >= Max_Open_Trades) return;
+   
+   // جلوگیری از پردازش در ناحیه طلایی تا شرایط مناسب فراهم شود
+   if(HipoFibo.IsEntryZoneActive()) return;
+   
+   // به‌روزرسانی اطلاعات پنل رابط کاربری
+   UpdateTraderPanel();
+   
+   // مدیریت معاملات موجود و اجرای معامله جدید
+   if(PositionsTotal() > 0) return;
+   ExecuteTradeIfReady();
 }
 
 //+------------------------------------------------------------------+
 //| تابع تشخیص کندل جدید (OnNewBar)                                  |
 //| این تابع بررسی می‌کند که آیا کندل جدیدی بسته شده است یا خیر.
-//| - مقایسه زمان فعلی با زمان آخرین کندل
+//| - مقایسه زمان فعلی با زمان آخرین کندل پردازش‌شده
 //+------------------------------------------------------------------+
 
 bool OnNewBar() {
+   // دریافت زمان کندل فعلی
    datetime currentTime = iTime(_Symbol, PERIOD_CURRENT, 0);
+   
+   // بررسی تغییر زمان کندل و به‌روزرسانی
    if(currentTime != lastBarTime) {
       lastBarTime = currentTime;
-      return true;
+      return true; // کندل جدید تشخیص داده شد
    }
-   return false;
+   return false; // هیچ کندل جدیدی نیست
 }
 
 //+------------------------------------------------------------------+
@@ -202,18 +224,23 @@ bool OnNewBar() {
 //+------------------------------------------------------------------+
 
 void CoreProcessing() {
+   // آرایه‌ها برای ذخیره داده‌های MACD
    double htf_main[], htf_signal[], mtf_main[], mtf_signal[];
+   
+   // کپی داده‌های MACD از هندل‌ها
    if(CopyBuffer(macd_htf_handle, 0, 1, 2, htf_main) < 2 || CopyBuffer(macd_htf_handle, 1, 1, 2, htf_signal) < 2 ||
       CopyBuffer(macd_mtf_handle, 0, 1, 2, mtf_main) < 2 || CopyBuffer(macd_mtf_handle, 1, 1, 2, mtf_signal) < 2) {
       lastError = "خطا در کپی داده‌های MACD";
       return;
    }
 
-   bool htf_buy_permission = (htf_main[1] > htf_signal[1]);
-   bool htf_sell_permission = (htf_signal[1] > htf_main[1]);
-   bool mtf_buy_trigger = (mtf_main[1] < 0);
-   bool mtf_sell_trigger = (mtf_main[1] > 0);
+   // تحلیل سیگنال‌های MACD برای تعیین مجوز و ماشه
+   bool htf_buy_permission = (htf_main[1] > htf_signal[1]);    // تقاطع صعودی در تایم‌فریم بالا
+   bool htf_sell_permission = (htf_signal[1] > htf_main[1]);    // تقاطع نزولی در تایم‌فریم بالا
+   bool mtf_buy_trigger = (mtf_main[1] < 0);                   // خط MACD زیر صفر در تایم‌فریم میانی
+   bool mtf_sell_trigger = (mtf_main[1] > 0);                  // خط MACD بالای صفر در تایم‌فریم میانی
 
+   // تعیین روند جدید با توجه به فیلتر تأیید
    E_Trend newTrend = NEUTRAL;
    if(htf_buy_permission && mtf_buy_trigger && !Enable_Confirmation_Filter) newTrend = TREND_UP;
    else if(htf_sell_permission && mtf_sell_trigger && !Enable_Confirmation_Filter) newTrend = TREND_DOWN;
@@ -222,46 +249,51 @@ void CoreProcessing() {
       else if(OnNewBar() && htf_sell_permission && mtf_sell_trigger) newTrend = TREND_DOWN;
    }
 
+   // ارسال دستور به کتابخانه در صورت تغییر روند
    if(newTrend != currentTrend) {
-      currentTrend = newTrend;
-      E_SignalType signal = STOP_SEARCH;
-      if(newTrend == TREND_UP) signal = SIGNAL_BUY;
-      else if(newTrend == TREND_DOWN) signal = SIGNAL_SELL;
-      HipoFibo.ReceiveCommand(signal, PERIOD_CURRENT);
+      currentTrend = newTrend;                              // به‌روزرسانی وضعیت روند
+      E_SignalType signal = STOP_SEARCH;                    // پیش‌فرض: توقف جستجو
+      if(newTrend == TREND_UP) signal = SIGNAL_BUY;         // سیگنال خرید
+      else if(newTrend == TREND_DOWN) signal = SIGNAL_SELL; // سیگنال فروش
+      HipoFibo.ReceiveCommand(signal, PERIOD_CURRENT);      // ارسال دستور به کتابخانه
    }
 
+   // پردازش کندل جدید برای به‌روزرسانی فیبوناچی
    if(OnNewBar()) {
       MqlRates rates[];
-      ArraySetAsSeries(rates, true);
+      ArraySetAsSeries(rates, true);                       // تنظیم آرایه به ترتیب معکوس (جدیدترین در صفر)
       if(CopyRates(_Symbol, PERIOD_CURRENT, 0, 2, rates) < 2) {
          lastError = "خطا در کپی داده‌های قیمت";
          return;
       }
-      datetime times[2] = {rates[0].time, rates[1].time};
-      double opens[2] = {rates[0].open, rates[1].open};
-      double highs[2] = {rates[0].high, rates[1].high};
-      double lows[2] = {rates[0].low, rates[1].low};
-      double closes[2] = {rates[0].close, rates[1].close};
-      HipoFibo.OnNewCandle(2, times, opens, highs, lows, closes);
+      datetime times[2] = {rates[0].time, rates[1].time};  // آرایه زمان‌ها
+      double opens[2] = {rates[0].open, rates[1].open};    // آرایه قیمت‌های باز
+      double highs[2] = {rates[0].high, rates[1].high};    // آرایه بالاترین‌ها
+      double lows[2] = {rates[0].low, rates[1].low};       // آرایه پایین‌ترین‌ها
+      double closes[2] = {rates[0].close, rates[1].close}; // آرایه قیمت‌های بسته
+      HipoFibo.OnNewCandle(2, times, opens, highs, lows, closes); // فراخوانی تابع کتابخانه
    }
 }
 
 //+------------------------------------------------------------------+
 //| تابع اجرای معامله (ExecuteTrade)                                 |
 //| این تابع زمانی فراخوانی می‌شود که ناحیه طلایی فعال باشد.
-//| - محاسبه استاپ لاس، حجم، و حد سود
+//| - محاسبه استاپ لاس، حجم، و حد سود بر اساس تنظیمات
 //| - ارسال سفارش با استفاده از CTrade
 //+------------------------------------------------------------------+
 
 void ExecuteTrade() {
+   // جلوگیری از ورود چندگانه در ناحیه طلایی
    if(CountOpenTradesInZone() > 0) return;
 
-   double sl_price = 0.0;
-   if(!HipoFibo.GetFiboLevelPrice(FIBO_MOTHER, 0.0, sl_price)) {
+   // محاسبه قیمت استاپ لاس از سطح فیبوناچی مادر (سطح 0%)
+   double sl_price = HipoFibo.GetFiboLevelPrice(FIBO_MOTHER, 0.0);
+   if(sl_price == 0.0) {
       lastError = "خطا در دریافت قیمت استاپ لاس از کتابخانه";
       return;
    }
 
+   // دریافت قیمت ورود (ASK برای خرید، BID برای فروش)
    double entry_price = 0.0;
    if(currentTrend == TREND_UP) {
       if(!SymbolInfoDouble(_Symbol, SYMBOL_ASK, entry_price)) {
@@ -275,20 +307,24 @@ void ExecuteTrade() {
       }
    }
 
+   // محاسبه اسپرد و تنظیم قیمت استاپ لاس
    double spread = 0.0;
    if(!SymbolInfoDouble(_Symbol, SYMBOL_SPREAD, spread)) spread = 0.0;
-   spread *= _Point;
+   spread *= _Point;                         // تبدیل اسپرد به قیمت
    double final_sl_price = (currentTrend == TREND_UP) ? sl_price - SL_Buffer_Pips * _Point - spread : sl_price + SL_Buffer_Pips * _Point + spread;
-   double sl_distance = MathAbs(entry_price - final_sl_price) / _Point;
+   double sl_distance = MathAbs(entry_price - final_sl_price) / _Point; // فاصله استاپ لاس به پیپ
 
+   // محاسبه ارزش تیک و حجم معامله
    double tick_value = 0.0;
    if(!SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE, tick_value)) tick_value = 1.0;
    double volume = (AccountInfoDouble(ACCOUNT_BALANCE) * Risk_Percentage_Per_Trade / 100.0) / (sl_distance * tick_value);
-   volume = NormalizeDouble(volume, 2);
+   volume = NormalizeDouble(volume, 2);      // تنظیم حجم به 2 رقم اعشار
 
+   // محاسبه حد سود بر اساس نسبت ریسک به ریوارد
    double tp_distance = sl_distance * Risk_Reward_Ratio;
    double take_profit = (currentTrend == TREND_UP) ? entry_price + tp_distance * _Point + spread : entry_price - tp_distance * _Point - spread;
 
+   // ارسال سفارش خرید یا فروش
    if(currentTrend == TREND_UP) {
       if(!trade.Buy(volume, _Symbol, entry_price, final_sl_price, take_profit, "Buy Order - HipoTrader")) {
          lastError = "خطا در ارسال سفارش خرید: " + IntegerToString(GetLastError());
@@ -299,8 +335,9 @@ void ExecuteTrade() {
       }
    }
 
+   // تأیید موفقیت معامله و پاک‌سازی
    if(trade.ResultRetcode() == TRADE_RETCODE_DONE) {
-      HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
+      HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT); // توقف جستجو پس از ورود
       Print("معامله با موفقیت اجرا شد - حجم: ", volume, "، SL: ", final_sl_price, "، TP: ", take_profit);
    }
 }
@@ -311,6 +348,7 @@ void ExecuteTrade() {
 //+------------------------------------------------------------------+
 
 void ExecuteTradeIfReady() {
+   // اجرای معامله اگر ناحیه طلایی فعال باشد
    if(HipoFibo.IsEntryZoneActive()) ExecuteTrade();
 }
 
@@ -320,13 +358,13 @@ void ExecuteTradeIfReady() {
 //+------------------------------------------------------------------+
 
 int CountOpenTrades() {
-   int count = 0;
+   int count = 0;                            // شمارنده اولیه معاملات
    for(int i = PositionsTotal() - 1; i >= 0; i--) {
       if(PositionGetSymbol(i) == _Symbol && PositionGetInteger(POSITION_MAGIC) == MagicNumber) {
-         count++;
+         count++;                           // افزایش شمارنده برای معاملات مرتبط
       }
    }
-   return count;
+   return count;                             // برگرداندن تعداد کل معاملات
 }
 
 //+------------------------------------------------------------------+
@@ -335,16 +373,18 @@ int CountOpenTrades() {
 //+------------------------------------------------------------------+
 
 int CountOpenTradesInZone() {
+   // اگر ناحیه طلایی فعال نباشد، صفر برگردان
    if(!HipoFibo.IsEntryZoneActive()) return 0;
-   datetime zoneTime = HipoFibo.GetEntryZoneActivationTime();
-   int count = 0;
+   
+   datetime zoneTime = HipoFibo.GetEntryZoneActivationTime(); // زمان فعال‌سازی ناحیه
+   int count = 0;                            // شمارنده اولیه
    for(int i = PositionsTotal() - 1; i >= 0; i--) {
       if(PositionGetSymbol(i) == _Symbol && PositionGetInteger(POSITION_MAGIC) == MagicNumber &&
          PositionGetInteger(POSITION_TIME) >= zoneTime) {
-         count++;
+         count++;                           // افزایش شمارنده برای معاملات در ناحیه
       }
    }
-   return count;
+   return count;                             // برگرداندن تعداد معاملات در ناحیه
 }
 
 //+------------------------------------------------------------------+
@@ -354,29 +394,37 @@ int CountOpenTradesInZone() {
 //+------------------------------------------------------------------+
 
 void CreateMACDDisplay(ENUM_TIMEFRAMES timeframe, color macdColor, color signalColor, int subwindow) {
-   string name = (subwindow == 0) ? "HTF_MACD" : "MTF_MACD";
+   string name = (subwindow == 0) ? "HTF_MACD" : "MTF_MACD"; // نام اندیکاتور بر اساس تایم‌فریم
    int handle = iMACD(_Symbol, timeframe, HTF_Fast_EMA, HTF_Slow_EMA, HTF_Signal_SMA, PRICE_CLOSE);
    if(handle != INVALID_HANDLE) {
-      IndicatorSetInteger(INDICATOR_DIGITS, 5);
-      IndicatorSetString(INDICATOR_SHORTNAME, name);
-      if(subwindow > 0) ChartIndicatorAdd(ChartID(), subwindow, handle);
-      IndicatorRelease(handle);
+      IndicatorSetInteger(INDICATOR_DIGITS, 5);              // تنظیم دقت اعشار به 5 رقم
+      IndicatorSetString(INDICATOR_SHORTNAME, name);         // تنظیم نام کوتاه اندیکاتور
+      if(subwindow > 0) ChartIndicatorAdd(ChartID(), subwindow, handle); // افزودن به ویندو جدید
+      IndicatorRelease(handle);                              // آزادسازی هندل پس از تنظیم
    }
 }
 
 //+------------------------------------------------------------------+
 //| تابع ایجاد پنل رابط کاربری (CreateTraderPanel)                   |
 //| این تابع پنل وضعیت اکسپرت را روی چارت ایجاد می‌کند.
-//| - قرارگیری زیر پنل HipoFibonacci
+//| - قرارگیری زیر پنل HipoFibonacci (فاصله 70 پیکسل عمودی)
 //+------------------------------------------------------------------+
 
 void CreateTraderPanel() {
-   ObjectCreate(0, "HipoTrader_Panel", OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_XDISTANCE, 10);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_YDISTANCE, 70);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_FONTSIZE, 10);
-   ObjectSetString(0, "HipoTrader_Panel", OBJPROP_FONT, "Arial");
+   // ایجاد شیء لیبل برای پنل
+   if(!ObjectCreate(0, "HipoTrader_Panel", OBJ_LABEL, 0, 0, 0)) {
+      lastError = "خطا در ایجاد پنل رابط کاربری";
+      return;
+   }
+   
+   // تنظیم موقعیت و ظاهر پنل
+   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_XDISTANCE, 10); // فاصله افقی از گوشه
+   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_YDISTANCE, 70); // فاصله عمودی (زیر پنل Hipo)
+   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_CORNER, CORNER_RIGHT_UPPER); // گوشه راست بالا
+   ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_FONTSIZE, 10); // اندازه فونت
+   ObjectSetString(0, "HipoTrader_Panel", OBJPROP_FONT, "Arial"); // نوع فونت
+   
+   // به‌روزرسانی اولیه پنل
    UpdateTraderPanel();
 }
 
@@ -387,18 +435,28 @@ void CreateTraderPanel() {
 //+------------------------------------------------------------------+
 
 void UpdateTraderPanel() {
+   // ساخت متن وضعیت
    string statusText = "HipoTrader Panel\n";
+   
+   // تنظیم رنگ و متن سیگنال HTF
    color htfColor = (currentTrend == TREND_UP) ? clrGreen : (currentTrend == TREND_DOWN) ? clrRed : clrGray;
    statusText += "HTF Signal (H1): " + CharToString(110) + " [رنگ: " + GetColorName(htfColor) + "]\n";
+   
+   // تنظیم رنگ و متن سیگنال MTF
    color mtfColor = (currentTrend == TREND_UP && HipoFibo.GetCurrentStatus() == ENTRY_ZONE_ACTIVE) ? clrGreen : 
                     (currentTrend == TREND_DOWN && HipoFibo.GetCurrentStatus() == ENTRY_ZONE_ACTIVE) ? clrRed : clrGray;
    statusText += "MTF Signal (M15): " + CharToString(110) + " [رنگ: " + GetColorName(mtfColor) + "]\n";
+   
+   // نمایش وضعیت کتابخانه
    string fiboStatus = EnumToString(HipoFibo.GetCurrentStatus());
    statusText += "HipoFibo Status: " + fiboStatus + "\n";
+   
+   // نمایش وضعیت کلی
    string overallStatus = (HipoFibo.IsEntryZoneActive()) ? "در انتظار ورود..." : 
                          (PositionsTotal() > 0) ? "معامله باز..." : "جستجوی سیگنال...";
    statusText += "وضعیت کلی: " + overallStatus;
 
+   // اعمال متن و رنگ به پنل
    ObjectSetString(0, "HipoTrader_Panel", OBJPROP_TEXT, statusText);
    ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_COLOR, clrWhite);
 }
@@ -406,11 +464,11 @@ void UpdateTraderPanel() {
 //+------------------------------------------------------------------+
 //| تابع تبدیل رنگ به نام (GetColorName)                             |
 //| این تابع رنگ را به نام متنی تبدیل می‌کند.
-//| - استفاده برای نمایش رنگ‌ها در پنل
+//| - استفاده برای نمایش رنگ‌ها در پنل رابط کاربری
 //+------------------------------------------------------------------+
 
 string GetColorName(color clr) {
-   if(clr == clrGreen) return "سبز";
-   if(clr == clrRed) return "قرمز";
-   return "خاکستری";
+   if(clr == clrGreen) return "سبز";     // تبدیل رنگ سبز
+   if(clr == clrRed) return "قرمز";      // تبدیل رنگ قرمز
+   return "خاکستری";                     // رنگ پیش‌فرض
 }
