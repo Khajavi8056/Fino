@@ -2,14 +2,14 @@
 //| HipoTrader.mq5                                                  |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 2.2                                                        |
-//| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 2.4) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ریسک، رابط کاربری، و تنظیمات چارت به‌صورت استاندارد و بهینه پیاده‌سازی شده است. |
-//| هماهنگی: این کد با نسخه 2.4 کتابخانه HipoFibonacci.mqh طراحی شده و از ساختارها و توابع آن استفاده می‌کند. |
+//| نسخه: 2.3                                                        |
+//| توضیحات: این اکسپرت با استفاده از اندیکاتور MACD در دو تایم‌فریم (HTF و MTF)، جهت بازار را تشخیص داده و با کتابخانه HipoFibonacci (نسخه 2.4) نقاط ورود بهینه را محاسبه می‌کند. مدیریت ریسک و ورود به معامله بهبود یافته است. |
+//| هماهنگی: این کد با نسخه 2.4 کتابخانه HipoFibonacci.mqh طراحی شده است. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "2.2"
+#property version   "2.3"
 #property strict
 
 // شامل کردن کتابخانه‌های مورد نیاز
@@ -31,6 +31,7 @@ bool isCommandSent = false;             // وضعیت ارسال دستور به
 HipoSettings fiboSettings;              // ساختار تنظیمات کتابخانه HipoFibonacci
 datetime lastBarTime = 0;               // زمان آخرین کندل پردازش‌شده
 string lastError = "";                  // ذخیره آخرین خطا برای گزارش‌دهی
+datetime lastTradeTime = 0;             // زمان آخرین معامله برای جلوگیری از ورود تند تند
 
 //+------------------------------------------------------------------+
 //| پارامترهای ورودی                                                 |
@@ -241,7 +242,7 @@ bool OnNewBar() {
 }
 
 //+------------------------------------------------------------------+
-//| تابع پردازش اصلی (نسخه جدید با منطق درخواست/پاسخ و پاکسازی)      |
+//| تابع پردازش اصلی (نسخه جدید با منطق درخواست/پاسخ و کنترل ورود)   |
 //| این تابع منطق اصلی تحلیل و ارسال دستور به کتابخانه را اجرا می‌کند. |
 //+------------------------------------------------------------------+
 
@@ -280,12 +281,8 @@ void CoreProcessing() {
       return;
    }
 
-   // ارسال سیگنال جدید فقط اگر قبلاً دستوری ارسال نشده باشه
-   if(newTrend != NEUTRAL && !isCommandSent) {
-      // پاکسازی قبل از شروع ساختار جدید
-      HipoFibo.DeleteAllObjects();
-      Print("پاکسازی کامل چارت قبل از شروع ساختار جدید.");
-
+   // ارسال سیگنال جدید فقط اگر قبلاً دستوری ارسال نشده باشه و معامله باز نباشه
+   if(newTrend != NEUTRAL && !isCommandSent && CountOpenTrades() == 0) {
       currentTrend = newTrend;
       if(newTrend == TREND_UP) {
          HipoFibo.ReceiveCommand(SIGNAL_BUY, PERIOD_CURRENT);
@@ -305,7 +302,7 @@ void CoreProcessing() {
 //+------------------------------------------------------------------+
 
 void ExecuteTrade() {
-   if(CountOpenTradesInZone() > 0) return;
+   if(CountOpenTradesInZone() > 0 || TimeCurrent() - lastTradeTime < 60) return; // جلوگیری از ورود تند تند (حداقل 60 ثانیه فاصله)
 
    double sl_price = HipoFibo.GetFiboLevelPrice(FIBO_MOTHER, 0.0);
    if(sl_price == 0.0) {
@@ -355,7 +352,8 @@ void ExecuteTrade() {
       }
    }
 
-   // بعد از معامله، قفل آزاد می‌شه ولی پاکسازی نمی‌کنیم
+   // ثبت زمان معامله و آزادسازی قفل
+   lastTradeTime = TimeCurrent();
    isCommandSent = false;
 
    if(trade.ResultRetcode() == TRADE_RETCODE_DONE) {
@@ -371,7 +369,7 @@ void ExecuteTrade() {
 //+------------------------------------------------------------------+
 
 void ExecuteTradeIfReady() {
-   if(HipoFibo.IsEntryZoneActive()) ExecuteTrade();
+   if(HipoFibo.IsEntryZoneActive() && CountOpenTrades() < Max_Open_Trades) ExecuteTrade();
 }
 
 //+------------------------------------------------------------------+
