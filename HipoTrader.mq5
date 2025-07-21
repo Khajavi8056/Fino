@@ -1,4 +1,4 @@
-//*+------------------------------------------------------------------+
+/*+------------------------------------------------------------------+
 //| HipoTrader.mq5                                                  |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
@@ -10,8 +10,9 @@
 #property version   "1.0"
 #property strict
 
-// شامل کردن کتابخانه HipoFibonacci از پوشه Include
+// شامل کردن کتابخانه‌های مورد نیاز
 #include <HipoFibonacci.mqh>
+#include <Trade/Trade.mqh>
 
 //+------------------------------------------------------------------+
 //| متغیرهای سراسری                                                 |
@@ -19,13 +20,13 @@
 //+------------------------------------------------------------------+
 
 CHipoFibonacci HipoFibo;                // نمونه از کلاس کتابخانه HipoFibonacci
+CTrade trade;                           // کلاس استاندارد متاتریدر برای مدیریت معاملات
 int macd_htf_handle;                    // هندل برای MACD تایم‌فریم بالا
 int macd_mtf_handle;                    // هندل برای MACD تایم‌فریم میانی
 enum E_Trend { TREND_UP, TREND_DOWN, NEUTRAL }; // انوم برای وضعیت روند
 E_Trend currentTrend = NEUTRAL;         // وضعیت فعلی روند
 HipoSettings fiboSettings;              // تنظیمات کتابخانه
 datetime lastBarTime = 0;               // زمان آخرین کندل برای تشخیص کندل جدید
-CTrade trade;                           // کلاس استاندارد متاتریدر برای مدیریت معاملات
 string lastError = "";                  // ذخیره آخرین خطا برای نمایش
 
 //+------------------------------------------------------------------+
@@ -210,24 +211,25 @@ void CoreProcessing() {
       if(newTrend == TREND_UP) signal = SIGNAL_BUY;
       else if(newTrend == TREND_DOWN) signal = SIGNAL_SELL;
       HipoFibo.ReceiveCommand(signal, PERIOD_CURRENT);
-      if(signal == STOP_SEARCH) HipoFibo.DeleteFiboObjects();
+      if(signal == STOP_SEARCH) HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT); // پاک‌سازی داخلی
    }
 
    // پردازش کندل جدید
    if(OnNewBar()) {
-      double open[], high[], low[], close[];
-      ArraySetAsSeries(open, true);
-      ArraySetAsSeries(high, true);
-      ArraySetAsSeries(low, true);
-      ArraySetAsSeries(close, true);
-      if(CopyOpen(_Symbol, PERIOD_CURRENT, 0, 2, open) < 2 ||
-         CopyHigh(_Symbol, PERIOD_CURRENT, 0, 2, high) < 2 ||
-         CopyLow(_Symbol, PERIOD_CURRENT, 0, 2, low) < 2 ||
-         CopyClose(_Symbol, PERIOD_CURRENT, 0, 2, close) < 2) {
+      MqlRates rates[];
+      ArraySetAsSeries(rates, true);
+      if(CopyRates(_Symbol, PERIOD_CURRENT, 0, 2, rates) < 2) {
          lastError = "خطا در کپی داده‌های قیمت";
          return;
       }
-      HipoFibo.OnNewCandle(2, TimeCurrent(), open, high, low, close);
+      datetime times[2];
+      double opens[2], highs[2], lows[2], closes[2];
+      ArrayCopy(times, rates.Time);
+      ArrayCopy(opens, rates.Open);
+      ArrayCopy(highs, rates.High);
+      ArrayCopy(lows, rates.Low);
+      ArrayCopy(closes, rates.Close);
+      HipoFibo.OnNewCandle(2, times, opens, highs, lows, closes);
    }
 }
 
@@ -239,8 +241,8 @@ void CoreProcessing() {
 void ExecuteTrade() {
    if(CountOpenTradesInZone() > 0) return; // جلوگیری از ورود چندگانه در یک ناحیه
 
-   double sl_price = HipoFibo.GetFiboLevelPrice(FIBO_MOTHER, 0);
-   if(sl_price == 0) {
+   double sl_price = 0;
+   if(!HipoFibo.GetFiboLevelPrice(FIBO_MOTHER, 0, sl_price)) {
       lastError = "قیمت استاپ لاس نامعتبر است";
       return;
    }
@@ -250,8 +252,9 @@ void ExecuteTrade() {
    double spread = SymbolInfoDouble(_Symbol, SYMBOL_SPREAD) * _Point;
    double final_sl_price = (currentTrend == TREND_UP) ? sl_price - SL_Buffer_Pips * _Point - spread : sl_price + SL_Buffer_Pips * _Point + spread;
    double sl_distance = MathAbs(entry_price - final_sl_price) / _Point;
-   double pip_value = MarketInfo(_Symbol, MODE_TICKVALUE) * 10; // ارزش پیپ با توجه به بروکر
-   double volume = (AccountEquity() * Risk_Percentage_Per_Trade / 100) / (sl_distance * pip_value);
+   double tick_value = 0;
+   SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE, tick_value);
+   double volume = (AccountBalance() * Risk_Percentage_Per_Trade / 100) / (sl_distance * tick_value);
    volume = NormalizeDouble(volume, 2);
 
    double tp_distance = sl_distance * Risk_Reward_Ratio;
@@ -326,8 +329,8 @@ void CreateMACDDisplay(ENUM_TIMEFRAMES timeframe, color macdColor, color signalC
    int handle = iMACD(_Symbol, timeframe, HTF_Fast_EMA, HTF_Slow_EMA, HTF_Signal_SMA, PRICE_CLOSE);
    if(handle != INVALID_HANDLE) {
       IndicatorSetInteger(INDICATOR_DIGITS, 5);
-      IndicatorSetInteger(INDICATOR_COLOR_INDEX_0, macdColor);
-      IndicatorSetInteger(INDICATOR_COLOR_INDEX_1, signalColor);
+      IndicatorSetString(INDICATOR_SHORTNAME, name);
+      if(subwindow > 0) ChartIndicatorAdd(ChartID(), subwindow, handle);
       IndicatorRelease(handle);
    }
 }
@@ -355,10 +358,10 @@ void CreateTraderPanel() {
 void UpdateTraderPanel() {
    string statusText = "HipoTrader Panel\n";
    color htfColor = (currentTrend == TREND_UP) ? clrGreen : (currentTrend == TREND_DOWN) ? clrRed : clrGray;
-   statusText += "HTF Signal (H1): " + CharToString(110) + " [رنگ: " + ColorToString(htfColor) + "]\n";
+   statusText += "HTF Signal (H1): " + CharToString(110) + " [رنگ: " + GetColorName(htfColor) + "]\n";
    color mtfColor = (currentTrend == TREND_UP && HipoFibo.GetCurrentStatus() == ENTRY_ZONE_ACTIVE) ? clrGreen : 
                     (currentTrend == TREND_DOWN && HipoFibo.GetCurrentStatus() == ENTRY_ZONE_ACTIVE) ? clrRed : clrGray;
-   statusText += "MTF Signal (M15): " + CharToString(110) + " [رنگ: " + ColorToString(mtfColor) + "]\n";
+   statusText += "MTF Signal (M15): " + CharToString(110) + " [رنگ: " + GetColorName(mtfColor) + "]\n";
    string fiboStatus = EnumToString(HipoFibo.GetCurrentStatus());
    statusText += "HipoFibo Status: " + fiboStatus + "\n";
    string overallStatus = (HipoFibo.IsEntryZoneActive()) ? "در انتظار ورود..." : 
@@ -370,11 +373,11 @@ void UpdateTraderPanel() {
 }
 
 //+------------------------------------------------------------------+
-//| تابع تبدیل رنگ به رشته (ColorToString)                           |
-//| این تابع رنگ را به رشته متن تبدیل می‌کند.
+//| تابع تبدیل رنگ به نام (GetColorName)                             |
+//| این تابع رنگ را به نام متنی تبدیل می‌کند.
 //+------------------------------------------------------------------+
 
-string ColorToString(color clr) {
+string GetColorName(color clr) {
    if(clr == clrGreen) return "سبز";
    if(clr == clrRed) return "قرمز";
    return "خاکستری";
