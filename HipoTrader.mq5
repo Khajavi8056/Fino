@@ -408,134 +408,117 @@ void CreateMACDDisplay(ENUM_TIMEFRAMES timeframe, color macdColor, color signalC
       if(subwindow > 0) ChartIndicatorAdd(ChartID(), subwindow, handle);
    }
 }
-
 //+------------------------------------------------------------------+
-//| تابع ایجاد پنل رابط کاربری (CreateTraderPanel)                   |
-//| این تابع پنل وضعیت اکسپرت را روی چارت ایجاد می‌کند.             |
+//| تابع ایجاد پنل رابط کاربری (نسخه نهایی با لیبل‌های جدا)           |
 //+------------------------------------------------------------------+
-
 void CreateTraderPanel() {
-   // ایجاد کادر پس‌زمینه
-   ObjectCreate(0, "HipoTrader_Panel_BG", OBJ_RECTANGLE_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_XDISTANCE, 10);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_YDISTANCE, 100);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_XSIZE, 220);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_YSIZE, 140);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_BGCOLOR, clrBlack);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_BORDER_TYPE, BORDER_FLAT);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_COLOR, clrWhite);
-   ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    // ایجاد کادر پس‌زمینه
+    ObjectCreate(0, "HipoTrader_Panel_BG", OBJ_RECTANGLE_LABEL, 0, 0, 0);
+    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_XDISTANCE, 10);
+    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_YDISTANCE, 100);
+    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_XSIZE, 220);
+    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_YSIZE, 120); // کمی بزرگتر برای جا شدن متن
+    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_BGCOLOR, clrBlack);
+    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_BORDER_TYPE, BORDER_FLAT);
+    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_COLOR, clrWhite);
+    ObjectSetInteger(0, "HipoTrader_Panel_BG", OBJPROP_CORNER, CORNER_LEFT_UPPER);
 
-   // ایجاد لیبل‌های جداگانه برای هر خط متن
-   string labels[] = {"HipoTrader_Panel_Trend", "HipoTrader_Panel_HTF", "HipoTrader_Panel_MTF", "HipoTrader_Panel_Fibo", "HipoTrader_Panel_Status"};
-   int y_positions[] = {105, 125, 145, 165, 185};
+    // ایجاد لیبل‌های جداگانه برای هر خط (یک لیبل برای دایره، یکی برای متن)
+    string base_names[] = {"Trend", "HTF", "MTF", "Fibo", "Status"};
+    int y_positions[] = {105, 125, 145, 165, 185};
    
-   for(int i = 0; i < ArraySize(labels); i++) {
-      ObjectCreate(0, labels[i], OBJ_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, labels[i], OBJPROP_XDISTANCE, 15);
-      ObjectSetInteger(0, labels[i], OBJPROP_YDISTANCE, y_positions[i]);
-      ObjectSetInteger(0, labels[i], OBJPROP_ZORDER, 1);
-      ObjectSetInteger(0, labels[i], OBJPROP_CORNER, CORNER_LEFT_UPPER);
-      ObjectSetInteger(0, labels[i], OBJPROP_FONTSIZE, 10);
-      ObjectSetString(0, labels[i], OBJPROP_FONT, "Arial");
-      ObjectSetInteger(0, labels[i], OBJPROP_COLOR, clrWhite); // رنگ متن ثابت سفید
-   }
-   UpdateTraderPanel();
+    for(int i = 0; i < ArraySize(base_names); i++) {
+        string bullet_name = "HipoTrader_Panel_" + base_names[i] + "_Bullet";
+        string text_name = "HipoTrader_Panel_" + base_names[i] + "_Text";
+
+        // ایجاد لیبل برای دایره رنگی
+        ObjectCreate(0, bullet_name, OBJ_LABEL, 0, 0, 0);
+        ObjectSetInteger(0, bullet_name, OBJPROP_XDISTANCE, 15);
+        ObjectSetInteger(0, bullet_name, OBJPROP_YDISTANCE, y_positions[i]);
+        ObjectSetString(0, bullet_name, OBJPROP_TEXT, "●");
+        ObjectSetInteger(0, bullet_name, OBJPROP_FONTSIZE, 12);
+        ObjectSetString(0, bullet_name, OBJPROP_FONT, "Arial");
+        ObjectSetInteger(0, bullet_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+
+        // ایجاد لیبل برای متن سفید
+        ObjectCreate(0, text_name, OBJ_LABEL, 0, 0, 0);
+        ObjectSetInteger(0, text_name, OBJPROP_XDISTANCE, 30); // با کمی فاصله از دایره
+        ObjectSetInteger(0, text_name, OBJPROP_YDISTANCE, y_positions[i]);
+        ObjectSetString(0, text_name, OBJPROP_TEXT, "...");
+        ObjectSetInteger(0, text_name, OBJPROP_FONTSIZE, 10);
+        ObjectSetString(0, text_name, OBJPROP_FONT, "Arial");
+        ObjectSetInteger(0, text_name, OBJPROP_COLOR, clrWhite);
+        ObjectSetInteger(0, text_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    }
+    UpdateTraderPanel();
 }
 
-//+------------------------------------------------------------------+
-//| تابع به‌روزرسانی پنل رابط کاربری (UpdateTraderPanel)            |
-//| این تابع اطلاعات پنل را به‌روز می‌کند با دایره‌های رنگی.        |
-//+------------------------------------------------------------------+
 
+//+------------------------------------------------------------------+
+//| تابع به‌روزرسانی پنل رابط کاربری (نسخه نهایی با لیبل‌های جدا)    |
+//+------------------------------------------------------------------+
 void UpdateTraderPanel() {
-   // خط اول: روند کلی
-   string trend_text = "● روند: ";
-   color trend_color = clrGray;
-   switch(currentTrend) {
-      case TREND_UP: trend_text += "صعودی"; trend_color = clrGreen; break;
-      case TREND_DOWN: trend_text += "نزولی"; trend_color = clrRed; break;
-      case NEUTRAL: trend_text += "خنثی"; break;
-   }
-   ObjectSetString(0, "HipoTrader_Panel_Trend", OBJPROP_TEXT, trend_text);
-   ObjectSetInteger(0, "HipoTrader_Panel_Trend", OBJPROP_COLOR, clrWhite);
-   ObjectSetString(0, "HipoTrader_Panel_Trend", OBJPROP_TEXT, StringSubstr(trend_text, 2)); // متن بدون دایره
-   ObjectSetString(0, "HipoTrader_Panel_Trend", OBJPROP_TEXT, "●"); // دایره رنگی
-   ObjectSetInteger(0, "HipoTrader_Panel_Trend", OBJPROP_COLOR, trend_color); // رنگ دایره
-   ObjectSetInteger(0, "HipoTrader_Panel_Trend", OBJPROP_XDISTANCE, 15);
-   ObjectSetString(0, "HipoTrader_Panel_Trend", OBJPROP_TEXT, trend_text);
+    // --- خط ۱: روند کلی ---
+    string trend_text = "روند: ";
+    color trend_color = clrGray;
+    switch(currentTrend) {
+        case TREND_UP:   trend_text += "صعودی"; trend_color = clrGreen; break;
+        case TREND_DOWN: trend_text += "نزولی"; trend_color = clrRed; break;
+        case NEUTRAL:    trend_text += "خنثی"; break;
+    }
+    ObjectSetInteger(0, "HipoTrader_Panel_Trend_Bullet", OBJPROP_COLOR, trend_color);
+    ObjectSetString(0, "HipoTrader_Panel_Trend_Text", OBJPROP_TEXT, trend_text);
 
-   // خط دوم: HTF MACD
-   string htf_text = "● HTF MACD: ";
-   color htf_color = clrGray;
-   double htf_main[], htf_signal[];
-   if(CopyBuffer(macd_htf_handle, 0, 1, 1, htf_main) >= 1 && CopyBuffer(macd_htf_handle, 1, 1, 1, htf_signal) >= 1) {
-      htf_text += (htf_main[0] > htf_signal[0]) ? "صعودی" : "نزولی";
-      htf_color = (htf_main[0] > htf_signal[0]) ? clrGreen : clrRed;
-   } else {
-      htf_text += "نامشخص";
-   }
-   ObjectSetString(0, "HipoTrader_Panel_HTF", OBJPROP_TEXT, htf_text);
-   ObjectSetInteger(0, "HipoTrader_Panel_HTF", OBJPROP_COLOR, clrWhite);
-   ObjectSetString(0, "HipoTrader_Panel_HTF", OBJPROP_TEXT, StringSubstr(htf_text, 2));
-   ObjectSetString(0, "HipoTrader_Panel_HTF", OBJPROP_TEXT, "●");
-   ObjectSetInteger(0, "HipoTrader_Panel_HTF", OBJPROP_COLOR, htf_color);
-   ObjectSetInteger(0, "HipoTrader_Panel_HTF", OBJPROP_XDISTANCE, 15);
-   ObjectSetString(0, "HipoTrader_Panel_HTF", OBJPROP_TEXT, htf_text);
+    // --- خط ۲: HTF MACD ---
+    string htf_text = "HTF MACD: ";
+    color htf_color = clrGray;
+    double htf_main[], htf_signal[];
+    if(CopyBuffer(macd_htf_handle, 0, 1, 1, htf_main) >= 1 && CopyBuffer(macd_htf_handle, 1, 1, 1, htf_signal) >= 1) {
+        bool is_up = htf_main[0] > htf_signal[0];
+        htf_text += is_up ? "صعودی" : "نزولی";
+        htf_color = is_up ? clrGreen : clrRed;
+    } else { htf_text += "نامشخص"; }
+    ObjectSetInteger(0, "HipoTrader_Panel_HTF_Bullet", OBJPROP_COLOR, htf_color);
+    ObjectSetString(0, "HipoTrader_Panel_HTF_Text", OBJPROP_TEXT, htf_text);
 
-   // خط سوم: MTF MACD
-   string mtf_text = "● MTF MACD: ";
-   color mtf_color = clrGray;
-   double mtf_main[], mtf_signal[];
-   if(CopyBuffer(macd_mtf_handle, 0, 1, 1, mtf_main) >= 1 && CopyBuffer(macd_mtf_handle, 1, 1, 1, mtf_signal) >= 1) {
-      mtf_text += (mtf_main[0] < 0) ? "صعودی" : "نزولی";
-      mtf_color = (mtf_main[0] < 0) ? clrGreen : clrRed;
-   } else {
-      mtf_text += "نامشخص";
-   }
-   ObjectSetString(0, "HipoTrader_Panel_MTF", OBJPROP_TEXT, mtf_text);
-   ObjectSetInteger(0, "HipoTrader_Panel_MTF", OBJPROP_COLOR, clrWhite);
-   ObjectSetString(0, "HipoTrader_Panel_MTF", OBJPROP_TEXT, StringSubstr(mtf_text, 2));
-   ObjectSetString(0, "HipoTrader_Panel_MTF", OBJPROP_TEXT, "●");
-   ObjectSetInteger(0, "HipoTrader_Panel_MTF", OBJPROP_COLOR, mtf_color);
-   ObjectSetInteger(0, "HipoTrader_Panel_MTF", OBJPROP_XDISTANCE, 15);
-   ObjectSetString(0, "HipoTrader_Panel_MTF", OBJPROP_TEXT, mtf_text);
+    // --- خط ۳: MTF MACD ---
+    string mtf_text = "MTF MACD: ";
+    color mtf_color = clrGray;
+    double mtf_main[];
+    if(CopyBuffer(macd_mtf_handle, 0, 1, 1, mtf_main) >= 1) {
+        bool is_up = mtf_main[0] < 0;
+        mtf_text += is_up ? "صعودی" : "نزولی";
+        mtf_color = is_up ? clrGreen : clrRed;
+    } else { mtf_text += "نامشخص"; }
+    ObjectSetInteger(0, "HipoTrader_Panel_MTF_Bullet", OBJPROP_COLOR, mtf_color);
+    ObjectSetString(0, "HipoTrader_Panel_MTF_Text", OBJPROP_TEXT, mtf_text);
 
-   // خط چهارم: وضعیت HipoFibo
-   string fibo_text = "● HipoFibo: " + EnumToString(HipoFibo.GetCurrentStatus());
-   color fibo_color = clrGray;
-   if(HipoFibo.GetCurrentStatus() == ENTRY_ZONE_ACTIVE) fibo_color = clrGreen;
-   else if(HipoFibo.GetCurrentStatus() == SEARCHING_FOR_LEG) fibo_color = clrGray;
-   else fibo_color = clrYellow; // برای حالت‌های میانی مثل MONITORING یا AWAITING
-   ObjectSetString(0, "HipoTrader_Panel_Fibo", OBJPROP_TEXT, fibo_text);
-   ObjectSetInteger(0, "HipoTrader_Panel_Fibo", OBJPROP_COLOR, clrWhite);
-   ObjectSetString(0, "HipoTrader_Panel_Fibo", OBJPROP_TEXT, StringSubstr(fibo_text, 2));
-   ObjectSetString(0, "HipoTrader_Panel_Fibo", OBJPROP_TEXT, "●");
-   ObjectSetInteger(0, "HipoTrader_Panel_Fibo", OBJPROP_COLOR, fibo_color);
-   ObjectSetInteger(0, "HipoTrader_Panel_Fibo", OBJPROP_XDISTANCE, 15);
-   ObjectSetString(0, "HipoTrader_Panel_Fibo", OBJPROP_TEXT, fibo_text);
+    // --- خط ۴: وضعیت HipoFibo ---
+    string fibo_text = "HipoFibo: " + EnumToString(HipoFibo.GetCurrentStatus());
+    color fibo_color = clrGray;
+    E_Status fibo_status = HipoFibo.GetCurrentStatus();
+    if(fibo_status == ENTRY_ZONE_ACTIVE) fibo_color = clrGreen;
+    else if(fibo_status != SEARCHING_FOR_LEG && fibo_status != WAITING_FOR_COMMAND) fibo_color = clrYellow;
+    ObjectSetInteger(0, "HipoTrader_Panel_Fibo_Bullet", OBJPROP_COLOR, fibo_color);
+    ObjectSetString(0, "HipoTrader_Panel_Fibo_Text", OBJPROP_TEXT, fibo_text);
 
-   // خط پنجم: وضعیت کلی
-   string status_text = "● وضعیت: ";
-   color status_color = clrGray;
-   if(HipoFibo.IsEntryZoneActive()) {
-      status_text += "ناحیه طلایی فعال";
-      status_color = clrGreen;
-   } else if(CountOpenTrades() > 0) {
-      status_text += "معامله باز";
-      status_color = clrYellow;
-   } else {
-      status_text += isCommandSent ? "در انتظار پاسخ کتابخانه" : "جستجوی سیگنال";
-      status_color = isCommandSent ? clrYellow : clrGray;
-   }
-   ObjectSetString(0, "HipoTrader_Panel_Status", OBJPROP_TEXT, status_text);
-   ObjectSetInteger(0, "HipoTrader_Panel_Status", OBJPROP_COLOR, clrWhite);
-   ObjectSetString(0, "HipoTrader_Panel_Status", OBJPROP_TEXT, StringSubstr(status_text, 2));
-   ObjectSetString(0, "HipoTrader_Panel_Status", OBJPROP_TEXT, "●");
-   ObjectSetInteger(0, "HipoTrader_Panel_Status", OBJPROP_COLOR, status_color);
-   ObjectSetInteger(0, "HipoTrader_Panel_Status", OBJPROP_XDISTANCE, 15);
-   ObjectSetString(0, "HipoTrader_Panel_Status", OBJPROP_TEXT, status_text);
+    // --- خط ۵: وضعیت کلی ---
+    string status_text = "وضعیت: ";
+    color status_color = clrGray;
+    if(HipoFibo.IsEntryZoneActive()) {
+        status_text += "ناحیه طلایی فعال";
+        status_color = clrGreen;
+    } else if(CountOpenTrades() > 0) {
+        status_text += "معامله باز";
+        status_color = clrDodgerBlue;
+    } else {
+        status_text += isCommandSent ? "در انتظار پاسخ کتابخانه" : "جستجوی سیگنال";
+        status_color = isCommandSent ? clrYellow : clrGray;
+    }
+    ObjectSetInteger(0, "HipoTrader_Panel_Status_Bullet", OBJPROP_COLOR, status_color);
+    ObjectSetString(0, "HipoTrader_Panel_Status_Text", OBJPROP_TEXT, status_text);
 }
+
 
 //+------------------------------------------------------------------+
 //| تابع تبدیل رنگ به نام (GetColorName)                             |
