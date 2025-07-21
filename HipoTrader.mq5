@@ -236,53 +236,60 @@ bool OnNewBar() {
 }
 
 //+------------------------------------------------------------------+
-//| تابع پردازش اصلی (نسخه جدید با منطق درخواست/پاسخ)                |
+//| تابع پردازش اصلی (نسخه نهایی با منطق سخت‌گیری هوشمند)             |
 //| این تابع منطق اصلی تحلیل و ارسال دستور به کتابخانه را اجرا می‌کند. |
 //+------------------------------------------------------------------+
-
 void CoreProcessing() {
-   double htf_main[], htf_signal[], mtf_main[], mtf_signal[];
-   if(CopyBuffer(macd_htf_handle, 0, 1, 2, htf_main) < 2 || 
-      CopyBuffer(macd_htf_handle, 1, 1, 2, htf_signal) < 2 ||
-      CopyBuffer(macd_mtf_handle, 0, 1, 2, mtf_main) < 2 || 
-      CopyBuffer(macd_mtf_handle, 1, 1, 2, mtf_signal) < 2) {
+   // --- بخش اول: خواندن داده‌های مکدی ---
+   double htf_main[2], htf_signal[2], mtf_main[2];
+   if(CopyBuffer(macd_htf_handle, 0, 0, 2, htf_main) < 2 || 
+      CopyBuffer(macd_htf_handle, 1, 0, 2, htf_signal) < 2 ||
+      CopyBuffer(macd_mtf_handle, 0, 0, 2, mtf_main) < 2) {
       lastError = "خطا در کپی داده‌های MACD";
       return;
    }
 
-   bool htf_buy_permission = (htf_main[0] > htf_signal[0]);
-   bool htf_sell_permission = (htf_signal[0] > htf_main[0]);
-   bool mtf_buy_trigger = (mtf_main[0] < 0);
-   bool mtf_sell_trigger = (mtf_main[0] > 0);
+   // --- بخش دوم: تعریف شرط‌های اولیه بر اساس کندل بسته شده [1] ---
+   bool htf_buy_permission = (htf_main[1] > htf_signal[1]);
+   bool htf_sell_permission = (htf_main[1] < htf_signal[1]);
+   bool mtf_buy_trigger = (mtf_main[1] < 0);
+   bool mtf_sell_trigger = (mtf_main[1] > 0);
 
-   E_Trend newTrend = NEUTRAL;
-   if(htf_buy_permission && mtf_buy_trigger && !Enable_Confirmation_Filter) newTrend = TREND_UP;
-   else if(htf_sell_permission && mtf_sell_trigger && !Enable_Confirmation_Filter) newTrend = TREND_DOWN;
-   else if(Enable_Confirmation_Filter) {
-      if(OnNewBar() && htf_buy_permission && mtf_buy_trigger) newTrend = TREND_UP;
-      else if(OnNewBar() && htf_sell_permission && mtf_sell_trigger) newTrend = TREND_DOWN;
-   }
+   // --- بخش سوم: درخت تصمیم‌گیری جدید ---
 
-   // شرط ۱: اگر روند صعودی است و ما قبلاً دستوری نداده‌ایم
-   if(newTrend == TREND_UP && !isCommandSent) {
-      currentTrend = TREND_UP;
-      HipoFibo.ReceiveCommand(SIGNAL_BUY, PERIOD_CURRENT);
-      isCommandSent = true; // قفل فعال شد، منتظر پاسخ کتابخانه هستیم
-      Print("دستور خرید جدید صادر شد. اکسپرت در حالت انتظار.");
+   // فاز اول: وقتی منتظر سیگنال جدید هستیم (!isCommandSent)
+   if(!isCommandSent) {
+      // حالت سخت‌گیرانه: هر دو مکدی باید تایید کنند
+      if(htf_buy_permission && mtf_buy_trigger) {
+         currentTrend = TREND_UP;
+         HipoFibo.ReceiveCommand(SIGNAL_BUY, PERIOD_CURRENT);
+         isCommandSent = true; // قفل فعال شد، وارد فاز پایش می‌شویم
+         Print("سیگنال خرید جدید دریافت شد. دستور به کتابخانه ارسال و قفل فعال شد.");
+      }
+      else if(htf_sell_permission && mtf_sell_trigger) {
+         currentTrend = TREND_DOWN;
+         HipoFibo.ReceiveCommand(SIGNAL_SELL, PERIOD_CURRENT);
+         isCommandSent = true; // قفل فعال شد
+         Print("سیگنال فروش جدید دریافت شد. دستور به کتابخانه ارسال و قفل فعال شد.");
+      }
    }
-   // شرط ۲: اگر روند نزولی است و ما قبلاً دستوری نداده‌ایم
-   else if(newTrend == TREND_DOWN && !isCommandSent) {
-      currentTrend = TREND_DOWN;
-      HipoFibo.ReceiveCommand(SIGNAL_SELL, PERIOD_CURRENT);
-      isCommandSent = true; // قفل فعال شد
-      Print("دستور فروش جدید صادر شد. اکسپرت در حالت انتظار.");
-   }
-   // شرط ۳: اگر روند تغییر کرده و خنثی یا مخالف شده، و ما قبلاً دستوری داده بودیم
-   else if(newTrend != currentTrend && isCommandSent) {
-      currentTrend = newTrend;
-      HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
-      isCommandSent = false; // قفل آزاد شد، چون خودمان دستور توقف دادیم
-      Print("روند در اکسپرت تغییر کرد. دستور توقف به کتابخانه ارسال شد.");
+   // فاز دوم: وقتی کتابخانه در حال اجرای یک ساختار است (isCommandSent)
+   else {
+      // حالت آسان‌گیرانه: فقط مکدی HTF حق وتو دارد
+      if(currentTrend == TREND_UP && !htf_buy_permission) {
+         Print("روند HTF برای خرید از بین رفت. ارسال دستور توقف.");
+         HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
+         isCommandSent = false; // قفل آزاد شد
+         currentTrend = NEUTRAL;
+      }
+      else if(currentTrend == TREND_DOWN && !htf_sell_permission) {
+         Print("روند HTF برای فروش از بین رفت. ارسال دستور توقف.");
+         HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
+         isCommandSent = false; // قفل آزاد شد
+         currentTrend = NEUTRAL;
+      }
+      // در غیر این صورت، هیچ کاری نکن و به کتابخانه اجازه بده کارش را ادامه دهد
+      // مکدی MTF در این فاز نادیده گرفته می‌شود
    }
 }
 
@@ -546,4 +553,4 @@ string GetColorName(color clr) {
    if(clr == clrGreen) return "سبز";
    if(clr == clrRed) return "قرمز";
    return "خاکستری";
-}
+}v
