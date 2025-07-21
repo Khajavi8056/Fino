@@ -27,6 +27,7 @@ int macd_htf_handle;                    // هندل برای اندیکاتور 
 int macd_mtf_handle;                    // هندل برای اندیکاتور MACD در تایم‌فریم میانی
 enum E_Trend { TREND_UP, TREND_DOWN, NEUTRAL }; // تعریف انوم برای وضعیت روند
 E_Trend currentTrend = NEUTRAL;         // وضعیت فعلی روند بازار
+bool isCommandSent = false;             // وضعیت ارسال دستور به کتابخانه (قفل)
 HipoSettings fiboSettings;              // ساختار تنظیمات کتابخانه HipoFibonacci
 datetime lastBarTime = 0;               // زمان آخرین کندل پردازش‌شده
 string lastError = "";                  // ذخیره آخرین خطا برای گزارش‌دهی
@@ -186,6 +187,12 @@ void OnTick() {
 //+------------------------------------------------------------------+
 
 void OnTimer() {
+   // بررسی پاسخ کتابخانه برای آزادسازی قفل
+   if(isCommandSent && HipoFibo.GetCurrentStatus() == SEARCHING_FOR_LEG) {
+      isCommandSent = false; // کتابخانه کارش تمام شده، قفل آزاد می‌شود
+      Print("کتابخانه ساختار قبلی را تمام کرده. اکسپرت آماده ارسال دستور جدید است.");
+   }
+
    CoreProcessing();
 
    if(OnNewBar()) {
@@ -224,14 +231,16 @@ bool OnNewBar() {
 }
 
 //+------------------------------------------------------------------+
-//| تابع پردازش اصلی (CoreProcessing)                                |
+//| تابع پردازش اصلی (نسخه جدید با منطق درخواست/پاسخ)                |
 //| این تابع منطق اصلی تحلیل و ارسال دستور به کتابخانه را اجرا می‌کند. |
 //+------------------------------------------------------------------+
 
 void CoreProcessing() {
    double htf_main[], htf_signal[], mtf_main[], mtf_signal[];
-   if(CopyBuffer(macd_htf_handle, 0, 1, 2, htf_main) < 2 || CopyBuffer(macd_htf_handle, 1, 1, 2, htf_signal) < 2 ||
-      CopyBuffer(macd_mtf_handle, 0, 1, 2, mtf_main) < 2 || CopyBuffer(macd_mtf_handle, 1, 1, 2, mtf_signal) < 2) {
+   if(CopyBuffer(macd_htf_handle, 0, 1, 2, htf_main) < 2 || 
+      CopyBuffer(macd_htf_handle, 1, 1, 2, htf_signal) < 2 ||
+      CopyBuffer(macd_mtf_handle, 0, 1, 2, mtf_main) < 2 || 
+      CopyBuffer(macd_mtf_handle, 1, 1, 2, mtf_signal) < 2) {
       lastError = "خطا در کپی داده‌های MACD";
       return;
    }
@@ -249,12 +258,26 @@ void CoreProcessing() {
       else if(OnNewBar() && htf_sell_permission && mtf_sell_trigger) newTrend = TREND_DOWN;
    }
 
-   if(newTrend != currentTrend) {
+   // شرط ۱: اگر روند صعودی است و ما قبلاً دستوری نداده‌ایم
+   if(newTrend == TREND_UP && !isCommandSent) {
+      currentTrend = TREND_UP;
+      HipoFibo.ReceiveCommand(SIGNAL_BUY, PERIOD_CURRENT);
+      isCommandSent = true; // قفل فعال شد، منتظر پاسخ کتابخانه هستیم
+      Print("دستور خرید جدید صادر شد. اکسپرت در حالت انتظار.");
+   }
+   // شرط ۲: اگر روند نزولی است و ما قبلاً دستوری نداده‌ایم
+   else if(newTrend == TREND_DOWN && !isCommandSent) {
+      currentTrend = TREND_DOWN;
+      HipoFibo.ReceiveCommand(SIGNAL_SELL, PERIOD_CURRENT);
+      isCommandSent = true; // قفل فعال شد
+      Print("دستور فروش جدید صادر شد. اکسپرت در حالت انتظار.");
+   }
+   // شرط ۳: اگر روند تغییر کرده و خنثی یا مخالف شده، و ما قبلاً دستوری داده بودیم
+   else if(newTrend != currentTrend && isCommandSent) {
       currentTrend = newTrend;
-      E_SignalType signal = STOP_SEARCH;
-      if(newTrend == TREND_UP) signal = SIGNAL_BUY;
-      else if(newTrend == TREND_DOWN) signal = SIGNAL_SELL;
-      HipoFibo.ReceiveCommand(signal, PERIOD_CURRENT);
+      HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
+      isCommandSent = false; // قفل آزاد شد، چون خودمان دستور توقف دادیم
+      Print("روند در اکسپرت تغییر کرد. دستور توقف به کتابخانه ارسال شد.");
    }
 }
 
@@ -315,6 +338,7 @@ void ExecuteTrade() {
    }
 
    HipoFibo.ReceiveCommand(STOP_SEARCH, PERIOD_CURRENT);
+   isCommandSent = false; // آزادسازی قفل پس از اجرای معامله
 
    if(trade.ResultRetcode() == TRADE_RETCODE_DONE) {
       Print("معامله با موفقیت اجرا شد - حجم: ", volume, "، SL: ", final_sl_price, "، TP: ", take_profit);
@@ -440,7 +464,7 @@ void UpdateTraderPanel() {
    statusText += "\nوضعیت: ";
    if(HipoFibo.IsEntryZoneActive()) statusText += "ناحیه طلایی فعال";
    else if(CountOpenTrades() > 0) statusText += "معامله باز";
-   else statusText += "جستجوی سیگنال";
+   else statusText += isCommandSent ? "در انتظار پاسخ کتابخانه" : "جستجوی سیگنال";
 
    ObjectSetString(0, "HipoTrader_Panel", OBJPROP_TEXT, statusText);
    ObjectSetInteger(0, "HipoTrader_Panel", OBJPROP_COLOR, trendColor);
