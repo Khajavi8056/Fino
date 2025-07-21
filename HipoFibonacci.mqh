@@ -2,13 +2,13 @@
 //| HipoFibonacci.mqh                                                |
 //| Copyright © 2025 HipoAlgorithm                                   |
 //| https://hipoalgorithm.com                                        |
-//| نسخه: 1.5                                                        |
+//| نسخه: 1.6                                                        |
 //| توضیحات: این فایل شامل کلاس CHipoFibonacci است که برای شناسایی نقاط چرخش بازار با استفاده از اندیکاتور Fineflow، رسم سطوح فیبوناچی و مدیریت استراتژی‌های معاملاتی در متاتریدر 5 طراحی شده است. |
 //+------------------------------------------------------------------+
 
 #property copyright "HipoAlgorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.5"
+#property version   "1.6"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -145,6 +145,8 @@ public:
    string GetFinalFiboScenario() { return finalFiboScenario; } // دریافت سناریوی نهایی
    E_Status GetCurrentStatus() { return currentStatus; } // دریافت وضعیت فعلی
    double GetFiboLevelPrice(E_FiboType type, double level) { return CalculateFiboLevelPrice(type, level); } // دریافت قیمت سطح فیبوناچی
+   bool FindValley(datetime &localTime, double &localPrice, int &localPosition, const datetime &time[]); // یافتن دره
+   bool FindPeak(datetime &localTime, double &localPrice, int &localPosition, const datetime &time[]); // یافتن قله
 };
 
 //+------------------------------------------------------------------+
@@ -344,10 +346,11 @@ void CHipoFibonacci::OnNewCandle(const int rates_total, const datetime &time[], 
 //+------------------------------------------------------------------+
 //| یافتن دره (Find Valley)                                          |
 //| این تابع نقاط پایین (دره) را از بافر اندیکاتور Fineflow می‌خواند. |
+//| جستجو از جدید به قدیم انجام می‌شود و اولین دره معتبر را برمی‌گرداند. |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::FindValley(datetime &localTime, double &localPrice, int &localPosition, const datetime &time[]) {
-   for(int i = MathMin(settings.MaxCandles - settings.Lookback - 1, ArraySize(valleyBuffer) - 1); i >= 0; i--) {
+   for(int i = MathMin(rates_total - settings.Lookback - 1, ArraySize(valleyBuffer) - 1); i >= 0; i--) {
       if(valleyBuffer[i] > 0) {
          localPrice = valleyBuffer[i];
          localTime = time[i];
@@ -361,10 +364,11 @@ bool CHipoFibonacci::FindValley(datetime &localTime, double &localPrice, int &lo
 //+------------------------------------------------------------------+
 //| یافتن قله (Find Peak)                                            |
 //| این تابع نقاط بالا (قله) را از بافر اندیکاتور Fineflow می‌خواند. |
+//| جستجو از جدید به قدیم انجام می‌شود و اولین قله معتبر را برمی‌گرداند. |
 //+------------------------------------------------------------------+
 
 bool CHipoFibonacci::FindPeak(datetime &localTime, double &localPrice, int &localPosition, const datetime &time[]) {
-   for(int i = MathMin(settings.MaxCandles - settings.Lookback - 1, ArraySize(peakBuffer) - 1); i >= 0; i--) {
+   for(int i = MathMin(rates_total - settings.Lookback - 1, ArraySize(peakBuffer) - 1); i >= 0; i--) {
       if(peakBuffer[i] > 0) {
          localPrice = peakBuffer[i];
          localTime = time[i];
@@ -390,15 +394,26 @@ void CHipoFibonacci::ProcessBuyLogic(const int rates_total, const datetime &time
          anchor.time = localTime;
          anchor.position = localPosition;
          anchorID = localTime;
+         // جستجو برای مادر (قله) از نقطه لنگرگاه به عقب
          datetime peakTime;
          double peakPrice;
          int peakPosition;
-         if(FindPeak(peakTime, peakPrice, peakPosition, time) && peakTime < localTime) {
-            mother.price = peakPrice;
-            mother.time = peakTime;
-            mother.position = peakPosition;
+         for(int i = localPosition - 1; i >= 0; i--) {
+            if(peakBuffer[i] > 0) {
+               peakPrice = peakBuffer[i];
+               peakTime = time[i];
+               peakPosition = i;
+               if(peakTime < localTime) {
+                  mother.price = peakPrice;
+                  mother.time = peakTime;
+                  mother.position = peakPosition;
+                  break;
+               }
+            }
+         }
+         if(mother.price > 0) {
             if(settings.Enable_Drawing) DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
-            if(settings.Enable_Logging) Print("Anchor_Low یافت شد در قیمت ", localPrice, " در ", TimeToString(localTime), ", Mother_High در ", peakPrice);
+            if(settings.Enable_Logging) Print("Anchor_Low یافت شد در قیمت ", localPrice, " در ", TimeToString(localTime), ", Mother_High در ", mother.price);
             currentStatus = MONITORING_SCENARIO_1_PROGRESS;
          }
       } else {
@@ -532,15 +547,26 @@ void CHipoFibonacci::ProcessSellLogic(const int rates_total, const datetime &tim
          anchor.time = localTime;
          anchor.position = localPosition;
          anchorID = localTime;
+         // جستجو برای مادر (دره) از نقطه لنگرگاه به عقب
          datetime valleyTime;
          double valleyPrice;
          int valleyPosition;
-         if(FindValley(valleyTime, valleyPrice, valleyPosition, time) && valleyTime < localTime) {
-            mother.price = valleyPrice;
-            mother.time = valleyTime;
-            mother.position = valleyPosition;
+         for(int i = localPosition - 1; i >= 0; i--) {
+            if(valleyBuffer[i] > 0) {
+               valleyPrice = valleyBuffer[i];
+               valleyTime = time[i];
+               valleyPosition = i;
+               if(valleyTime < localTime) {
+                  mother.price = valleyPrice;
+                  mother.time = valleyTime;
+                  mother.position = valleyPosition;
+                  break;
+               }
+            }
+         }
+         if(mother.price > 0) {
             if(settings.Enable_Drawing) DrawFibo(FIBO_MOTHER, anchor.price, mother.price, anchor.time, mother.time, settings.MotherFibo_Color);
-            if(settings.Enable_Logging) Print("Anchor_High یافت شد در قیمت ", localPrice, " در ", TimeToString(localTime), ", Mother_Low در ", valleyPrice);
+            if(settings.Enable_Logging) Print("Anchor_High یافت شد در قیمت ", localPrice, " در ", TimeToString(localTime), ", Mother_Low در ", mother.price);
             currentStatus = MONITORING_SCENARIO_1_PROGRESS;
          }
       } else {
