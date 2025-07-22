@@ -96,7 +96,7 @@ enum ENUM_DIRECTION
 struct SSignal
 {
    string type;    // "Buy" یا "Sell"
-   stringλιبل id;      // شناسه منحصربه‌فرد
+   string id;      // شناسه منحصربه‌فرد
 };
 
 struct SFractal
