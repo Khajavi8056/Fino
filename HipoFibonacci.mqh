@@ -8,7 +8,7 @@
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.2"//beta
+#property version   "1.2" //beta
 
 //+------------------------------------------------------------------+
 //| ورودی‌های کتابخانه                                              |
@@ -97,7 +97,6 @@ struct SFractal
 class CFractalFinder
 {
 private:
-   // بررسی فراکتال بودن کندل
    bool IsHighFractal(int index, int peers)
    {
       for(int i = 1; i <= peers; i++)
@@ -121,7 +120,6 @@ private:
    }
 
 public:
-   // پیدا کردن جدیدترین سقف فراکتالی
    void FindRecentHigh(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
       fractal.price = 0.0;
@@ -138,7 +136,6 @@ public:
       }
    }
 
-   // پیدا کردن جدیدترین کف فراکتالی
    void FindRecentLow(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
       fractal.price = 0.0;
@@ -166,7 +163,6 @@ private:
    ENUM_BASE_CORNER m_corner;
    int m_offset_x, m_offset_y;
 
-   // ایجاد لیبل پنل
    bool CreateLabel(string name, string text, int x, int y, color clr)
    {
       if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0))
@@ -228,7 +224,6 @@ private:
    int m_offset_x, m_offset_y;
    color m_button_color_long, m_button_color_short, m_button_color_stop, m_bg_color;
 
-   // ایجاد دکمه
    bool CreateButton(string name, string text, int x, int y, color clr)
    {
       if(!ObjectCreate(0, name, OBJ_BUTTON, 0, 0, 0))
@@ -244,7 +239,6 @@ private:
       return true;
    }
 
-   // ایجاد پس‌زمینه
    bool CreateBackground(string name, int x, int y)
    {
       if(!ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
@@ -313,7 +307,6 @@ protected:
    double m_price0, m_price100;
    bool m_is_test;
 
-   // بررسی وجود شیء
    bool CheckObjectExists(string name)
    {
       for(int i = 0; i < 3; i++)
@@ -325,18 +318,10 @@ protected:
       return false;
    }
 
-   // ثبت لاگ
    void Log(string message)
    {
       if(InpEnableLog)
-      {
-         int handle = FileOpen(InpLogFilePath, FILE_WRITE | FILE_TXT | FILE_COMMON);
-         if(handle != INVALID_HANDLE)
-         {
-            FileWrite(handle, TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": " + message);
-            FileClose(handle);
-         }
-      }
+         CStructureManager::LogStatic(message);
    }
 
 public:
@@ -474,12 +459,6 @@ public:
       double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
       bool fix_condition = (m_direction == LONG && current_price >= level_50) ||
                            (m_direction == SHORT && current_price <= level_50);
-      if(InpMotherFixMode == CANDLE_CLOSE)
-      {
-         int shift = iBarShift(_Symbol, _Period, TimeCurrent());
-         fix_condition = (m_direction == LONG && iClose(_Symbol, _Period, shift) >= level_50) ||
-                         (m_direction == SHORT && iClose(_Symbol, _Period, shift) <= level_50);
-      }
       if(fix_condition)
       {
          m_is_fixed = true;
@@ -488,6 +467,36 @@ public:
          {
             string arrow_name = "Debug_Arrow_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
             if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
+               CheckObjectExists(arrow_name);
+            }
+            string label_name = "Debug_Label_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price0))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر فیکس شد: صفر=" + DoubleToString(m_price0, _Digits));
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            }
+         }
+         return true;
+      }
+      return false;
+   }
+
+   bool CheckFixingOnBar()
+   {
+      if(m_is_fixed) return true;
+      double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
+      bool fix_condition = (m_direction == LONG && iClose(_Symbol, _Period, 1) >= level_50) ||
+                           (m_direction == SHORT && iClose(_Symbol, _Period, 1) <= level_50);
+      if(fix_condition)
+      {
+         m_is_fixed = true;
+         Log("مادر فیکس شد (OnBar): صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         if(InpVisualDebug)
+         {
+            string arrow_name = "Debug_Arrow_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
             {
                ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
                CheckObjectExists(arrow_name);
@@ -529,9 +538,9 @@ public:
 
    bool Initialize(datetime current_time)
    {
-      m_time0 = m_parent_mother.GetTime0();
-      m_price0 = m_parent_mother.GetPrice0();
-      if(m_parent_mother.GetDirection() == LONG)
+      m_time0 = m_parent_mother->GetTime0();
+      m_price0 = m_parent_mother->GetPrice0();
+      if(m_parent_mother->GetDirection() == LONG)
       {
          m_price100 = iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, current_time));
          for(int i = iBarShift(_Symbol, _Period, m_time0); i >= iBarShift(_Symbol, _Period, current_time); i--)
@@ -553,10 +562,10 @@ public:
          {
             string arrow_name = "Debug_Arrow_" + (StringFind(m_name, "Child1") >= 0 ? "Child1Birth_" : "Child2Birth_") +
                                 TimeToString(m_time100) + (m_is_test ? "_Test" : "");
-            if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100))
+            if(ObjectCreate(0, arrow_name, m_parent_mother->GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100))
             {
-               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, StringFind(m_name, "Child1") >= 0 ? (m_parent_mother.GetDirection() == LONG ? clrCyan : clrPink) :
-                                                               (m_parent_mother.GetDirection() == LONG ? clrDarkGreen : clrDarkRed));
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, StringFind(m_name, "Child1") >= 0 ? (m_parent_mother->GetDirection() == LONG ? clrCyan : clrPink) :
+                                                               (m_parent_mother->GetDirection() == LONG ? clrDarkGreen : clrDarkRed));
                CheckObjectExists(arrow_name);
             }
          }
@@ -569,7 +578,7 @@ public:
    {
       if(m_is_fixed) return true;
       double old_price100 = m_price100;
-      if(m_parent_mother.GetDirection() == LONG)
+      if(m_parent_mother->GetDirection() == LONG)
       {
          m_price100 = MathMax(m_price100, iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, new_time)));
       }
@@ -607,8 +616,8 @@ public:
    {
       if(m_is_fixed || StringFind(m_name, "Child2") >= 0) return false;
       double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
-      bool fix_condition = (m_parent_mother.GetDirection() == LONG && current_price <= level_50) ||
-                           (m_parent_mother.GetDirection() == SHORT && current_price >= level_50);
+      bool fix_condition = (m_parent_mother->GetDirection() == LONG && current_price <= level_50) ||
+                           (m_parent_mother->GetDirection() == SHORT && current_price >= level_50);
       if(fix_condition)
       {
          m_is_fixed = true;
@@ -616,9 +625,9 @@ public:
          if(InpVisualDebug)
          {
             string arrow_name = "Debug_Arrow_Child1Fix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_DOWN : OBJ_ARROW_UP, 0, TimeCurrent(), current_price))
+            if(ObjectCreate(0, arrow_name, m_parent_mother->GetDirection() == LONG ? OBJ_ARROW_DOWN : OBJ_ARROW_UP, 0, TimeCurrent(), current_price))
             {
-               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_parent_mother.GetDirection() == LONG ? clrGreen : clrRed);
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_parent_mother->GetDirection() == LONG ? clrGreen : clrRed);
                CheckObjectExists(arrow_name);
             }
             string label_name = "Debug_Label_Child1Fix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
@@ -635,8 +644,8 @@ public:
 
    bool CheckFailure(double current_price)
    {
-      bool fail_condition = (m_parent_mother.GetDirection() == LONG && current_price > m_parent_mother.GetPrice100()) ||
-                            (m_parent_mother.GetDirection() == SHORT && current_price < m_parent_mother.GetPrice100());
+      bool fail_condition = (m_parent_mother->GetDirection() == LONG && current_price > m_parent_mother->GetPrice100()) ||
+                            (m_parent_mother->GetDirection() == SHORT && current_price < m_parent_mother->GetPrice100());
       if(fail_condition)
       {
          Log("فرزند اول شکست خورد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
@@ -659,8 +668,8 @@ public:
       if(StringFind(m_name, "Child2") < 0) return false;
       double zone_start = m_price100 + (m_price0 - m_price100) * levels[0] / 100.0;
       double zone_end = m_price100 + (m_price0 - m_price100) * levels[1] / 100.0;
-      bool in_zone = (m_parent_mother.GetDirection() == LONG && current_price >= zone_start && current_price <= zone_end) ||
-                     (m_parent_mother.GetDirection() == SHORT && current_price <= zone_start && current_price >= zone_end);
+      bool in_zone = (m_parent_mother->GetDirection() == LONG && current_price >= zone_start && current_price <= zone_end) ||
+                     (m_parent_mother->GetDirection() == SHORT && current_price <= zone_start && current_price >= zone_end);
       if(in_zone && InpVisualDebug)
       {
          string rect_name = "Debug_Rectangle_GoldenZone_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "");
@@ -698,20 +707,23 @@ private:
    double m_break_levels[];
    double m_golden_zone[];
    string m_signal_id;
+   datetime m_start_time;
 
-   // ثبت لاگ
+   bool CheckObjectExists(string name)
+   {
+      for(int i = 0; i < 3; i++)
+      {
+         if(ObjectFind(0, name) >= 0) return true;
+         Sleep(100);
+      }
+      Log("خطا: عدم رندر شیء " + name);
+      return false;
+   }
+
    void Log(string message)
    {
       if(InpEnableLog)
-      {
-         int handle = FileOpen(InpLogFilePath, FILE_WRITE | FILE_TXT | FILE_COMMON);
-         if(handle != INVALID_HANDLE)
-         {
-            FileWrite(handle, TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": " +
-                      (m_is_test ? "حالت تست: " : "") + message);
-            FileClose(handle);
-         }
-      }
+         CStructureManager::LogStatic(message + (m_is_test ? " [Test]" : ""));
    }
 
 public:
@@ -723,6 +735,7 @@ public:
       m_child2 = NULL;
       m_is_test = is_test;
       m_panel = panel;
+      m_start_time = TimeCurrent();
       string temp_levels[];
       int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
       ArrayResize(m_break_levels, count);
@@ -738,6 +751,7 @@ public:
    {
       m_direction = direction;
       m_state = SEARCHING;
+      m_start_time = TimeCurrent();
       string dir_str = m_direction == LONG ? "Long" : "Short";
       Log("شروع ساختار " + dir_str);
       if(m_panel && InpShowPanel)
@@ -775,7 +789,7 @@ public:
       else if(m_state == MOTHER_ACTIVE)
       {
          m_mother.Update(current_time);
-         if(m_mother.IsFixed())
+         if(InpMotherFixMode == CANDLE_CLOSE && m_mother.CheckFixingOnBar())
          {
             m_child1 = new CChildFibo("HipoFibo_" + TimeToString(current_time) + "_Child1_" + (m_direction == LONG ? "Long" : "Short"),
                                       InpChild1Color, InpChildLevels, m_mother, false, m_is_test);
@@ -823,7 +837,7 @@ public:
       signal.type = "";
       signal.id = "";
       double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      if(m_state == MOTHER_ACTIVE)
+      if(m_state == MOTHER_ACTIVE && InpMotherFixMode == PRICE_CROSS)
       {
          if(m_mother.CheckFixing(current_price))
          {
@@ -885,7 +899,7 @@ public:
                if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
                {
                   ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
-                  /////CheckObjectExists(arrow_name);
+                  CheckObjectExists(arrow_name); // خط ۸۸۸
                }
                string label_name = "Debug_Label_Signal_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
                if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
@@ -922,6 +936,7 @@ public:
    }
 
    ENUM_STRUCTURE_STATE GetState() { return m_state; }
+   datetime GetStartTime() { return m_start_time; }
 };
 
 //+------------------------------------------------------------------+
@@ -936,9 +951,19 @@ private:
    bool m_is_test_mode;
    datetime m_last_update;
    int m_max_families;
+   SSignal m_last_signal;
+   int m_log_handle;
 
-   // ثبت لاگ
    void Log(string message)
+   {
+      if(InpEnableLog && m_log_handle != INVALID_HANDLE)
+      {
+         FileWrite(m_log_handle, TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": " + message);
+      }
+   }
+
+public:
+   static void LogStatic(string message)
    {
       if(InpEnableLog)
       {
@@ -949,48 +974,17 @@ private:
             FileClose(handle);
          }
       }
-      if(m_panel && InpShowPanel && StringFind(message, "خطا") >= 0)
-      {
-         string label_name = "Debug_Label_Error_" + TimeToString(TimeCurrent()) + (m_is_test_mode ? "_Test" : "");
-         if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), SymbolInfoDouble(_Symbol, SYMBOL_BID)))
-         {
-            ObjectSetString(0, label_name, OBJPROP_TEXT, message);
-            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrOrangeRed);
-         }
-      }
    }
 
-   // پاک‌سازی قدیمی‌ترین ساختار کامل‌شده
-   void CleanupOldestStructure()
-   {
-      if(ArraySize(m_structures) >= m_max_families)
-      {
-         int oldest_index = -1;
-         datetime oldest_time = TimeCurrent();
-         for(int i = 0; i < ArraySize(m_structures); i++)
-         {
-            if(m_structures[i].GetState() == COMPLETED)
-            {
-               oldest_index = i;
-               oldest_time = TimeCurrent();
-            }
-         }
-         if(oldest_index >= 0)
-         {
-            m_structures[oldest_index].Stop();
-            delete m_structures[oldest_index];
-            ArrayRemove(m_structures, oldest_index, 1);
-         }
-      }
-   }
-
-public:
    CStructureManager()
    {
       ArrayResize(m_structures, 0);
       m_is_test_mode = false;
       m_last_update = 0;
       m_max_families = InpMaxFamilies < 1 ? 2 : InpMaxFamilies;
+      m_last_signal.type = "";
+      m_last_signal.id = "";
+      m_log_handle = InpEnableLog ? FileOpen(InpLogFilePath, FILE_WRITE | FILE_TXT | FILE_COMMON) : INVALID_HANDLE;
       m_panel = InpShowPanel ? new CPanel("HipoPanel", InpPanelCorner, InpPanelOffsetX < 0 ? 10 : InpPanelOffsetX,
                                           InpPanelOffsetY < 0 ? 20 : InpPanelOffsetY) : NULL;
       m_test_panel = NULL;
@@ -1008,6 +1002,7 @@ public:
       ArrayFree(m_structures);
       if(m_panel) { m_panel.Destroy(); delete m_panel; }
       if(m_test_panel) { m_test_panel.Destroy(); delete m_test_panel; }
+      if(m_log_handle != INVALID_HANDLE) FileClose(m_log_handle);
    }
 
    void EnableTestMode(bool enable)
@@ -1035,7 +1030,7 @@ public:
 
    bool CreateNewStructure(ENUM_DIRECTION direction)
    {
-      if(m_is_test_mode) return false; // فقط پنل تست دستور می‌دهد
+      if(m_is_test_mode) return false;
       for(int i = 0; i < ArraySize(m_structures); i++)
       {
          if(m_structures[i].GetState() != COMPLETED)
@@ -1127,6 +1122,7 @@ public:
          {
             signal.type = temp.type;
             signal.id = temp.id;
+            m_last_signal = temp;
          }
       }
       m_last_update = TimeCurrent();
@@ -1159,6 +1155,37 @@ public:
             ProcessTestCommand(command);
       }
    }
+
+   void CleanupOldestStructure()
+   {
+      if(ArraySize(m_structures) >= m_max_families)
+      {
+         int oldest_index = -1;
+         datetime oldest_time = TimeCurrent();
+         for(int i = 0; i < ArraySize(m_structures); i++)
+         {
+            if(m_structures[i].GetState() == COMPLETED && m_structures[i].GetStartTime() < oldest_time)
+            {
+               oldest_index = i;
+               oldest_time = m_structures[i].GetStartTime();
+            }
+         }
+         if(oldest_index >= 0)
+         {
+            m_structures[oldest_index].Stop();
+            delete m_structures[oldest_index];
+            ArrayRemove(m_structures, oldest_index, 1);
+         }
+      }
+   }
+
+   SSignal GetLastSignal()
+   {
+      SSignal signal = m_last_signal;
+      m_last_signal.type = "";
+      m_last_signal.id = "";
+      return signal;
+   }
 };
 
 //+------------------------------------------------------------------+
@@ -1178,34 +1205,34 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
-   if(g_manager) g_manager.OnTick();
+   if(g_manager) g_manager->OnTick();
 }
 
 void OnNewBar()
 {
-   if(g_manager) g_manager.OnNewBar();
+   if(g_manager) g_manager->OnNewBar();
 }
 
 bool StartStructure(ENUM_DIRECTION direction)
 {
-   if(g_manager) return g_manager.CreateNewStructure(direction);
+   if(g_manager) return g_manager->CreateNewStructure(direction);
    return false;
 }
 
 SSignal GetSignal()
 {
-   if(g_manager) return g_manager.OnTick();
+   if(g_manager) return g_manager->GetLastSignal();
    SSignal signal = {"", ""};
    return signal;
 }
 
 bool AcknowledgeSignal(string id)
 {
-   if(g_manager) return g_manager.AcknowledgeSignal(id);
+   if(g_manager) return g_manager->AcknowledgeSignal(id);
    return false;
 }
 
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
-   if(g_manager) g_manager.OnChartEvent(id, lparam, dparam, sparam);
+   if(g_manager) g_manager->OnChartEvent(id, lparam, dparam, sparam);
 }
