@@ -38,13 +38,13 @@ input color InpChild2Color = clrGreen;    // رنگ فیبوناچی فرزند 
 
 input group "تنظیمات پنل اصلی"
 input bool InpShowPanel = true;           // نمایش پنل اصلی اطلاعاتی
-input ENUM_CHART_CORNER InpPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل اصلی
+input ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل اصلی
 input int InpPanelOffsetX = 10;           // فاصله افقی پنل اصلی (حداقل 0)
 input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصلی (حداقل 0)
 
 input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
 input bool InpTestMode = false;           // فعال‌سازی حالت تست داخلی
-input ENUM_CHART_CORNER InpTestPanelCorner = CORNER_TOP_CENTER; // گوشه پنل تست (مرکز بالا)
+input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_TOP; // گوشه پنل تست (مرکز بالا)
 input int InpTestPanelOffsetX = 0;        // فاصله افقی پنل تست از مرکز
 input int InpTestPanelOffsetY = 20;       // فاصله عمودی پنل تست از بالا
 input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
@@ -58,6 +58,7 @@ input bool InpVisualDebug = false;        // فعال‌سازی حالت تست
 input group "تنظیمات لاگ"
 input bool InpEnableLog = true;           // فعال‌سازی لاگ‌گیری
 input string InpLogFilePath = "HipoFibonacci_Log.txt"; // مسیر فایل لاگ (MQL5/Files)
+input int InpMaxFamilies = 2;             // حداکثر تعداد ساختارهای فعال (حداقل 1)
 
 //+------------------------------------------------------------------+
 //| ساختارها و ثابت‌ها                                              |
@@ -121,9 +122,10 @@ private:
 
 public:
    // پیدا کردن جدیدترین سقف فراکتالی
-   SFractal FindRecentHigh(datetime startTime, int lookback, int peers)
+   void FindRecentHigh(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
-      SFractal fractal = {0.0, 0};
+      fractal.price = 0.0;
+      fractal.time = 0;
       int startIndex = iBarShift(_Symbol, _Period, startTime);
       for(int i = startIndex; i <= MathMin(startIndex + lookback, iBars(_Symbol, _Period) - 1); i++)
       {
@@ -134,13 +136,13 @@ public:
             break;
          }
       }
-      return fractal;
    }
 
    // پیدا کردن جدیدترین کف فراکتالی
-   SFractal FindRecentLow(datetime startTime, int lookback, int peers)
+   void FindRecentLow(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
-      SFractal fractal = {0.0, 0};
+      fractal.price = 0.0;
+      fractal.time = 0;
       int startIndex = iBarShift(_Symbol, _Period, startTime);
       for(int i = startIndex; i <= MathMin(startIndex + lookback, iBars(_Symbol, _Period) - 1); i++)
       {
@@ -151,7 +153,6 @@ public:
             break;
          }
       }
-      return fractal;
    }
 };
 
@@ -162,7 +163,7 @@ class CPanel
 {
 private:
    string m_name;
-   ENUM_CHART_CORNER m_corner;
+   ENUM_BASE_CORNER m_corner;
    int m_offset_x, m_offset_y;
 
    // ایجاد لیبل پنل
@@ -180,7 +181,7 @@ private:
    }
 
 public:
-   CPanel(string name, ENUM_CHART_CORNER corner, int x, int y)
+   CPanel(string name, ENUM_BASE_CORNER corner, int x, int y)
    {
       m_name = name;
       m_corner = corner;
@@ -223,7 +224,7 @@ class CTestPanel
 {
 private:
    string m_name;
-   ENUM_CHART_CORNER m_corner;
+   ENUM_BASE_CORNER m_corner;
    int m_offset_x, m_offset_y;
    color m_button_color_long, m_button_color_short, m_button_color_stop, m_bg_color;
 
@@ -258,7 +259,7 @@ private:
    }
 
 public:
-   CTestPanel(string name, ENUM_CHART_CORNER corner, int x, int y, color long_color, color short_color, color stop_color, color bg_color)
+   CTestPanel(string name, ENUM_BASE_CORNER corner, int x, int y, color long_color, color short_color, color stop_color, color bg_color)
    {
       m_name = name;
       m_corner = corner;
@@ -278,14 +279,14 @@ public:
              CreateButton(m_name + "_Stop", "Stop", m_offset_x + 210, m_offset_y + 5, m_button_color_stop);
    }
 
-   bool OnButtonClick(string button)
+   bool OnButtonClick(string button, string &command)
    {
       if(ObjectGetInteger(0, button, OBJPROP_STATE))
       {
          ObjectSetInteger(0, button, OBJPROP_STATE, false);
-         if(StringFind(button, "_StartLong") >= 0) return true; // Start Long
-         if(StringFind(button, "_StartShort") >= 0) return true; // Start Short
-         if(StringFind(button, "_Stop") >= 0) return true; // Stop
+         if(StringFind(button, "_StartLong") >= 0) { command = "StartLong"; return true; }
+         if(StringFind(button, "_StartShort") >= 0) { command = "StartShort"; return true; }
+         if(StringFind(button, "_Stop") >= 0) { command = "Stop"; return true; }
       }
       return false;
    }
@@ -344,10 +345,11 @@ public:
       m_name = name;
       m_color = clr;
       m_is_test = is_test;
-      StringSplit(levels, StringGetCharacter(",", 0), m_levels);
-      ArrayResize(m_levels, ArraySize(m_levels));
-      for(int i = 0; i < ArraySize(m_levels); i++)
-         m_levels[i] = StringToDouble(m_levels[i]);
+      string temp_levels[];
+      int count = StringSplit(levels, StringGetCharacter(",", 0), temp_levels);
+      ArrayResize(m_levels, count);
+      for(int i = 0; i < count; i++)
+         m_levels[i] = StringToDouble(temp_levels[i]);
    }
 
    virtual bool Draw()
@@ -367,6 +369,10 @@ public:
       string obj_name = m_name + (m_is_test ? "_Test" : "");
       ObjectDelete(0, obj_name);
    }
+
+   datetime GetTime0() { return m_time0; }
+   double GetPrice0() { return m_price0; }
+   double GetPrice100() { return m_price100; }
 };
 
 //+------------------------------------------------------------------+
@@ -386,7 +392,7 @@ public:
       m_direction = dir;
    }
 
-   bool Initialize(SFractal fractal, datetime current_time)
+   bool Initialize(SFractal &fractal, datetime current_time)
    {
       m_time100 = fractal.time;
       m_price100 = fractal.price;
@@ -489,8 +495,7 @@ public:
    }
 
    bool IsFixed() { return m_is_fixed; }
-   double GetPrice0() { return m_price0; }
-   double GetPrice100() { return m_price100; }
+   ENUM_DIRECTION GetDirection() { return m_direction; }
 };
 
 //+------------------------------------------------------------------+
@@ -514,9 +519,9 @@ public:
 
    bool Initialize(datetime current_time)
    {
-      m_time0 = m_parent_mother.m_time0;
-      m_price0 = m_parent_mother.m_price0;
-      if(m_parent_mother.m_direction == LONG)
+      m_time0 = m_parent_mother.GetTime0();
+      m_price0 = m_parent_mother.GetPrice0();
+      if(m_parent_mother.GetDirection() == LONG)
       {
          m_price100 = iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, current_time));
          for(int i = iBarShift(_Symbol, _Period, m_time0); i >= iBarShift(_Symbol, _Period, current_time); i--)
@@ -538,9 +543,9 @@ public:
          {
             string arrow_name = "Debug_Arrow_" + (StringFind(m_name, "Child1") >= 0 ? "Child1Birth_" : "Child2Birth_") +
                                 TimeToString(m_time100) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, arrow_name, m_parent_mother.m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100);
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, StringFind(m_name, "Child1") >= 0 ? (m_parent_mother.m_direction == LONG ? clrCyan : clrPink) :
-                                                            (m_parent_mother.m_direction == LONG ? clrDarkGreen : clrDarkRed));
+            ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100);
+            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, StringFind(m_name, "Child1") >= 0 ? (m_parent_mother.GetDirection() == LONG ? clrCyan : clrPink) :
+                                                            (m_parent_mother.GetDirection() == LONG ? clrDarkGreen : clrDarkRed));
             CheckObjectExists(arrow_name);
          }
          return true;
@@ -552,7 +557,7 @@ public:
    {
       if(m_is_fixed) return true;
       double old_price100 = m_price100;
-      if(m_parent_mother.m_direction == LONG)
+      if(m_parent_mother.GetDirection() == LONG)
       {
          m_price100 = MathMax(m_price100, iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, new_time)));
       }
@@ -588,8 +593,8 @@ public:
    {
       if(m_is_fixed || StringFind(m_name, "Child2") >= 0) return false;
       double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
-      bool fix_condition = (m_parent_mother.m_direction == LONG && current_price <= level_50) ||
-                           (m_parent_mother.m_direction == SHORT && current_price >= level_50);
+      bool fix_condition = (m_parent_mother.GetDirection() == LONG && current_price <= level_50) ||
+                           (m_parent_mother.GetDirection() == SHORT && current_price >= level_50);
       if(fix_condition)
       {
          m_is_fixed = true;
@@ -597,8 +602,8 @@ public:
          if(InpVisualDebug)
          {
             string arrow_name = "Debug_Arrow_Child1Fix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            ObjectGST(0, arrow_name, m_parent_mother.m_direction == LONG ? OBJ_ARROW_DOWN : OBJ_ARROW_UP, 0, TimeCurrent(), current_price);
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_parent_mother.m_direction == LONG ? clrGreen : clrRed);
+            ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_DOWN : OBJ_ARROW_UP, 0, TimeCurrent(), current_price);
+            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_parent_mother.GetDirection() == LONG ? clrGreen : clrRed);
             CheckObjectExists(arrow_name);
             string label_name = "Debug_Label_Child1Fix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
             ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price100);
@@ -612,8 +617,8 @@ public:
 
    bool CheckFailure(double current_price)
    {
-      bool fail_condition = (m_parent_mother.m_direction == LONG && current_price > m_parent_mother.m_price100) ||
-                            (m_parent_mother.m_direction == SHORT && current_price < m_parent_mother.m_price100);
+      bool fail_condition = (m_parent_mother.GetDirection() == LONG && current_price > m_parent_mother.GetPrice100()) ||
+                            (m_parent_mother.GetDirection() == SHORT && current_price < m_parent_mother.GetPrice100());
       if(fail_condition)
       {
          Log("فرزند اول شکست خورد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
@@ -634,22 +639,24 @@ public:
       if(StringFind(m_name, "Child2") < 0) return false;
       double zone_start = m_price100 + (m_price0 - m_price100) * levels[0] / 100.0;
       double zone_end = m_price100 + (m_price0 - m_price100) * levels[1] / 100.0;
-      bool in_zone = (m_parent_mother.m_direction == LONG && current_price >= zone_start && current_price <= zone_end) ||
-                     (m_parent_mother.m_direction == SHORT && current_price <= zone_start && current_price >= zone_end);
-      if(in_zone && InpVisualDebug && !ObjectFind(0, "Debug_Rectangle_GoldenZone_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "") >= 0))
+      bool in_zone = (m_parent_mother.GetDirection() == LONG && current_price >= zone_start && current_price <= zone_end) ||
+                     (m_parent_mother.GetDirection() == SHORT && current_price <= zone_start && current_price >= zone_end);
+      if(in_zone && InpVisualDebug)
       {
          string rect_name = "Debug_Rectangle_GoldenZone_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "");
-         ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, m_time100, zone_start, TimeCurrent(), zone_end);
-         ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrLightYellow);
-         ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
-         ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrLightYellow);
-         CheckObjectExists(rect_name);
+         if(ObjectFind(0, rect_name) < 0)
+         {
+            ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, m_time100, zone_start, TimeCurrent(), zone_end);
+            ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrLightYellow);
+            ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
+            ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrLightYellow);
+            CheckObjectExists(rect_name);
+         }
       }
       return in_zone;
    }
 
    bool IsFixed() { return m_is_fixed; }
-   double GetPrice100() { return m_price100; }
    bool IsSuccessChild2() { return m_is_success_child2; }
 };
 
@@ -694,14 +701,15 @@ public:
       m_child2 = NULL;
       m_is_test = is_test;
       m_panel = panel;
-      StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), m_break_levels);
-      StringSplit(InpGoldenZone, StringGetCharacter(",", 0), m_golden_zone);
-      ArrayResize(m_break_levels, ArraySize(m_break_levels));
-      ArrayResize(m_golden_zone, ArraySize(m_golden_zone));
-      for(int i = 0; i < ArraySize(m_break_levels); i++)
-         m_break_levels[i] = StringToDouble(m_break_levels[i]);
-      for(int i = 0; i < ArraySize(m_golden_zone); i++)
-         m_golden_zone[i] = StringToDouble(m_golden_zone[i]);
+      string temp_levels[];
+      int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
+      ArrayResize(m_break_levels, count);
+      for(int i = 0; i < count; i++)
+         m_break_levels[i] = StringToDouble(temp_levels[i]);
+      count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+      ArrayResize(m_golden_zone, count);
+      for(int i = 0; i < count; i++)
+         m_golden_zone[i] = StringToDouble(temp_levels[i]);
    }
 
    bool Start(ENUM_DIRECTION direction)
@@ -723,9 +731,9 @@ public:
          CFractalFinder finder;
          SFractal fractal;
          if(m_direction == LONG)
-            fractal = finder.FindRecentHigh(current_time, InpFractalLookback, InpFractalPeers);
+            finder.FindRecentHigh(current_time, InpFractalLookback, InpFractalPeers, fractal);
          else
-            fractal = finder.FindRecentLow(current_time, InpFractalLookback, InpFractalPeers);
+            finder.FindRecentLow(current_time, InpFractalLookback, InpFractalPeers, fractal);
          if(fractal.time == 0)
          {
             if(m_panel && InpShowPanel)
@@ -765,7 +773,7 @@ public:
       {
          m_child2.Update(current_time);
          double last_close = iClose(_Symbol, _Period, 0);
-         double break_level = m_mother.m_price100 + (m_mother.m_price0 - m_mother.m_price100) * m_break_levels[1] / 100.0;
+         double break_level = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * m_break_levels[1] / 100.0;
          if((m_direction == LONG && last_close > break_level) ||
             (m_direction == SHORT && last_close < break_level))
          {
@@ -787,7 +795,9 @@ public:
 
    SSignal OnTick()
    {
-      SSignal signal = {"", ""};
+      SSignal signal;
+      signal.type = "";
+      signal.id = "";
       double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
       if(m_state == MOTHER_ACTIVE)
       {
@@ -818,8 +828,8 @@ public:
          }
          else if(m_child1.CheckFailure(current_price))
          {
-            double break_level_start = m_mother.m_price100 + (m_mother.m_price0 - m_mother.m_price100) * m_break_levels[0] / 100.0;
-            double break_level_end = m_mother.m_price100 + (m_mother.m_price0 - m_mother.m_price100) * m_break_levels[1] / 100.0;
+            double break_level_start = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * m_break_levels[0] / 100.0;
+            double break_level_end = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * m_break_levels[1] / 100.0;
             bool in_break_zone = (m_direction == LONG && current_price >= break_level_start && current_price <= break_level_end) ||
                                  (m_direction == SHORT && current_price <= break_level_start && current_price >= break_level_end);
             if(in_break_zone)
@@ -929,10 +939,10 @@ private:
          datetime oldest_time = TimeCurrent();
          for(int i = 0; i < ArraySize(m_structures); i++)
          {
-            if(m_structures[i].GetState() == COMPLETED && m_structures[i].m_time100 < oldest_time)
+            if(m_structures[i].GetState() == COMPLETED && m_structures[i].GetState() != SEARCHING)
             {
                oldest_index = i;
-               oldest_time = m_structures[i].m_time100;
+               oldest_time = TimeCurrent();
             }
          }
          if(oldest_index >= 0)
@@ -1077,11 +1087,17 @@ public:
 
    SSignal OnTick()
    {
-      SSignal signal = {"", ""};
+      SSignal signal;
+      signal.type = "";
+      signal.id = "";
       for(int i = 0; i < ArraySize(m_structures); i++)
       {
          SSignal temp = m_structures[i].OnTick();
-         if(temp.id != "") signal = temp;
+         if(temp.id != "")
+         {
+            signal.type = temp.type;
+            signal.id = temp.id;
+         }
       }
       m_last_update = TimeCurrent();
       return signal;
@@ -1108,13 +1124,9 @@ public:
    {
       if(id == CHARTEVENT_OBJECT_CLICK && m_is_test_mode && m_test_panel)
       {
-         string button = sparam;
-         if(StringFind(button, "_StartLong") >= 0)
-            ProcessTestCommand("StartLong");
-         else if(StringFind(button, "_StartShort") >= 0)
-            ProcessTestCommand("StartShort");
-         else if(StringFind(button, "_Stop") >= 0)
-            ProcessTestCommand("Stop");
+         string command;
+         if(m_test_panel.OnButtonClick(sparam, command))
+            ProcessTestCommand(command);
       }
    }
 };
@@ -1153,7 +1165,8 @@ bool StartStructure(ENUM_DIRECTION direction)
 SSignal GetSignal()
 {
    if(g_manager) return g_manager.OnTick();
-   return SSignal{"", ""};
+   SSignal signal = {"", ""};
+   return signal;
 }
 
 bool AcknowledgeSignal(string id)
