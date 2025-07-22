@@ -72,7 +72,7 @@ input bool InpVisualDebug = false;        // فعال‌سازی حالت تست
 input group "تنظیمات لاگ"
 input bool InpEnableLog = true;           // فعال‌سازی لاگ‌گیری
 input string InpLogFilePath = "HipoFibonacci_Log.txt"; // مسیر فایل لاگ (MQL5/Files)
-input ­input int InpMaxFamilies = 2;             // حداکثر تعداد ساختارهای فعال (حداقل 1)
+input ­ int InpMaxFamilies = 2;             // حداکثر تعداد ساختارهای فعال (حداقل 1)
 
 //+------------------------------------------------------------------+
 //| ساختارها و ثابت‌ها                                              |
