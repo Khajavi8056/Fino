@@ -44,7 +44,7 @@ input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصل
 
 input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
 input bool InpTestMode = false;           // فعال‌سازی حالت تست داخلی
-input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_TOP; // گوشه پنل تست (مرکز بالا)
+input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
 input int InpTestPanelOffsetX = 0;        // فاصله افقی پنل تست از مرکز
 input int InpTestPanelOffsetY = 20;       // فاصله عمودی پنل تست از بالا
 input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
@@ -415,13 +415,17 @@ public:
          if(InpVisualDebug)
          {
             string arrow_name = "Debug_Arrow_Fractal_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100);
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrSkyBlue : clrOrangeRed);
-            CheckObjectExists(arrow_name);
+            if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrSkyBlue : clrOrangeRed);
+               CheckObjectExists(arrow_name);
+            }
             string label_name = "Debug_Label_MotherBirth_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, label_name, OBJ_TEXT, 0, m_time100, m_price100);
-            ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر متولد شد: صد=" + DoubleToString(m_price100, _Digits));
-            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, m_time100, m_price100))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر متولد شد: صد=" + DoubleToString(m_price100, _Digits));
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            }
          }
          return true;
       }
@@ -450,10 +454,12 @@ public:
             if(InpVisualDebug)
             {
                string line_name = "Debug_HLine_MotherZero_" + TimeToString(new_time) + (m_is_test ? "_Test" : "");
-               ObjectCreate(0, line_name, OBJ_HLINE, 0, 0, m_price0);
-               ObjectSetInteger(0, line_name, OBJPROP_COLOR, clrGray);
-               ObjectSetInteger(0, line_name, OBJPROP_STYLE, STYLE_DOT);
-               CheckObjectExists(line_name);
+               if(ObjectCreate(0, line_name, OBJ_HLINE, 0, 0, m_price0))
+               {
+                  ObjectSetInteger(0, line_name, OBJPROP_COLOR, clrGray);
+                  ObjectSetInteger(0, line_name, OBJPROP_STYLE, STYLE_DOT);
+                  CheckObjectExists(line_name);
+               }
             }
             return true;
          }
@@ -481,13 +487,17 @@ public:
          if(InpVisualDebug)
          {
             string arrow_name = "Debug_Arrow_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price);
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
-            CheckObjectExists(arrow_name);
+            if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
+               CheckObjectExists(arrow_name);
+            }
             string label_name = "Debug_Label_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price0);
-            ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر فیکس شد: صفر=" + DoubleToString(m_price0, _Digits));
-            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price0))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر فیکس شد: صفر=" + DoubleToString(m_price0, _Digits));
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            }
          }
          return true;
       }
@@ -543,10 +553,12 @@ public:
          {
             string arrow_name = "Debug_Arrow_" + (StringFind(m_name, "Child1") >= 0 ? "Child1Birth_" : "Child2Birth_") +
                                 TimeToString(m_time100) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100);
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, StringFind(m_name, "Child1") >= 0 ? (m_parent_mother.GetDirection() == LONG ? clrCyan : clrPink) :
-                                                            (m_parent_mother.GetDirection() == LONG ? clrDarkGreen : clrDarkRed));
-            CheckObjectExists(arrow_name);
+            if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, StringFind(m_name, "Child1") >= 0 ? (m_parent_mother.GetDirection() == LONG ? clrCyan : clrPink) :
+                                                               (m_parent_mother.GetDirection() == LONG ? clrDarkGreen : clrDarkRed));
+               CheckObjectExists(arrow_name);
+            }
          }
          return true;
       }
@@ -577,10 +589,12 @@ public:
             {
                string line_name = "Debug_HLine_" + (StringFind(m_name, "Child1") >= 0 ? "Child1Hundred_" : "Child2Hundred_") +
                                   TimeToString(new_time) + (m_is_test ? "_Test" : "");
-               ObjectCreate(0, line_name, OBJ_HLINE, 0, 0, m_price100);
-               ObjectSetInteger(0, line_name, OBJPROP_COLOR, clrLightGray);
-               ObjectSetInteger(0, line_name, OBJPROP_STYLE, STYLE_DOT);
-               CheckObjectExists(line_name);
+               if(ObjectCreate(0, line_name, OBJ_HLINE, 0, 0, m_price100))
+               {
+                  ObjectSetInteger(0, line_name, OBJPROP_COLOR, clrLightGray);
+                  ObjectSetInteger(0, line_name, OBJPROP_STYLE, STYLE_DOT);
+                  CheckObjectExists(line_name);
+               }
             }
             return true;
          }
@@ -602,13 +616,17 @@ public:
          if(InpVisualDebug)
          {
             string arrow_name = "Debug_Arrow_Child1Fix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_DOWN : OBJ_ARROW_UP, 0, TimeCurrent(), current_price);
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_parent_mother.GetDirection() == LONG ? clrGreen : clrRed);
-            CheckObjectExists(arrow_name);
+            if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_DOWN : OBJ_ARROW_UP, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_parent_mother.GetDirection() == LONG ? clrGreen : clrRed);
+               CheckObjectExists(arrow_name);
+            }
             string label_name = "Debug_Label_Child1Fix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price100);
-            ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند اول فیکس شد: صد=" + DoubleToString(m_price100, _Digits));
-            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price100))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند اول فیکس شد: صد=" + DoubleToString(m_price100, _Digits));
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            }
          }
          return true;
       }
@@ -625,9 +643,11 @@ public:
          if(InpVisualDebug)
          {
             string label_name = "Debug_Label_Child1Fail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price);
-            ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند اول شکست خورد: قیمت=" + DoubleToString(current_price, _Digits));
-            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند اول شکست خورد: قیمت=" + DoubleToString(current_price, _Digits));
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+            }
          }
          return true;
       }
@@ -646,11 +666,13 @@ public:
          string rect_name = "Debug_Rectangle_GoldenZone_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "");
          if(ObjectFind(0, rect_name) < 0)
          {
-            ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, m_time100, zone_start, TimeCurrent(), zone_end);
-            ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrLightYellow);
-            ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
-            ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrLightYellow);
-            CheckObjectExists(rect_name);
+            if(ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, m_time100, zone_start, TimeCurrent(), zone_end))
+            {
+               ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrLightYellow);
+               ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
+               ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrLightYellow);
+               CheckObjectExists(rect_name);
+            }
          }
       }
       return in_zone;
@@ -784,9 +806,11 @@ public:
             if(InpVisualDebug)
             {
                string label_name = "Debug_Label_Failure_" + TimeToString(current_time) + (m_is_test ? "_Test" : "");
-               ObjectCreate(0, label_name, OBJ_TEXT, 0, current_time, last_close);
-               ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار " + (m_direction == LONG ? "Long" : "Short") + " شکست خورد");
-               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+               if(ObjectCreate(0, label_name, OBJ_TEXT, 0, current_time, last_close))
+               {
+                  ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار " + (m_direction == LONG ? "Long" : "Short") + " شکست خورد");
+                  ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+               }
             }
             Stop();
          }
@@ -858,13 +882,17 @@ public:
             if(InpVisualDebug)
             {
                string arrow_name = "Debug_Arrow_Signal_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-               ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price);
-               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
-               CheckObjectExists(arrow_name);
+               if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
+               {
+                  ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
+                  CheckObjectExists(arrow_name);
+               }
                string label_name = "Debug_Label_Signal_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-               ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price);
-               ObjectSetString(0, label_name, OBJPROP_TEXT, "سیگنال " + signal.type + ": ID=" + signal.id);
-               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+               if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
+               {
+                  ObjectSetString(0, label_name, OBJPROP_TEXT, "سیگنال " + signal.type + ": ID=" + signal.id);
+                  ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+               }
             }
             m_signal_id = signal.id;
          }
@@ -924,9 +952,11 @@ private:
       if(m_panel && InpShowPanel && StringFind(message, "خطا") >= 0)
       {
          string label_name = "Debug_Label_Error_" + TimeToString(TimeCurrent()) + (m_is_test_mode ? "_Test" : "");
-         ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), SymbolInfoDouble(_Symbol, SYMBOL_BID));
-         ObjectSetString(0, label_name, OBJPROP_TEXT, message);
-         ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrOrangeRed);
+         if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), SymbolInfoDouble(_Symbol, SYMBOL_BID)))
+         {
+            ObjectSetString(0, label_name, OBJPROP_TEXT, message);
+            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrOrangeRed);
+         }
       }
    }
 
@@ -939,7 +969,7 @@ private:
          datetime oldest_time = TimeCurrent();
          for(int i = 0; i < ArraySize(m_structures); i++)
          {
-            if(m_structures[i].GetState() == COMPLETED && m_structures[i].GetState() != SEARCHING)
+            if(m_structures[i].GetState() == COMPLETED)
             {
                oldest_index = i;
                oldest_time = TimeCurrent();
@@ -1122,7 +1152,7 @@ public:
 
    void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
    {
-      if(id == CHARTEVENT_OBJECT_CLICK && m_is_test_mode && m_test_panel)
+      if(id == CHARTEVENT_OBJECT_CLICK && m_is_test_mode && m_test_panel != NULL)
       {
          string command;
          if(m_test_panel.OnButtonClick(sparam, command))
