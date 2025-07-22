@@ -97,7 +97,6 @@ struct SFractal
 class CFractalFinder
 {
 private:
-   // بررسی فراکتال بودن کندل
    bool IsHighFractal(int index, int peers)
    {
       for(int i = 1; i <= peers; i++)
@@ -121,7 +120,6 @@ private:
    }
 
 public:
-   // پیدا کردن جدیدترین سقف فراکتالی
    void FindRecentHigh(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
       fractal.price = 0.0;
@@ -138,7 +136,6 @@ public:
       }
    }
 
-   // پیدا کردن جدیدترین کف فراکتالی
    void FindRecentLow(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
       fractal.price = 0.0;
@@ -166,7 +163,6 @@ private:
    ENUM_BASE_CORNER m_corner;
    int m_offset_x, m_offset_y;
 
-   // ایجاد لیبل پنل
    bool CreateLabel(string name, string text, int x, int y, color clr)
    {
       if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0))
@@ -228,7 +224,6 @@ private:
    int m_offset_x, m_offset_y;
    color m_button_color_long, m_button_color_short, m_button_color_stop, m_bg_color;
 
-   // ایجاد دکمه
    bool CreateButton(string name, string text, int x, int y, color clr)
    {
       if(!ObjectCreate(0, name, OBJ_BUTTON, 0, 0, 0))
@@ -244,7 +239,6 @@ private:
       return true;
    }
 
-   // ایجاد پس‌زمینه
    bool CreateBackground(string name, int x, int y)
    {
       if(!ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
@@ -313,19 +307,6 @@ protected:
    double m_price0, m_price100;
    bool m_is_test;
 
-   // بررسی وجود شیء
-   bool CheckObjectExists(string name)
-   {
-      for(int i = 0; i < 3; i++)
-      {
-         if(ObjectFind(0, name) >= 0) return true;
-         Sleep(100);
-      }
-      Log("خطا: عدم رندر شیء " + name);
-      return false;
-   }
-
-   // ثبت لاگ
    void Log(string message)
    {
       if(InpEnableLog)
@@ -350,6 +331,17 @@ public:
       ArrayResize(m_levels, count);
       for(int i = 0; i < count; i++)
          m_levels[i] = StringToDouble(temp_levels[i]);
+   }
+
+   bool CheckObjectExists(string name)
+   {
+      for(int i = 0; i < 3; i++)
+      {
+         if(ObjectFind(0, name) >= 0) return true;
+         Sleep(100);
+      }
+      Log("خطا: عدم رندر شیء " + name);
+      return false;
    }
 
    virtual bool Draw()
@@ -418,17 +410,19 @@ public:
             if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, m_time100, m_price100))
             {
                ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrSkyBlue : clrOrangeRed);
-               if(!CheckObjectExists(arrow_name))
-                  Log("خطا در رندر فلش فراکتال: " + arrow_name);
+               CheckObjectExists(arrow_name);
             }
+            else
+               Log("خطا در ایجاد فلش فراکتال: " + arrow_name);
             string label_name = "Debug_Label_MotherBirth_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "");
             if(ObjectCreate(0, label_name, OBJ_TEXT, 0, m_time100, m_price100))
             {
                ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر متولد شد: صد=" + DoubleToString(m_price100, _Digits));
                ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
-               if(!CheckObjectExists(label_name))
-                  Log("خطا در رندر لیبل مادر: " + label_name);
+               CheckObjectExists(label_name);
             }
+            else
+               Log("خطا در ایجاد لیبل مادر: " + label_name);
          }
          return true;
       }
@@ -461,9 +455,10 @@ public:
                {
                   ObjectSetInteger(0, line_name, OBJPROP_COLOR, clrGray);
                   ObjectSetInteger(0, line_name, OBJPROP_STYLE, STYLE_DOT);
-                  if(!CheckObjectExists(line_name))
-                     Log("خطا در رندر خط افقی مادر: " + line_name);
+                  CheckObjectExists(line_name);
                }
+               else
+                  Log("خطا در ایجاد خط افقی مادر: " + line_name);
             }
             return true;
          }
@@ -494,17 +489,19 @@ public:
             if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
             {
                ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
-               if(!CheckObjectExists(arrow_name))
-                  Log("خطا در رندر فلش فیکس مادر: " + arrow_name);
+               CheckObjectExists(arrow_name);
             }
+            else
+               Log("خطا در ایجاد فلش فیکس مادر: " + arrow_name);
             string label_name = "Debug_Label_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
             if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price0))
             {
                ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر فیکس شد: صفر=" + DoubleToString(m_price0, _Digits));
                ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
-               if(!CheckObjectExists(label_name))
-                  Log("خطا در رندر لیبل فیکس مادر: " + label_name);
+               CheckObjectExists(label_name);
             }
+            else
+               Log("خطا در ایجاد لیبل فیکس مادر: " + label_name);
          }
          return true;
       }
@@ -564,9 +561,10 @@ public:
             {
                ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, StringFind(m_name, "Child1") >= 0 ? (m_parent_mother.GetDirection() == LONG ? clrCyan : clrPink) :
                                                                (m_parent_mother.GetDirection() == LONG ? clrDarkGreen : clrDarkRed));
-               if(!CheckObjectExists(arrow_name))
-                  Log("خطا در رندر فلش فرزند: " + arrow_name);
+               CheckObjectExists(arrow_name);
             }
+            else
+               Log("خطا در ایجاد فلش فرزند: " + arrow_name);
          }
          return true;
       }
@@ -601,9 +599,10 @@ public:
                {
                   ObjectSetInteger(0, line_name, OBJPROP_COLOR, clrLightGray);
                   ObjectSetInteger(0, line_name, OBJPROP_STYLE, STYLE_DOT);
-                  if(!CheckObjectExists(line_name))
-                     Log("خطا در رندر خط افقی فرزند: " + line_name);
+                  CheckObjectExists(line_name);
                }
+               else
+                  Log("خطا در ایجاد خط افقی فرزند: " + line_name);
             }
             return true;
          }
@@ -628,17 +627,19 @@ public:
             if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_DOWN : OBJ_ARROW_UP, 0, TimeCurrent(), current_price))
             {
                ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_parent_mother.GetDirection() == LONG ? clrGreen : clrRed);
-               if(!CheckObjectExists(arrow_name))
-                  Log("خطا در رندر فلش فیکس فرزند اول: " + arrow_name);
+               CheckObjectExists(arrow_name);
             }
+            else
+               Log("خطا در ایجاد فلش فیکس فرزند اول: " + arrow_name);
             string label_name = "Debug_Label_Child1Fix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
             if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price100))
             {
                ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند اول فیکس شد: صد=" + DoubleToString(m_price100, _Digits));
                ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
-               if(!CheckObjectExists(label_name))
-                  Log("خطا در رندر لیبل فیکس فرزند اول: " + label_name);
+               CheckObjectExists(label_name);
             }
+            else
+               Log("خطا در ایجاد لیبل فیکس فرزند اول: " + label_name);
          }
          return true;
       }
@@ -659,9 +660,10 @@ public:
             {
                ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند اول شکست خورد: قیمت=" + DoubleToString(current_price, _Digits));
                ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
-               if(!CheckObjectExists(label_name))
-                  Log("خطا در رندر لیبل شکست فرزند اول: " + label_name);
+               CheckObjectExists(label_name);
             }
+            else
+               Log("خطا در ایجاد لیبل شکست فرزند اول: " + label_name);
          }
          return true;
       }
@@ -685,9 +687,10 @@ public:
                ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrLightYellow);
                ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
                ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrLightYellow);
-               if(!CheckObjectExists(rect_name))
-                  Log("خطا در رندر مستطیل ناحیه طلایی: " + rect_name);
+               CheckObjectExists(rect_name);
             }
+            else
+               Log("خطا در ایجاد مستطیل ناحیه طلایی: " + rect_name);
          }
       }
       return in_zone;
@@ -714,7 +717,6 @@ private:
    double m_golden_zone[];
    string m_signal_id;
 
-   // ثبت لاگ
    void Log(string message)
    {
       if(InpEnableLog)
@@ -825,9 +827,10 @@ public:
                {
                   ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار " + (m_direction == LONG ? "Long" : "Short") + " شکست خورد");
                   ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
-                  if(!CheckObjectExists(label_name))
-                     Log("خطا در رندر لیبل شکست ساختار: " + label_name);
+                  CheckObjectExists(label_name);
                }
+               else
+                  Log("خطا در ایجاد لیبل شکست ساختار: " + label_name);
             }
             Stop();
          }
@@ -902,17 +905,19 @@ public:
                if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
                {
                   ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
-                  if(!CheckObjectExists(arrow_name))
-                     Log("خطا در رندر فلش سیگنال: " + arrow_name);
+                  CheckObjectExists(arrow_name);
                }
+               else
+                  Log("خطا در ایجاد فلش سیگنال: " + arrow_name);
                string label_name = "Debug_Label_Signal_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
                if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
                {
                   ObjectSetString(0, label_name, OBJPROP_TEXT, "سیگنال " + signal.type + ": ID=" + signal.id);
                   ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
-                  if(!CheckObjectExists(label_name))
-                     Log("خطا در رندر لیبل سیگنال: " + label_name);
+                  CheckObjectExists(label_name);
                }
+               else
+                  Log("خطا در ایجاد لیبل سیگنال: " + label_name);
             }
             m_signal_id = signal.id;
          }
@@ -957,7 +962,6 @@ private:
    datetime m_last_update;
    int m_max_families;
 
-   // ثبت لاگ
    void Log(string message)
    {
       if(InpEnableLog)
@@ -976,13 +980,14 @@ private:
          {
             ObjectSetString(0, label_name, OBJPROP_TEXT, message);
             ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrOrangeRed);
-            if(!CheckObjectExists(label_name))
+            if(ObjectFind(0, label_name) < 0)
                Log("خطا در رندر لیبل خطا: " + label_name);
          }
+         else
+            Log("خطا در ایجاد لیبل خطا: " + label_name);
       }
    }
 
-   // پاک‌سازی قدیمی‌ترین ساختار کامل‌شده
    void CleanupOldestStructure()
    {
       if(ArraySize(m_structures) >= m_max_families)
@@ -1057,7 +1062,7 @@ public:
 
    bool CreateNewStructure(ENUM_DIRECTION direction)
    {
-      if(m_is_test_mode) return false; // فقط پنل تست دستور می‌دهد
+      if(m_is_test_mode) return false;
       for(int i = 0; i < ArraySize(m_structures); i++)
       {
          if(m_structures[i].GetState() != COMPLETED)
