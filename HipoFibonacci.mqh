@@ -307,19 +307,6 @@ protected:
    double m_price0, m_price100;
    bool m_is_test;
 
-   void Log(string message)
-   {
-      if(InpEnableLog)
-      {
-         int handle = FileOpen(InpLogFilePath, FILE_WRITE | FILE_TXT | FILE_COMMON);
-         if(handle != INVALID_HANDLE)
-         {
-            FileWrite(handle, TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": " + message);
-            FileClose(handle);
-         }
-      }
-   }
-
 public:
    CBaseFibo(string name, color clr, string levels, bool is_test)
    {
@@ -342,6 +329,19 @@ public:
       }
       Log("خطا: عدم رندر شیء " + name);
       return false;
+   }
+
+   void Log(string message)
+   {
+      if(InpEnableLog)
+      {
+         int handle = FileOpen(InpLogFilePath, FILE_WRITE | FILE_TXT | FILE_COMMON);
+         if(handle != INVALID_HANDLE)
+         {
+            FileWrite(handle, TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": " + message);
+            FileClose(handle);
+         }
+      }
    }
 
    virtual bool Draw()
@@ -577,7 +577,7 @@ public:
       double old_price100 = m_price100;
       if(m_parent_mother.GetDirection() == LONG)
       {
-         m_price100 = MathMax(m_price100, iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, new_time)));
+         m_price100 = MathMax(m_price100, iHigh(_Symbol, _Period, iBarShift(_ finished_time, _Period, new_time)));
       }
       else
       {
@@ -884,7 +884,7 @@ public:
                {
                   m_state = CHILD2_ACTIVE;
                   if(m_panel && InpShowPanel)
-                     m_panel.UpdateStatus("فرزند دوم (ناموفق) متولد شد" + (m_is_test ? " [Test]" : ""));
+                     m_panel.UpdateStatus("فرزند دوم (ناموفق) متولد شد" + (m_is_test ? " [Test]}" : ""));
                }
             }
          }
