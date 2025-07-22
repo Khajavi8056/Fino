@@ -885,7 +885,7 @@ public:
                if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
                {
                   ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
-                  CheckObjectExists(arrow_name);
+                  /////CheckObjectExists(arrow_name);
                }
                string label_name = "Debug_Label_Signal_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
                if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
