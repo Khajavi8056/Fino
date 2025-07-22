@@ -8,7 +8,7 @@
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.2"
+#property version   "1.2"//beta
 
 //+------------------------------------------------------------------+
 //| ورودی‌های کتابخانه                                              |
