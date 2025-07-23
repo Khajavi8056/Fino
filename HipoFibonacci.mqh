@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                                  HipoFibonacci.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۵                            |
+//|                              نسخه: ۱.۶                            |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
 //| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.5"
+#property version   "1.6"
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -59,7 +59,7 @@ input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصل
 input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
 input bool InpTestMode = true;            // فعال‌سازی حالت تست داخلی
 input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
-input int InpTestPanelOffsetX = 135;        // فاصله افقی پنل تست از مرکز (حداقل 0)
+input int InpTestPanelOffsetX = 153;        // فاصله افقی پنل تست از مرکز (حداقل 0)
 input int InpTestPanelOffsetY = 38;       // فاصله عمودی پنل تست از بالا (حداقل 0)
 input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
 input color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Start Short
@@ -236,7 +236,7 @@ public:
    {
       return CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
              CreateHeader(m_name + "_Header", m_offset_x, m_offset_y) &&
-             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.5 - 2025/07/23", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
+             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.6 - 2025/07/23", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
              CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 35, clrLightGray, 9, "Calibri") &&
              CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 65, clrLightGray, 9, "Calibri");
    }
@@ -627,7 +627,7 @@ public:
 
    bool CheckStructureFailure(double current_price)
    {
-      if(m_is_fixed) return false;
+      if(!m_is_fixed) return false; // فقط بعد از فیکس شدن مادر بررسی می‌شود
       double level_0 = m_price0;
       bool fail_condition = (m_direction == LONG && current_price <= level_0) ||
                             (m_direction == SHORT && current_price >= level_0);
@@ -1049,6 +1049,12 @@ public:
       }
       else if(m_state == CHILD2_ACTIVE)
       {
+         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
+         {
+            m_state = FAILED;
+            Log("ساختار شکست خورد");
+            return false;
+         }
          if(m_child2 != NULL && m_child2.CheckFailureChild2OnTick(current_price))
          {
             m_state = FAILED;
