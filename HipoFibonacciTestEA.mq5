@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                           HipoFibonacciTestEA.mq5 |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۰                            |
+//|                              نسخه: ۱.۱                            |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
 //| اکسپرت ساده برای اجرای حالت تست دستی کتابخانه HipoFibonacci   |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.0"
+#property version   "1.1"
 
 #include <HipoFibonacci.mqh>
 
@@ -17,8 +17,27 @@
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // فراخوانی تابع OnInit از کتابخانه
-   ::OnInit();
+   if(!InpTestMode)
+   {
+      Print("خطا: حالت تست (InpTestMode) باید فعال باشد");
+      return(INIT_PARAMETERS_INCORRECT);
+   }
+
+   g_manager = new CStructureManager();
+   if(g_manager == NULL)
+   {
+      Print("خطا: نمی‌توان CStructureManager را ایجاد کرد");
+      return(INIT_FAILED);
+   }
+
+   if(!g_manager.HFiboOnInit())
+   {
+      delete g_manager;
+      g_manager = NULL;
+      Print("خطا: راه‌اندازی کتابخانه HipoFibonacci ناموفق بود");
+      return(INIT_FAILED);
+   }
+
    Print("اکسپرت HipoFibonacciTestEA شروع شد. حالت تست دستی فعال است.");
    return(INIT_SUCCEEDED);
 }
@@ -28,8 +47,12 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   // فراخوانی تابع OnDeinit از کتابخانه
-   ::OnDeinit(reason);
+   if(g_manager != NULL)
+   {
+      g_manager.HFiboOnDeinit(reason);
+      delete g_manager;
+      g_manager = NULL;
+   }
    Print("اکسپرت HipoFibonacciTestEA متوقف شد. دلیل: ", reason);
 }
 
@@ -38,8 +61,8 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   // فراخوانی تابع OnTick از کتابخانه
-   ::OnTick();
+   if(g_manager != NULL)
+      g_manager.HFiboOnTick();
 }
 
 //+------------------------------------------------------------------+
@@ -47,17 +70,17 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
-   // فراخوانی تابع OnChartEvent از کتابخانه برای مدیریت کلیک‌های پنل
-   ::OnChartEvent(id, lparam, dparam, sparam);
+   if(g_manager != NULL)
+      g_manager.HFiboOnChartEvent(id, lparam, dparam, sparam);
 }
 
 //+------------------------------------------------------------------+
-//| Expert new bar function                                           |
+//| Expert timer function                                             |
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-   // فراخوانی تابع OnNewBar از کتابخانه برای مدیریت بارهای جدید
-   ::OnNewBar();
+   if(g_manager != NULL)
+      g_manager.HFiboOnNewBar();
 }
 
 //+------------------------------------------------------------------+
