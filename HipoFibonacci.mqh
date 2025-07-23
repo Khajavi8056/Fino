@@ -491,21 +491,21 @@ public:
 
    bool Initialize(SFractal &fractal, datetime current_time)
    {
-      m_price100 = fractal.price;       // قیمت فراکتال (ثابت)
-      m_time0 = current_time;           // زمان فعلی (کندل صفر)
-      m_time100 = current_time;         // زمان 100 هم همون زمان فعلی
+      m_time100 = fractal.time;
+      m_price100 = fractal.price;
       if(m_direction == LONG)
       {
-         m_price0 = iLow(_Symbol, _Period, iBarShift(_Symbol, _Period, current_time));
-         for(int i = iBarShift(_Symbol, _Period, current_time); i >= 0; i--)
+         m_price0 = iLow(_Symbol, _Period, iBarShift(_Symbol, _Period, fractal.time));
+         for(int i = iBarShift(_Symbol, _Period, fractal.time); i >= iBarShift(_Symbol, _Period, current_time); i--)
             m_price0 = MathMin(m_price0, iLow(_Symbol, _Period, i));
       }
       else
       {
-         m_price0 = iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, current_time));
-         for(int i = iBarShift(_Symbol, _Period, current_time); i >= 0; i--)
+         m_price0 = iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, fractal.time));
+         for(int i = iBarShift(_Symbol, _Period, fractal.time); i >= iBarShift(_Symbol, _Period, current_time); i--)
             m_price0 = MathMax(m_price0, iHigh(_Symbol, _Period, i));
       }
+      m_time0 = current_time;
       if(Draw())
       {
          Log("مادر متولد شد: صد=" + DoubleToString(m_price100, _Digits) + ", صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(m_time0));
@@ -543,10 +543,9 @@ public:
       }
       if(m_price0 != old_price0)
       {
-         m_time0 = new_time;    // زمان فعلی به‌روزرسانی می‌شه
-         m_time100 = new_time;  // زمان 100 هم همون زمان فعلی می‌مونه
-         Delete();              // پاک کردن فیبوناچی قدیمی
-         if(Draw())             // رسم دوباره با نقاط جدید
+         m_time0 = new_time;
+         Delete();
+         if(Draw())
          {
             Log("صفر مادر آپدیت شد: صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(new_time));
             if(InpVisualDebug)
