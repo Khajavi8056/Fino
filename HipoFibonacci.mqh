@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                                  HipoFibonacci.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۶.۱                          |
+//|                              نسخه: ۱.۶.۲                          |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
 //| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.6.1"
+#property version   "1.6.2"
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -236,7 +236,7 @@ public:
    {
       return CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
              CreateHeader(m_name + "_Header", m_offset_x, m_offset_y) &&
-             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.6.1 - 2025/07/23", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
+             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.6.2 - 2025/07/23", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
              CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 35, clrLightGray, 9, "Calibri") &&
              CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 65, clrLightGray, 9, "Calibri");
    }
@@ -516,6 +516,7 @@ public:
             {
                ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrSkyBlue : clrOrangeRed);
                CheckObjectExists(arrow_name);
+           Pillars of Creation
             }
             string label_name = "Debug_Label_MotherBirth_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "");
             if(ObjectCreate(0, label_name, OBJ_TEXT, 0, m_time100, m_price100))
