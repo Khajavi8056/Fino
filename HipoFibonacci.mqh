@@ -58,9 +58,9 @@ input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصل
 
 input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
 input bool InpTestMode = true;            // فعال‌سازی حالت تست داخلی
-input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_TOP_CENTER; // گوشه پنل تست (مرکز بالا)
-input int InpTestPanelOffsetX = 0;        // فاصله افقی پنل تست از مرکز (حداقل 0)
-input int InpTestPanelOffsetY = 20;       // فاصله عمودی پنل تست از بالا (حداقل 0)
+input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
+input int InpTestPanelOffsetX = 145;        // فاصله افقی پنل تست از مرکز (حداقل 0)
+input int InpTestPanelOffsetY = 30;       // فاصله عمودی پنل تست از بالا (حداقل 0)
 input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
 input color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Start Short
 input color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
