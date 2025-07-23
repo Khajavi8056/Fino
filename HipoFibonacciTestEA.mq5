@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                           HipoFibonacciTestEA.mq5 |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۳                            |
+//|                              نسخه: ۱.۴                            |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
 //| اکسپرت ساده برای اجرای حالت تست دستی کتابخانه HipoFibonacci   |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.3"
+#property version   "1.4"
 
 #include <HipoFibonacci.mqh>
 
@@ -38,6 +38,7 @@ int OnInit()
       return(INIT_FAILED);
    }
 
+   EventSetTimer(1); // تایمر را روی هر 1 ثانیه تنظیم کن
    Print("اکسپرت HipoFibonacciTestEA شروع شد. حالت تست دستی فعال است.");
    return(INIT_SUCCEEDED);
 }
@@ -47,6 +48,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   EventKillTimer(); // تایمر را متوقف کن
    if(g_manager != NULL)
    {
       g_manager.HFiboOnDeinit(reason);
@@ -66,10 +68,27 @@ void OnTick()
 }
 
 //+------------------------------------------------------------------+
+//| Expert timer function                                             |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   static datetime last_bar_time = 0;
+   datetime current_bar_time = (datetime)SeriesInfoInteger(_Symbol, _Period, SERIES_LASTBAR_DATE);
+
+   if(current_bar_time > last_bar_time)
+   {
+      last_bar_time = current_bar_time;
+      if(g_manager != NULL)
+         g_manager.HFiboOnNewBar();
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Expert chart event function                                       |
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
+   Print("اکسپرت تست: رویداد چارت دریافت شد! ID=", id, ", sparam=", sparam);
    if(g_manager != NULL)
       g_manager.HFiboOnChartEvent(id, lparam, dparam, sparam);
 }
