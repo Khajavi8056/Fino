@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                           HipoFibonacciTestEA.mq5 |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۱                            |
+//|                              نسخه: ۱.۳                            |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
 //| اکسپرت ساده برای اجرای حالت تست دستی کتابخانه HipoFibonacci   |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.1"
+#property version   "1.3"
 
 #include <HipoFibonacci.mqh>
 
@@ -72,15 +72,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 {
    if(g_manager != NULL)
       g_manager.HFiboOnChartEvent(id, lparam, dparam, sparam);
-}
-
-//+------------------------------------------------------------------+
-//| Expert timer function                                             |
-//+------------------------------------------------------------------+
-void OnTimer()
-{
-   if(g_manager != NULL)
-      g_manager.HFiboOnNewBar();
 }
 
 //+------------------------------------------------------------------+
