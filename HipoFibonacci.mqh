@@ -516,7 +516,6 @@ public:
             {
                ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrSkyBlue : clrOrangeRed);
                CheckObjectExists(arrow_name);
-           Pillars of Creation
             }
             string label_name = "Debug_Label_MotherBirth_" + TimeToString(m_time100) + (m_is_test ? "_Test" : "");
             if(ObjectCreate(0, label_name, OBJ_TEXT, 0, m_time100, m_price100))
@@ -1045,7 +1044,7 @@ public:
          }
          else if(m_child1 != NULL && m_child1.UpdateOnTick(current_time))
          {
-            if(m_child1.CheckFixing(current_price) && m_child1.CheckChild1TriggerChild2(current_price))
+            if(m_child1.IsFixed() && m_child1.CheckChild1TriggerChild2(current_price))
             {
                m_child2 = new CChildFibo(m_id + "_SuccessChild2", InpChild2Color, InpChildLevels, m_mother, true, m_is_test);
                if(m_child2 == NULL || !m_child2.Initialize(current_time))
@@ -1058,6 +1057,10 @@ public:
                }
                m_state = CHILD2_ACTIVE;
                Log("فرزند اول فیکس شد و قیمت از صد آن عبور کرد، ساختار به فرزند دوم (موفق) تغییر کرد");
+            }
+            else
+            {
+               m_child1.CheckFixing(current_price);
             }
          }
       }
