@@ -392,7 +392,7 @@ public:
    {
       // شیفت چارت برای جلوگیری از تداخل با کندل‌ها
       ChartSetInteger(0, CHART_SHIFT, true);
-      ChartSetInteger(0, CHART_MARGIN_RIGHT, 100);
+     //// ChartSetInteger(0, CHART_MARGIN_RIGHT, 100);
 
       bool success = CreateBackground(m_name + "_Bg", 10, m_offset_y) &&
                      CreateButton(m_name + "_StartLong", "خرید", 10, m_offset_y + 10, m_button_color_long) &&
