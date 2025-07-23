@@ -58,9 +58,9 @@ input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصل
 
 input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
 input bool InpTestMode = true;            // فعال‌سازی حالت تست داخلی
-input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست
-input int InpTestPanelOffsetX = 100;      // فاصله افقی پنل تست از گوشه (به سمت چپ)
-input int InpTestPanelOffsetY = 20;       // فاصله عمودی پنل تست از بالا
+input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_TOP_CENTER; // گوشه پنل تست (مرکز بالا)
+input int InpTestPanelOffsetX = 0;        // فاصله افقی پنل تست از مرکز (حداقل 0)
+input int InpTestPanelOffsetY = 20;       // فاصله عمودی پنل تست از بالا (حداقل 0)
 input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
 input color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Start Short
 input color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
@@ -268,7 +268,10 @@ private:
    bool CreateButton(string name, string text, int x, int y, color clr)
    {
       if(!ObjectCreate(0, name, OBJ_BUTTON, 0, 0, 0))
+      {
+         Print("خطا: نمی‌توان دکمه " + name + " را ایجاد کرد");
          return false;
+      }
       ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
@@ -279,13 +282,17 @@ private:
       ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clr);
       ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_RAISED);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 1);
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
       return true;
    }
 
    bool CreateBackground(string name, int x, int y)
    {
       if(!ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
+      {
+         Print("خطا: نمی‌توان پس‌زمینه " + name + " را ایجاد کرد");
          return false;
+      }
       ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
@@ -300,7 +307,10 @@ private:
    bool CreateSignalLabel(string name, int x, int y)
    {
       if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0))
+      {
+         Print("خطا: نمی‌توان لیبل " + name + " را ایجاد کرد");
          return false;
+      }
       ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
@@ -597,6 +607,29 @@ public:
       return false;
    }
 
+   bool CheckStructureFailure(double current_price)
+   {
+      if(m_is_fixed) return false;
+      double level_0 = m_price0;
+      bool fail_condition = (m_direction == LONG && current_price <= level_0) ||
+                            (m_direction == SHORT && current_price >= level_0);
+      if(fail_condition)
+      {
+         Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         if(InpVisualDebug)
+         {
+            string label_name = "Debug_Label_StructureFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+            }
+         }
+         return true;
+      }
+      return false;
+   }
+
    bool IsFixed() { return m_is_fixed; }
    ENUM_DIRECTION GetDirection() { return m_direction; }
 };
@@ -736,13 +769,22 @@ public:
    bool CheckFailure(double current_price)
    {
       if(m_is_fixed || m_parent_mother == NULL) return false;
-      double level_0 = m_price0;
-      bool fail_condition = (m_parent_mother.GetDirection() == LONG && current_price <= level_0) ||
-                            (m_parent_mother.GetDirection() == SHORT && current_price >= level_0);
+      double mother_100_level = m_parent_mother.GetPrice100();
+      bool fail_condition = (m_parent_mother.GetDirection() == LONG && current_price > mother_100_level) ||
+                            (m_parent_mother.GetDirection() == SHORT && current_price < mother_100_level);
       if(fail_condition)
       {
          Log("فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : (m_is_success_child2 ? "دوم (موفق)" : "دوم (ناموفق)")) +
              " شکست خورد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         if(InpVisualDebug)
+         {
+            string label_name = "Debug_Label_ChildFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : "دوم") + " شکست خورد");
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+            }
+         }
          return true;
       }
       return false;
@@ -751,17 +793,94 @@ public:
    bool CheckSuccessChild2(double current_price)
    {
       if(!m_is_success_child2 || m_parent_mother == NULL) return false;
-      string temp_levels[];
-      int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
-      double max_level = 0.0;
-      for(int i = 0; i < count; i++)
-         max_level = MathMax(max_level, StringToDouble(temp_levels[i]));
-      double break_level = m_price100 + (m_price0 - m_price100) * max_level / 100.0;
-      bool success_condition = (m_parent_mother.GetDirection() == LONG && current_price >= break_level) ||
-                               (m_parent_mother.GetDirection() == SHORT && current_price <= break_level);
+      double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
+      double level_618 = m_price100 + (m_price0 - m_price100) * 0.618;
+      bool success_condition = (m_parent_mother.GetDirection() == LONG && current_price >= level_50 && current_price <= level_618) ||
+                               (m_parent_mother.GetDirection() == SHORT && current_price <= level_50 && current_price >= level_618);
       if(success_condition)
       {
-         Log("فرزند دوم موفق شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         Log("فرزند دوم موفق شد (ناحیه طلایی): قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         if(InpVisualDebug)
+         {
+            string rect_name = "Debug_Rect_GoldenZone_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, TimeCurrent(), level_50, TimeCurrent() + PeriodSeconds(), level_618))
+            {
+               ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrLightYellow);
+               ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
+               CheckObjectExists(rect_name);
+            }
+            string arrow_name = "Debug_Arrow_Signal_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
+               CheckObjectExists(arrow_name);
+            }
+         }
+         return true;
+      }
+      return false;
+   }
+
+   bool CheckFailureChild2(double current_price)
+   {
+      if(m_parent_mother == NULL) return false;
+      double level_0 = m_price0;
+      bool fail_condition = (m_parent_mother.GetDirection() == LONG && current_price <= level_0) ||
+                            (m_parent_mother.GetDirection() == SHORT && current_price >= level_0);
+      if(fail_condition)
+      {
+         Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         if(InpVisualDebug)
+         {
+            string label_name = "Debug_Label_StructureFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+            }
+         }
+         return true;
+      }
+      if(!m_is_success_child2)
+      {
+         string temp_levels[];
+         int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
+         double max_level = 0.0;
+         for(int i = 0; i < count; i++)
+            max_level = MathMax(max_level, StringToDouble(temp_levels[i]));
+         double break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * max_level / 100.0;
+         bool break_condition = (m_parent_mother.GetDirection() == LONG && iClose(_Symbol, _Period, 1) >= break_level) ||
+                                (m_parent_mother.GetDirection() == SHORT && iClose(_Symbol, _Period, 1) <= break_level);
+         if(break_condition)
+         {
+            Log("ساختار شکست خورد: کلوز کندل در سطح " + DoubleToString(max_level, 1) + "%: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+            if(InpVisualDebug)
+            {
+               string label_name = "Debug_Label_StructureFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+               if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
+               {
+                  ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار شکست خورد: کلوز در سطح " + DoubleToString(max_level, 1) + "%");
+                  ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+               }
+            }
+            return true;
+         }
+      }
+      return false;
+   }
+
+   bool CheckChild2Trigger(double current_price)
+   {
+      if(m_is_success_child2 || m_parent_mother == NULL) return false;
+      string temp_levels[];
+      int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
+      double min_level = StringToDouble(temp_levels[0]);
+      double break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * min_level / 100.0;
+      bool trigger_condition = (m_parent_mother.GetDirection() == LONG && current_price >= break_level) ||
+                               (m_parent_mother.GetDirection() == SHORT && current_price <= break_level);
+      if(trigger_condition)
+      {
+         Log("فرزند دوم (ناموفق) فعال شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
          return true;
       }
       return false;
@@ -841,6 +960,12 @@ public:
       }
       else if(m_state == MOTHER_ACTIVE)
       {
+         if(m_mother.CheckStructureFailure(current_price))
+         {
+            m_state = FAILED;
+            Log("ساختار شکست خورد");
+            return false;
+         }
          if(!m_mother.Update(current_time)) return false;
          bool fixed = false;
          if(InpMotherFixMode == PRICE_CROSS)
@@ -864,33 +989,48 @@ public:
       }
       else if(m_state == CHILD1_ACTIVE)
       {
-         if(m_child1.CheckFailure(current_price))
+         if(m_mother.CheckStructureFailure(current_price))
          {
             m_state = FAILED;
             Log("ساختار شکست خورد");
             return false;
          }
-         if(m_child1.Update(current_time))
+         if(m_child1.CheckFailure(current_price))
+         {
+            m_child1.Delete();
+            m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
+            if(m_child2 == NULL || !m_child2.Initialize(current_time))
+            {
+               Log("خطا: نمی‌توان فرزند دوم (ناموفق) را ایجاد کرد");
+               delete m_child2;
+               m_child2 = NULL;
+               m_state = FAILED;
+               return false;
+            }
+            m_state = CHILD2_ACTIVE;
+            Log("فرزند اول شکست خورد، ساختار به فرزند دوم (ناموفق) تغییر کرد");
+         }
+         else if(m_child1.Update(current_time))
          {
             if(m_child1.CheckFixing(current_price))
             {
-               m_child2 = new CChildFibo(m_id + "_Child2", InpChild2Color, InpChildLevels, m_mother, true, m_is_test);
+               m_child2 = new CChildFibo(m_id + "_SuccessChild2", InpChild2Color, InpChildLevels, m_mother, true, m_is_test);
                if(m_child2 == NULL || !m_child2.Initialize(current_time))
                {
-                  Log("خطا: نمی‌توان فرزند دوم را ایجاد کرد");
+                  Log("خطا: نمی‌توان فرزند دوم (موفق) را ایجاد کرد");
                   delete m_child2;
                   m_child2 = NULL;
                   m_state = FAILED;
                   return false;
                }
                m_state = CHILD2_ACTIVE;
-               Log("ساختار به فرزند دوم فعال تغییر کرد");
+               Log("فرزند اول فیکس شد، ساختار به فرزند دوم (موفق) تغییر کرد");
             }
          }
       }
       else if(m_state == CHILD2_ACTIVE)
       {
-         if(m_child2.CheckFailure(current_price))
+         if(m_child2.CheckFailureChild2(current_price))
          {
             m_state = FAILED;
             Log("ساختار شکست خورد");
@@ -898,11 +1038,25 @@ public:
          }
          if(m_child2.Update(current_time))
          {
-            if(m_child2.CheckSuccessChild2(current_price))
+            if(m_child2.IsSuccessChild2() && m_child2.CheckSuccessChild2(current_price))
             {
                m_state = COMPLETED;
                Log("ساختار کامل شد");
                return true;
+            }
+            else if(!m_child2.IsSuccessChild2() && m_child2.CheckChild2Trigger(current_price))
+            {
+               m_child2.Delete();
+               m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
+               if(m_child2 == NULL || !m_child2.Initialize(current_time))
+               {
+                  Log("خطا: نمی‌توان فرزند دوم (ناموفق) را ایجاد کرد");
+                  delete m_child2;
+                  m_child2 = NULL;
+                  m_state = FAILED;
+                  return false;
+               }
+               Log("فرزند دوم (ناموفق) فعال شد");
             }
          }
       }
@@ -912,7 +1066,7 @@ public:
    SSignal GetSignal()
    {
       SSignal signal = {"", ""};
-      if(m_state == CHILD2_ACTIVE && m_child2 != NULL && m_child2.IsSuccessChild2())
+      if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
       {
          string temp_levels[];
          int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
@@ -926,8 +1080,17 @@ public:
          if(in_golden_zone)
          {
             signal.type = m_direction == LONG ? "Buy" : "Sell";
-            signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_Success";
+            signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure");
             Log("سیگنال " + signal.type + ": ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits));
+            if(InpVisualDebug)
+            {
+               string arrow_name = "Debug_Arrow_Signal_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+               if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
+               {
+                  ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
+                  CheckObjectExists(arrow_name);
+               }
+            }
          }
       }
       return signal;
@@ -1030,31 +1193,9 @@ public:
             m_families[i] = NULL;
          }
       }
-      if(!m_is_test_mode && ArraySize(m_families) < InpMaxFamilies)
-      {
-         ENUM_DIRECTION direction = MathRand() % 2 == 0 ? LONG : SHORT;
-         CFamily* family = new CFamily("Family_" + TimeToString(TimeCurrent()), direction, false);
-         if(family != NULL && family.Initialize())
-         {
-            int index = ArraySize(m_families);
-            ArrayResize(m_families, index + 1);
-            m_families[index] = family;
-         }
-         else
-            delete family;
-      }
       string status = "ساختارهای فعال: " + IntegerToString(ArraySize(m_families));
       if(m_panel != NULL)
          m_panel.UpdateStatus(status);
-   }
-
-   void HFiboOnNewBar()
-   {
-      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      datetime current_time = TimeCurrent();
-      for(int i = 0; i < ArraySize(m_families); i++)
-         if(m_families[i] != NULL)
-            m_families[i].Update(current_price, current_time);
    }
 
    bool CreateNewStructure(ENUM_DIRECTION direction)
