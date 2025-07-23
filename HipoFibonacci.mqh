@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                                  HipoFibonacci.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۴                            |
+//|                              نسخه: ۱.۵                            |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
 //| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.4"
+#property version   "1.5"
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -190,7 +190,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_FONTSIZE, font_size);
       ObjectSetString(0, name, OBJPROP_FONT, font);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 1);
-      return true;
+      return CheckObjectExists(name);
    }
 
    bool CreateBackground(string name, int x, int y)
@@ -200,13 +200,12 @@ private:
       ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
-      ObjectSetInteger(0, name, OBJPROP_XSIZE, 280);
-      ObjectSetInteger(0, name, OBJPROP_YSIZE, 80);
-      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrDarkSlateGray);
+      ObjectSetInteger(0, name, OBJPROP_XSIZE, 300);
+      ObjectSetInteger(0, name, OBJPROP_YSIZE, 90);
       ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrDarkSlateGray);
       ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, -1);
-      return true;
+      return CheckObjectExists(name);
    }
 
    bool CreateHeader(string name, int x, int y)
@@ -216,11 +215,11 @@ private:
       ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
-      ObjectSetInteger(0, name, OBJPROP_XSIZE, 280);
+      ObjectSetInteger(0, name, OBJPROP_XSIZE, 300);
       ObjectSetInteger(0, name, OBJPROP_YSIZE, 20);
       ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrMidnightBlue);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
-      return true;
+      return CheckObjectExists(name);
    }
 
 public:
@@ -237,15 +236,15 @@ public:
    {
       return CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
              CreateHeader(m_name + "_Header", m_offset_x, m_offset_y) &&
-             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.4", m_offset_x + 10, m_offset_y + 5, clrWhite, 10, "Calibri Bold") &&
-             CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 30, clrLightGray, 9, "Calibri") &&
-             CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 50, clrLightGray, 9, "Calibri");
+             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.5 - 2025/07/23", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
+             CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 35, clrLightGray, 9, "Calibri") &&
+             CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 65, clrLightGray, 9, "Calibri");
    }
 
    void UpdateStatus(string status)
    {
-      m_flash_counter = (m_flash_counter + 1) % 30;
-      color status_color = (m_flash_counter < 15) ? clrLightYellow : clrWhite;
+      m_flash_counter = (m_flash_counter + 1) % 40;
+      color status_color = (m_flash_counter < 20) ? clrLightYellow : clrWhite;
       ObjectSetString(0, m_name + "_Status", OBJPROP_TEXT, "وضعیت: " + status);
       ObjectSetInteger(0, m_name + "_Status", OBJPROP_COLOR, status_color);
    }
@@ -257,8 +256,8 @@ public:
 
    void UpdateTestStatus(string status)
    {
-      m_flash_counter = (m_flash_counter + 1) % 30;
-      color status_color = (m_flash_counter < 15) ? clrLightYellow : clrWhite;
+      m_flash_counter = (m_flash_counter + 1) % 40;
+      color status_color = (m_flash_counter < 20) ? clrLightYellow : clrWhite;
       ObjectSetString(0, m_name + "_Status", OBJPROP_TEXT, "حالت تست: " + status);
       ObjectSetInteger(0, m_name + "_Status", OBJPROP_COLOR, status_color);
    }
@@ -302,7 +301,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_RAISED);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 2);
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-      return true;
+      return CheckObjectExists(name);
    }
 
    bool CreateBackground(string name, int x, int y)
@@ -320,7 +319,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_BGCOLOR, m_bg_color);
       ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, -1);
-      return true;
+      return CheckObjectExists(name);
    }
 
    bool CreateSignalLabel(string name, int x, int y)
@@ -338,7 +337,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9);
       ObjectSetString(0, name, OBJPROP_FONT, "Calibri");
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 1);
-      return true;
+      return CheckObjectExists(name);
    }
 
 public:
@@ -530,7 +529,7 @@ public:
       return false;
    }
 
-   bool Update(datetime new_time)
+   bool UpdateOnTick(datetime new_time)
    {
       if(m_is_fixed) return true;
       double old_price0 = m_price0;
@@ -717,7 +716,7 @@ public:
       return false;
    }
 
-   bool Update(datetime new_time)
+   bool UpdateOnTick(datetime new_time)
    {
       if(m_is_fixed || m_parent_mother == NULL) return true;
       double old_price100 = m_price100;
@@ -840,7 +839,7 @@ public:
       return false;
    }
 
-   bool CheckFailureChild2(double current_price)
+   bool CheckFailureChild2OnTick(double current_price)
    {
       if(m_parent_mother == NULL) return false;
       double level_0 = m_price0;
@@ -860,6 +859,12 @@ public:
          }
          return true;
       }
+      return false;
+   }
+
+   bool CheckFailureChild2OnNewBar()
+   {
+      if(m_parent_mother == NULL) return false;
       if(!m_is_success_child2)
       {
          string temp_levels[];
@@ -872,11 +877,11 @@ public:
                                 (m_parent_mother.GetDirection() == SHORT && iClose(_Symbol, _Period, 1) <= break_level);
          if(break_condition)
          {
-            Log("ساختار شکست خورد: کلوز کندل در سطح " + DoubleToString(max_level, 1) + "%: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+            Log("ساختار شکست خورد: کلوز کندل در سطح " + DoubleToString(max_level, 1) + "%: قیمت=" + DoubleToString(iClose(_Symbol, _Period, 1), _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
             if(InpVisualDebug)
             {
                string label_name = "Debug_Label_StructureFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-               if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
+               if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
                {
                   ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار شکست خورد: کلوز در سطح " + DoubleToString(max_level, 1) + "%");
                   ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
@@ -971,7 +976,7 @@ public:
       return false;
    }
 
-   bool Update(double current_price, datetime current_time)
+   bool UpdateOnTick(double current_price, datetime current_time)
    {
       if(m_state == SEARCHING)
       {
@@ -979,19 +984,14 @@ public:
       }
       else if(m_state == MOTHER_ACTIVE)
       {
-         if(m_mother.CheckStructureFailure(current_price))
+         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
          {
             m_state = FAILED;
             Log("ساختار شکست خورد");
             return false;
          }
-         if(!m_mother.Update(current_time)) return false;
-         bool fixed = false;
-         if(InpMotherFixMode == PRICE_CROSS)
-            fixed = m_mother.CheckFixingPriceCross(current_price);
-         else
-            fixed = m_mother.CheckFixingCandleClose();
-         if(fixed)
+         if(m_mother != NULL && !m_mother.UpdateOnTick(current_time)) return false;
+         if(m_mother != NULL && InpMotherFixMode == PRICE_CROSS && m_mother.CheckFixingPriceCross(current_price))
          {
             m_child1 = new CChildFibo(m_id + "_Child1", InpChild1Color, InpChildLevels, m_mother, false, m_is_test);
             if(m_child1 == NULL || !m_child1.Initialize(current_time))
@@ -1008,13 +1008,13 @@ public:
       }
       else if(m_state == CHILD1_ACTIVE)
       {
-         if(m_mother.CheckStructureFailure(current_price))
+         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
          {
             m_state = FAILED;
             Log("ساختار شکست خورد");
             return false;
          }
-         if(m_child1.CheckFailure(current_price))
+         if(m_child1 != NULL && m_child1.CheckFailure(current_price))
          {
             m_child1.Delete();
             m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
@@ -1029,7 +1029,7 @@ public:
             m_state = CHILD2_ACTIVE;
             Log("فرزند اول شکست خورد، ساختار به فرزند دوم (ناموفق) تغییر کرد");
          }
-         else if(m_child1.Update(current_time))
+         else if(m_child1 != NULL && m_child1.UpdateOnTick(current_time))
          {
             if(m_child1.CheckFixing(current_price))
             {
@@ -1049,13 +1049,13 @@ public:
       }
       else if(m_state == CHILD2_ACTIVE)
       {
-         if(m_child2.CheckFailureChild2(current_price))
+         if(m_child2 != NULL && m_child2.CheckFailureChild2OnTick(current_price))
          {
             m_state = FAILED;
             Log("ساختار شکست خورد");
             return false;
          }
-         if(m_child2.Update(current_time))
+         if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
          {
             if(m_child2.IsSuccessChild2() && m_child2.CheckSuccessChild2(current_price))
             {
@@ -1082,6 +1082,37 @@ public:
       return true;
    }
 
+   bool UpdateOnNewBar()
+   {
+      if(m_state == MOTHER_ACTIVE)
+      {
+         if(m_mother != NULL && InpMotherFixMode == CANDLE_CLOSE && m_mother.CheckFixingCandleClose())
+         {
+            m_child1 = new CChildFibo(m_id + "_Child1", InpChild1Color, InpChildLevels, m_mother, false, m_is_test);
+            if(m_child1 == NULL || !m_child1.Initialize(TimeCurrent()))
+            {
+               Log("خطا: نمی‌توان فرزند اول را ایجاد کرد");
+               delete m_child1;
+               m_child1 = NULL;
+               m_state = FAILED;
+               return false;
+            }
+            m_state = CHILD1_ACTIVE;
+            Log("ساختار به فرزند اول فعال تغییر کرد");
+         }
+      }
+      else if(m_state == CHILD2_ACTIVE)
+      {
+         if(m_child2 != NULL && m_child2.CheckFailureChild2OnNewBar())
+         {
+            m_state = FAILED;
+            Log("ساختار شکست خورد");
+            return false;
+         }
+      }
+      return true;
+   }
+
    SSignal GetSignal()
    {
       SSignal signal = {"", ""};
@@ -1091,9 +1122,11 @@ public:
          int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
          double min_level = StringToDouble(temp_levels[0]) / 100.0;
          double max_level = StringToDouble(temp_levels[1]) / 100.0;
+         double level_min = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * min_level;
+         double level_max = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * max_level;
          double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-         bool in_golden_zone = (m_direction == LONG && current_price >= min_level && current_price <= max_level) ||
-                               (m_direction == SHORT && current_price <= min_level && current_price >= max_level);
+         bool in_golden_zone = (m_direction == LONG && current_price >= level_min && current_price <= level_max) ||
+                               (m_direction == SHORT && current_price <= level_min && current_price >= level_max);
          if(in_golden_zone)
          {
             signal.type = m_direction == LONG ? "Buy" : "Sell";
@@ -1203,7 +1236,7 @@ public:
       datetime current_time = TimeCurrent();
       for(int i = ArraySize(m_families) - 1; i >= 0; i--)
       {
-         if(m_families[i] != NULL && !m_families[i].Update(current_price, current_time))
+         if(m_families[i] != NULL && !m_families[i].UpdateOnTick(current_price, current_time))
          {
             m_families[i].Destroy();
             delete m_families[i];
@@ -1217,11 +1250,9 @@ public:
 
    void HFiboOnNewBar()
    {
-      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      datetime current_time = TimeCurrent();
       for(int i = ArraySize(m_families) - 1; i >= 0; i--)
       {
-         if(m_families[i] != NULL && !m_families[i].Update(current_price, current_time))
+         if(m_families[i] != NULL && !m_families[i].UpdateOnNewBar())
          {
             m_families[i].Destroy();
             delete m_families[i];
