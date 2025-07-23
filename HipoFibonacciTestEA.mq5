@@ -1,94 +1,153 @@
 //+------------------------------------------------------------------+
-//|                                           HipoFibonacciTestEA.mq5 |
+//|                                              HipoFibonacciTest.mq5 |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۵                            |
+//|                              نسخه: ۱.۰.۰                          |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
-//| اکسپرت ساده برای اجرای حالت تست دستی کتابخانه HipoFibonacci   |
+//| اکسپرت تست برای کتابخانه HipoFibonacci با میانبرهای کیبوردی   |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.5"
+#property version   "1.0.0"
 
 #include <HipoFibonacci.mqh>
 
 //+------------------------------------------------------------------+
-//| Expert initialization function                                     |
+//| ورودی‌های اکسپرت                                               |
+//+------------------------------------------------------------------+
+input group "تنظیمات میانبرهای کیبوردی"
+input bool InpEnableHotkeys = true;        // فعال‌سازی میانبرهای کیبوردی
+input uchar InpKeyStartLong = 76;          // کلید برای StartLong (L=76)
+input uchar InpKeyStartShort = 83;         // کلید برای StartShort (S=83)
+input uchar InpKeyStop = 84;               // کلید برای Stop (T=84)
+
+//+------------------------------------------------------------------+
+//| متغیرهای جهانی                                                 |
+//+------------------------------------------------------------------+
+CStructureManager* manager = NULL;
+
+//+------------------------------------------------------------------+
+//| تابع اولیه اکسپرت                                              |
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   if(!InpTestMode)
+   // فعال‌سازی رویدادهای کلیک و کیبورد
+   ChartSetInteger(0, CHART_EVENT_OBJECT_CREATE, true);
+   ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
+   ChartSetInteger(0, CHART_EVENT_KEYDOWN, true);
+   
+   // راه‌اندازی مدیر ساختارها
+   manager = new CStructureManager();
+   if(manager == NULL || !manager.HFiboOnInit())
    {
-      Print("خطا: حالت تست (InpTestMode) باید فعال باشد");
-      return(INIT_PARAMETERS_INCORRECT);
+      Print("خطا: نمی‌توان مدیر ساختارها را راه‌اندازی کرد");
+      return INIT_FAILED;
    }
-
-   g_manager = new CStructureManager();
-   if(g_manager == NULL)
-   {
-      Print("خطا: نمی‌توان CStructureManager را ایجاد کرد");
-      return(INIT_FAILED);
-   }
-
-   if(!g_manager.HFiboOnInit())
-   {
-      delete g_manager;
-      g_manager = NULL;
-      Print("خطا: راه‌اندازی کتابخانه HipoFibonacci ناموفق بود");
-      return(INIT_FAILED);
-   }
-
-   EventSetTimer(1); // تنظیم تایمر برای اطمینان از آپدیت‌های منظم
-   Print("اکسپرت تست HipoFibonacci راه‌اندازی شد");
-   return(INIT_SUCCEEDED);
+   
+   Print("اکسپرت HipoFibonacciTest با موفقیت راه‌اندازی شد");
+   return INIT_SUCCEEDED;
 }
 
 //+------------------------------------------------------------------+
-//| Expert deinitialization function                                   |
+//| تابع خاتمه اکسپرت                                             |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   if(g_manager != NULL)
+   if(manager != NULL)
    {
-      g_manager.HFiboOnDeinit(reason);
-      delete g_manager;
-      g_manager = NULL;
+      manager.HFiboOnDeinit(reason);
+      delete manager;
+      manager = NULL;
    }
-   EventKillTimer();
-   Print("اکسپرت تست HipoFibonacci متوقف شد. دلیل: ", reason);
+   Print("اکسپرت HipoFibonacciTest متوقف شد. دلیل: ", reason);
 }
 
 //+------------------------------------------------------------------+
-//| Expert tick function                                              |
+//| تابع تیک                                                       |
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   if(g_manager != NULL)
-      g_manager.HFiboOnTick();
+   if(manager != NULL)
+      manager.HFiboOnTick();
 }
 
 //+------------------------------------------------------------------+
-//| Expert timer function                                             |
+//| تابع کندل جدید                                                |
 //+------------------------------------------------------------------+
-void OnTimer()
+void OnCalculate(const int rates_total,
+                 const int prev_calculated,
+                 const datetime &time[],
+                 const double &open[],
+                 const double &high[],
+                 const double &low[],
+                 const double &close[],
+                 const long &tick_volume[],
+                 const long &volume[],
+                 const int &spread[])
 {
-   if(g_manager != NULL)
+   if(prev_calculated == 0 || rates_total > prev_calculated)
    {
-      g_manager.HFiboOnTick(); // اطمینان از آپدیت در بازارهای کم‌حرکت
-      if(iTime(_Symbol, _Period, 0) != iTime(_Symbol, _Period, 1))
-         g_manager.HFiboOnNewBar();
+      if(manager != NULL)
+         manager.HFiboOnNewBar();
    }
 }
 
 //+------------------------------------------------------------------+
-//| Expert chart event function                                       |
+//| تابع مدیریت رویدادهای چارت                                    |
 //+------------------------------------------------------------------+
-void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+void OnChartEvent(const int id,
+                  const long &lparam,
+                  const double &dparam,
+                  const string &sparam)
 {
-   if(g_manager != NULL)
+   if(manager != NULL)
+      manager.HFiboOnChartEvent(id, lparam, dparam, sparam);
+   
+   // مدیریت میانبرهای کیبوردی
+   if(id == CHARTEVENT_KEYDOWN && InpEnableHotkeys)
    {
-      g_manager.HFiboOnChartEvent(id, lparam, dparam, sparam);
-      Print("اکسپرت تست: رویداد چارت دریافت شد! ID=", id, ", sparam=", sparam, ", زمان=", TimeToString(TimeCurrent()));
+      if(lparam == InpKeyStartLong) // کلید L
+      {
+         Print("میانبر کیبوردی: StartLong (کلید L)");
+         if(manager != NULL)
+         {
+            manager.EnableTestMode(true);
+            manager.CreateNewStructure(LONG);
+         }
+      }
+      else if(lparam == InpKeyStartShort) // کلید S
+      {
+         Print("میانبر کیبوردی: StartShort (کلید S)");
+         if(manager != NULL)
+         {
+            manager.EnableTestMode(true);
+            manager.CreateNewStructure(SHORT);
+         }
+      }
+      else if(lparam == InpKeyStop) // کلید T
+      {
+         Print("میانبر کیبوردی: Stop (کلید T)");
+         if(manager != NULL)
+         {
+            manager.EnableTestMode(false);
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| تابع دریافت سیگنال                                             |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   if(manager != NULL)
+   {
+      SSignal signal = manager.HFiboGetSignal();
+      if(signal.id != "")
+      {
+         Print("سیگنال دریافت شد: نوع=", signal.type, ", ID=", signal.id);
+         manager.AcknowledgeSignal(signal.id);
+      }
    }
 }
 
