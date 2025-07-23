@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                                  HipoFibonacci.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۶.۱                          |
+//|                              نسخه: ۱.۶.۲                          |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
 //| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.6.1"
+#property version   "1.6.2"
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -56,15 +56,15 @@ input ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل ا
 input int InpPanelOffsetX = 10;           // فاصله افقی پنل اصلی (حداقل 0)
 input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصلی (حداقل 0)
 
-input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
+input group "تنظیمات پنل تست"
 input bool InpTestMode = true;            // فعال‌سازی حالت تست داخلی
-input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل تست (مرکز بالا)
-input int InpTestPanelOffsetX = 156;        // فاصله افقی پنل تست از مرکز (حداقل 0)
-input int InpTestPanelOffsetY = 40;       // فاصله عمودی پنل تست از بالا (حداقل 0)
+input int InpTestPanelOffsetY = 20;       // فاصله عمودی پنل تست از بالا (حداقل 0)
 input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
 input color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Start Short
 input color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
-input color InpTestPanelBgColor = clrDarkGray;      // رنگ پس‌زمینه پنل تست
+input color InpTestPanelBgColor = clrBlack;         // رنگ پس‌زمینه پنل تست
+input color InpTestPanelBorderColor = clrGold;      // رنگ حاشیه دکمه‌ها
+input color InpTestPanelTextColor = clrWhite;       // رنگ متن دکمه‌ها
 
 input group "تنظیمات دیباگ"
 input bool InpVisualDebug = false;        // فعال‌سازی حالت تست بصری
@@ -202,7 +202,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetInteger(0, name, OBJPROP_XSIZE, 300);
       ObjectSetInteger(0, name, OBJPROP_YSIZE, 90);
-      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrDarkSlateGray);
+      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrBlack);
       ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, -1);
       return CheckObjectExists(name);
@@ -236,7 +236,7 @@ public:
    {
       return CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
              CreateHeader(m_name + "_Header", m_offset_x, m_offset_y) &&
-             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.6.1 - 2025/07/23", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
+             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.6.2 - 2025/07/23", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
              CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 35, clrLightGray, 9, "Calibri") &&
              CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 65, clrLightGray, 9, "Calibri");
    }
@@ -244,7 +244,7 @@ public:
    void UpdateStatus(string status)
    {
       m_flash_counter = (m_flash_counter + 1) % 40;
-      color status_color = (m_flash_counter < 20) ? clrLightYellow : clrWhite;
+      color status_color = (m_flash_counter < 20) ? clrGold : clrWhite;
       ObjectSetString(0, m_name + "_Status", OBJPROP_TEXT, "وضعیت: " + status);
       ObjectSetInteger(0, m_name + "_Status", OBJPROP_COLOR, status_color);
    }
@@ -257,7 +257,7 @@ public:
    void UpdateTestStatus(string status)
    {
       m_flash_counter = (m_flash_counter + 1) % 40;
-      color status_color = (m_flash_counter < 20) ? clrLightYellow : clrWhite;
+      color status_color = (m_flash_counter < 20) ? clrGold : clrWhite;
       ObjectSetString(0, m_name + "_Status", OBJPROP_TEXT, "حالت تست: " + status);
       ObjectSetInteger(0, m_name + "_Status", OBJPROP_COLOR, status_color);
    }
@@ -280,28 +280,60 @@ class CTestPanel
 private:
    string m_name;
    ENUM_BASE_CORNER m_corner;
-   int m_offset_x, m_offset_y;
-   color m_button_color_long, m_button_color_short, m_button_color_stop, m_bg_color;
+   int m_offset_y;
+   color m_button_color_long, m_button_color_short, m_button_color_stop, m_bg_color, m_border_color, m_text_color;
+   int m_flash_counter;
+   string m_active_signal;
 
-   bool CreateButton(string name, string text, int x, int y, color clr)
+   bool CreateButton(string name, string text, int x, int y, color bg_color, bool is_stop = false)
    {
-      if(!ObjectCreate(0, name, OBJ_BUTTON, 0, 0, 0))
+      // ایجاد پس‌زمینه دکمه (گرد)
+      if(!ObjectCreate(0, name + "_Bg", OBJ_RECTANGLE_LABEL, 0, 0, 0))
       {
-         Print("خطا: نمی‌توان دکمه " + name + " را ایجاد کرد");
+         Print("خطا: نمی‌توان پس‌زمینه دکمه " + name + " را ایجاد کرد");
          return false;
       }
-      ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
-      ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
-      ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
-      ObjectSetInteger(0, name, OBJPROP_XSIZE, 100);
-      ObjectSetInteger(0, name, OBJPROP_YSIZE, 30);
-      ObjectSetString(0, name, OBJPROP_TEXT, text);
-      ObjectSetInteger(0, name, OBJPROP_COLOR, clrWhite);
-      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clr);
-      ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_RAISED);
-      ObjectSetInteger(0, name, OBJPROP_ZORDER, 2);
-      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-      return CheckObjectExists(name);
+      ObjectSetInteger(0, name + "_Bg", OBJPROP_CORNER, m_corner);
+      ObjectSetInteger(0, name + "_Bg", OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, name + "_Bg", OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, name + "_Bg", OBJPROP_XSIZE, 60);
+      ObjectSetInteger(0, name + "_Bg", OBJPROP_YSIZE, 60);
+      ObjectSetInteger(0, name + "_Bg", OBJPROP_BGCOLOR, bg_color);
+      ObjectSetInteger(0, name + "_Bg", OBJPROP_ZORDER, 1);
+      ObjectSetInteger(0, name + "_Bg", OBJPROP_BORDER_TYPE, BORDER_FLAT);
+
+      // ایجاد حاشیه طلایی
+      if(!ObjectCreate(0, name + "_Border", OBJ_RECTANGLE, 0, 0, 0))
+      {
+         Print("خطا: نمی‌توان حاشیه دکمه " + name + " را ایجاد کرد");
+         return false;
+      }
+      ObjectSetInteger(0, name + "_Border", OBJPROP_CORNER, m_corner);
+      ObjectSetInteger(0, name + "_Border", OBJPROP_XDISTANCE, x - 2);
+      ObjectSetInteger(0, name + "_Border", OBJPROP_YDISTANCE, y - 2);
+      ObjectSetInteger(0, name + "_Border", OBJPROP_XSIZE, 64);
+      ObjectSetInteger(0, name + "_Border", OBJPROP_YSIZE, 64);
+      ObjectSetInteger(0, name + "_Border", OBJPROP_BGCOLOR, clrNONE);
+      ObjectSetInteger(0, name + "_Border", OBJPROP_COLOR, m_border_color);
+      ObjectSetInteger(0, name + "_Border", OBJPROP_WIDTH, 2);
+      ObjectSetInteger(0, name + "_Border", OBJPROP_ZORDER, 0);
+
+      // ایجاد متن دکمه
+      string text_obj = name + "_Text";
+      if(!ObjectCreate(0, text_obj, OBJ_LABEL, 0, 0, 0))
+      {
+         Print("خطا: نمی‌توان متن دکمه " + name + " را ایجاد کرد");
+         return false;
+      }
+      ObjectSetInteger(0, text_obj, OBJPROP_CORNER, m_corner);
+      ObjectSetInteger(0, text_obj, OBJPROP_XDISTANCE, x + 15);
+      ObjectSetInteger(0, text_obj, OBJPROP_YDISTANCE, y + 25);
+      ObjectSetString(0, text_obj, OBJPROP_TEXT, is_stop ? CharToString(215) : text); // ضربدر برای Stop
+      ObjectSetInteger(0, text_obj, OBJPROP_COLOR, m_text_color);
+      ObjectSetInteger(0, text_obj, OBJPROP_FONTSIZE, is_stop ? 24 : 10);
+      ObjectSetString(0, text_obj, OBJPROP_FONT, is_stop ? "Wingdings" : "Calibri Bold");
+      ObjectSetInteger(0, text_obj, OBJPROP_ZORDER, 2);
+      return CheckObjectExists(name + "_Bg") && CheckObjectExists(name + "_Border") && CheckObjectExists(text_obj);
    }
 
    bool CreateBackground(string name, int x, int y)
@@ -314,8 +346,8 @@ private:
       ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
-      ObjectSetInteger(0, name, OBJPROP_XSIZE, 320);
-      ObjectSetInteger(0, name, OBJPROP_YSIZE, 70);
+      ObjectSetInteger(0, name, OBJPROP_XSIZE, 80);
+      ObjectSetInteger(0, name, OBJPROP_YSIZE, 220);
       ObjectSetInteger(0, name, OBJPROP_BGCOLOR, m_bg_color);
       ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, -1);
@@ -333,7 +365,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetString(0, name, OBJPROP_TEXT, "آخرین سیگنال: هیچ");
-      ObjectSetInteger(0, name, OBJPROP_COLOR, clrLightGray);
+      ObjectSetInteger(0, name, OBJPROP_COLOR, m_text_color);
       ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9);
       ObjectSetString(0, name, OBJPROP_FONT, "Calibri");
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 1);
@@ -341,25 +373,32 @@ private:
    }
 
 public:
-   CTestPanel(string name, ENUM_BASE_CORNER corner, int x, int y, color long_color, color short_color, color stop_color, color bg_color)
+   CTestPanel(string name, ENUM_BASE_CORNER corner, int x, int y, color long_color, color short_color, color stop_color, color bg_color, color border_color, color text_color)
    {
       m_name = name;
-      m_corner = corner;
-      m_offset_x = x;
+      m_corner = CORNER_RIGHT_UPPER; // همیشه سمت راست بالا
       m_offset_y = y;
       m_button_color_long = long_color;
       m_button_color_short = short_color;
       m_button_color_stop = stop_color;
       m_bg_color = bg_color;
+      m_border_color = border_color;
+      m_text_color = text_color;
+      m_flash_counter = 0;
+      m_active_signal = "";
    }
 
    bool Create()
    {
-      bool success = CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
-                     CreateButton(m_name + "_StartLong", "Start Long", m_offset_x + 10, m_offset_y + 5, m_button_color_long) &&
-                     CreateButton(m_name + "_StartShort", "Start Short", m_offset_x + 110, m_offset_y + 5, m_button_color_short) &&
-                     CreateButton(m_name + "_Stop", "Stop", m_offset_x + 210, m_offset_y + 5, m_button_color_stop) &&
-                     CreateSignalLabel(m_name + "_Signal", m_offset_x + 10, m_offset_y + 40);
+      // شیفت چارت برای جلوگیری از تداخل با کندل‌ها
+      ChartSetInteger(0, CHART_SHIFT, true);
+      ChartSetInteger(0, CHART_MARGIN_RIGHT, 100);
+
+      bool success = CreateBackground(m_name + "_Bg", 10, m_offset_y) &&
+                     CreateButton(m_name + "_StartLong", "خرید", 10, m_offset_y + 10, m_button_color_long) &&
+                     CreateButton(m_name + "_StartShort", "فروش", 10, m_offset_y + 80, m_button_color_short) &&
+                     CreateButton(m_name + "_Stop", "", 10, m_offset_y + 150, m_button_color_stop, true) &&
+                     CreateSignalLabel(m_name + "_Signal", 10, m_offset_y + 190);
       if(success && InpEnableLog)
          Print("پنل تست با موفقیت ایجاد شد: " + m_name);
       return success;
@@ -367,52 +406,64 @@ public:
 
    bool OnButtonClick(string button, string &command)
    {
-      if(ObjectGetInteger(0, button, OBJPROP_STATE))
+      if(StringFind(button, "_StartLong_Bg") >= 0 && ObjectGetInteger(0, button, OBJPROP_STATE))
       {
          ObjectSetInteger(0, button, OBJPROP_STATE, false);
-         ObjectSetInteger(0, button, OBJPROP_BGCOLOR, C'100,100,100');
-         Sleep(100);
-         if(StringFind(button, "_StartLong") >= 0)
-         {
-            command = "StartLong";
-            ObjectSetInteger(0, button, OBJPROP_BGCOLOR, m_button_color_long);
-            if(InpEnableLog)
-               Print("دکمه StartLong کلیک شد");
-            return true;
-         }
-         if(StringFind(button, "_StartShort") >= 0)
-         {
-            command = "StartShort";
-            ObjectSetInteger(0, button, OBJPROP_BGCOLOR, m_button_color_short);
-            if(InpEnableLog)
-               Print("دکمه StartShort کلیک شد");
-            return true;
-         }
-         if(StringFind(button, "_Stop") >= 0)
-         {
-            command = "Stop";
-            ObjectSetInteger(0, button, OBJPROP_BGCOLOR, m_button_color_stop);
-            if(InpEnableLog)
-               Print("دکمه Stop کلیک شد");
-            return true;
-         }
+         command = "StartLong";
+         if(InpEnableLog)
+            Print("دکمه StartLong کلیک شد");
+         return true;
+      }
+      if(StringFind(button, "_StartShort_Bg") >= 0 && ObjectGetInteger(0, button, OBJPROP_STATE))
+      {
+         ObjectSetInteger(0, button, OBJPROP_STATE, false);
+         command = "StartShort";
+         if(InpEnableLog)
+            Print("دکمه StartShort کلیک شد");
+         return true;
+      }
+      if(StringFind(button, "_Stop_Bg") >= 0 && ObjectGetInteger(0, button, OBJPROP_STATE))
+      {
+         ObjectSetInteger(0, button, OBJPROP_STATE, false);
+         command = "Stop";
+         if(InpEnableLog)
+            Print("دکمه Stop کلیک شد");
+         return true;
       }
       return false;
    }
 
    void UpdateSignal(string signal_type, string signal_id)
    {
+      m_flash_counter = (m_flash_counter + 1) % 40;
+      m_active_signal = signal_type;
       string text = signal_id == "" ? "آخرین سیگنال: هیچ" : "آخرین سیگنال: " + signal_type + " (ID: " + signal_id + ")";
       ObjectSetString(0, m_name + "_Signal", OBJPROP_TEXT, text);
-      ObjectSetInteger(0, m_name + "_Signal", OBJPROP_COLOR, signal_type == "Buy" ? clrLimeGreen : (signal_type == "Sell" ? clrRed : clrLightGray));
+      ObjectSetInteger(0, m_name + "_Signal", OBJPROP_COLOR, signal_type == "Buy" ? clrLimeGreen : (signal_type == "Sell" ? clrRed : m_text_color));
+
+      // افکت چشمک‌زن برای دکمه فعال
+      color long_color = m_button_color_long;
+      color short_color = m_button_color_short;
+      if(signal_type == "Buy" && m_flash_counter < 20)
+         long_color = clrLimeGreen;
+      else if(signal_type == "Sell" && m_flash_counter < 20)
+         short_color = clrRed;
+      ObjectSetInteger(0, m_name + "_StartLong_Bg", OBJPROP_BGCOLOR, long_color);
+      ObjectSetInteger(0, m_name + "_StartShort_Bg", OBJPROP_BGCOLOR, short_color);
    }
 
    void Destroy()
    {
       ObjectDelete(0, m_name + "_Bg");
-      ObjectDelete(0, m_name + "_StartLong");
-      ObjectDelete(0, m_name + "_StartShort");
-      ObjectDelete(0, m_name + "_Stop");
+      ObjectDelete(0, m_name + "_StartLong_Bg");
+      ObjectDelete(0, m_name + "_StartLong_Border");
+      ObjectDelete(0, m_name + "_StartLong_Text");
+      ObjectDelete(0, m_name + "_StartShort_Bg");
+      ObjectDelete(0, m_name + "_StartShort_Border");
+      ObjectDelete(0, m_name + "_StartShort_Text");
+      ObjectDelete(0, m_name + "_Stop_Bg");
+      ObjectDelete(0, m_name + "_Stop_Border");
+      ObjectDelete(0, m_name + "_Stop_Text");
       ObjectDelete(0, m_name + "_Signal");
    }
 };
@@ -885,7 +936,7 @@ public:
          string temp_levels[];
          int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
          double max_level = StringToDouble(temp_levels[count - 1]); // استفاده از حداکثر سطح
-         double break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * max_level / 100.0;
+         double break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice100() - m_parent_mother.GetPrice0()) * max_level / 100.0;
          bool break_condition = (m_parent_mother.GetDirection() == LONG && iClose(_Symbol, _Period, 1) >= break_level) ||
                                 (m_parent_mother.GetDirection() == SHORT && iClose(_Symbol, _Period, 1) <= break_level);
          if(break_condition)
@@ -912,7 +963,7 @@ public:
       string temp_levels[];
       int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
       double min_level = StringToDouble(temp_levels[0]); // استفاده از حداقل سطح
-      double break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * min_level / 100.0;
+      double break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice100() - m_parent_mother.GetPrice0()) * min_level / 100.0;
       bool trigger_condition = (m_parent_mother.GetDirection() == LONG && current_price >= break_level) ||
                                (m_parent_mother.GetDirection() == SHORT && current_price <= break_level);
       if(trigger_condition)
@@ -1103,6 +1154,7 @@ public:
 
    bool UpdateOnNewBar()
    {
+      bool structure_changed = false;
       if(m_state == MOTHER_ACTIVE)
       {
          if(m_mother != NULL && InpMotherFixMode == CANDLE_CLOSE && m_mother.CheckFixingCandleClose())
@@ -1118,6 +1170,7 @@ public:
             }
             m_state = CHILD1_ACTIVE;
             Log("ساختار به فرزند اول فعال تغییر کرد");
+            structure_changed = true;
          }
       }
       else if(m_state == CHILD2_ACTIVE)
@@ -1129,6 +1182,9 @@ public:
             return false;
          }
       }
+      // فقط در صورت تغییر ساختار لاگ ثبت می‌شود
+      if(structure_changed && InpEnableLog)
+         Print(TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": رویداد کندل جدید: ساختار تغییر کرد");
       return true;
    }
 
@@ -1278,7 +1334,6 @@ public:
             m_families[i] = NULL;
          }
       }
-      Log("رویداد کندل جدید دریافت شد");
    }
 
    bool CreateNewStructure(ENUM_DIRECTION direction)
@@ -1376,8 +1431,9 @@ public:
       {
          if(m_test_panel == NULL)
          {
-            m_test_panel = new CTestPanel("HipoFibo_TestPanel", InpTestPanelCorner, InpTestPanelOffsetX, InpTestPanelOffsetY,
-                                          InpTestPanelButtonColorLong, InpTestPanelButtonColorShort, InpTestPanelButtonColorStop, InpTestPanelBgColor);
+            m_test_panel = new CTestPanel("HipoFibo_TestPanel", CORNER_RIGHT_UPPER, 0, InpTestPanelOffsetY,
+                                          InpTestPanelButtonColorLong, InpTestPanelButtonColorShort, InpTestPanelButtonColorStop,
+                                          InpTestPanelBgColor, InpTestPanelBorderColor, InpTestPanelTextColor);
             if(m_test_panel == NULL || !m_test_panel.Create())
             {
                Log("خطا: نمی‌توان پنل تست را ایجاد کرد");
