@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                                  HipoFibonacci.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۳                            |
+//|                              نسخه: ۱.۴                            |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
 //| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.3"
+#property version   "1.4"
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -58,9 +58,9 @@ input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصل
 
 input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
 input bool InpTestMode = true;            // فعال‌سازی حالت تست داخلی
-input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
-input int InpTestPanelOffsetX = 145;        // فاصله افقی پنل تست از مرکز (حداقل 0)
-input int InpTestPanelOffsetY = 30;       // فاصله عمودی پنل تست از بالا (حداقل 0)
+input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_TOP_CENTER; // گوشه پنل تست (مرکز بالا)
+input int InpTestPanelOffsetX = 0;        // فاصله افقی پنل تست از مرکز (حداقل 0)
+input int InpTestPanelOffsetY = 20;       // فاصله عمودی پنل تست از بالا (حداقل 0)
 input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
 input color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Start Short
 input color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
@@ -178,7 +178,7 @@ private:
    int m_offset_x, m_offset_y;
    int m_flash_counter;
 
-   bool CreateLabel(string name, string text, int x, int y, color clr)
+   bool CreateLabel(string name, string text, int x, int y, color clr, int font_size, string font)
    {
       if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0))
          return false;
@@ -187,9 +187,9 @@ private:
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetString(0, name, OBJPROP_TEXT, text);
       ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 12);
-      ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
-      ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
+      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, font_size);
+      ObjectSetString(0, name, OBJPROP_FONT, font);
+      ObjectSetInteger(0, name, OBJPROP_ZORDER, 1);
       return true;
    }
 
@@ -200,11 +200,26 @@ private:
       ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
-      ObjectSetInteger(0, name, OBJPROP_XSIZE, 250);
-      ObjectSetInteger(0, name, OBJPROP_YSIZE, 60);
+      ObjectSetInteger(0, name, OBJPROP_XSIZE, 280);
+      ObjectSetInteger(0, name, OBJPROP_YSIZE, 80);
       ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrDarkSlateGray);
-      ObjectSetInteger(0, name, OBJPROP_BACK, true);
+      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrDarkSlateGray);
+      ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, -1);
+      return true;
+   }
+
+   bool CreateHeader(string name, int x, int y)
+   {
+      if(!ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
+         return false;
+      ObjectSetInteger(0, name, OBJPROP_CORNER, m_corner);
+      ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, name, OBJPROP_XSIZE, 280);
+      ObjectSetInteger(0, name, OBJPROP_YSIZE, 20);
+      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrMidnightBlue);
+      ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
       return true;
    }
 
@@ -221,15 +236,17 @@ public:
    bool Create()
    {
       return CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
-             CreateLabel(m_name + "_Status", "Hipo Fibonacci: در حال انتظار", m_offset_x + 10, m_offset_y + 10, clrWhite) &&
-             CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 35, clrLightGray);
+             CreateHeader(m_name + "_Header", m_offset_x, m_offset_y) &&
+             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.4", m_offset_x + 10, m_offset_y + 5, clrWhite, 10, "Calibri Bold") &&
+             CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 30, clrLightGray, 9, "Calibri") &&
+             CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 50, clrLightGray, 9, "Calibri");
    }
 
    void UpdateStatus(string status)
    {
-      m_flash_counter = (m_flash_counter + 1) % 20;
-      color status_color = (m_flash_counter < 10) ? clrYellow : clrWhite;
-      ObjectSetString(0, m_name + "_Status", OBJPROP_TEXT, status);
+      m_flash_counter = (m_flash_counter + 1) % 30;
+      color status_color = (m_flash_counter < 15) ? clrLightYellow : clrWhite;
+      ObjectSetString(0, m_name + "_Status", OBJPROP_TEXT, "وضعیت: " + status);
       ObjectSetInteger(0, m_name + "_Status", OBJPROP_COLOR, status_color);
    }
 
@@ -240,8 +257,8 @@ public:
 
    void UpdateTestStatus(string status)
    {
-      m_flash_counter = (m_flash_counter + 1) % 20;
-      color status_color = (m_flash_counter < 10) ? clrYellow : clrWhite;
+      m_flash_counter = (m_flash_counter + 1) % 30;
+      color status_color = (m_flash_counter < 15) ? clrLightYellow : clrWhite;
       ObjectSetString(0, m_name + "_Status", OBJPROP_TEXT, "حالت تست: " + status);
       ObjectSetInteger(0, m_name + "_Status", OBJPROP_COLOR, status_color);
    }
@@ -249,6 +266,8 @@ public:
    void Destroy()
    {
       ObjectDelete(0, m_name + "_Bg");
+      ObjectDelete(0, m_name + "_Header");
+      ObjectDelete(0, m_name + "_Title");
       ObjectDelete(0, m_name + "_Status");
       ObjectDelete(0, m_name + "_Command");
    }
@@ -281,7 +300,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_COLOR, clrWhite);
       ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clr);
       ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_RAISED);
-      ObjectSetInteger(0, name, OBJPROP_ZORDER, 1);
+      ObjectSetInteger(0, name, OBJPROP_ZORDER, 2);
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
       return true;
    }
@@ -299,7 +318,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_XSIZE, 320);
       ObjectSetInteger(0, name, OBJPROP_YSIZE, 70);
       ObjectSetInteger(0, name, OBJPROP_BGCOLOR, m_bg_color);
-      ObjectSetInteger(0, name, OBJPROP_BACK, true);
+      ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, -1);
       return true;
    }
@@ -316,9 +335,9 @@ private:
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetString(0, name, OBJPROP_TEXT, "آخرین سیگنال: هیچ");
       ObjectSetInteger(0, name, OBJPROP_COLOR, clrLightGray);
-      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 10);
-      ObjectSetString(0, name, OBJPROP_FONT, "Arial");
-      ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
+      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9);
+      ObjectSetString(0, name, OBJPROP_FONT, "Calibri");
+      ObjectSetInteger(0, name, OBJPROP_ZORDER, 1);
       return true;
    }
 
@@ -1072,11 +1091,9 @@ public:
          int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
          double min_level = StringToDouble(temp_levels[0]) / 100.0;
          double max_level = StringToDouble(temp_levels[1]) / 100.0;
-         double level_min = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * min_level;
-         double level_max = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * max_level;
          double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-         bool in_golden_zone = (m_direction == LONG && current_price >= level_min && current_price <= level_max) ||
-                               (m_direction == SHORT && current_price <= level_min && current_price >= level_max);
+         bool in_golden_zone = (m_direction == LONG && current_price >= min_level && current_price <= max_level) ||
+                               (m_direction == SHORT && current_price <= min_level && current_price >= max_level);
          if(in_golden_zone)
          {
             signal.type = m_direction == LONG ? "Buy" : "Sell";
@@ -1196,6 +1213,22 @@ public:
       string status = "ساختارهای فعال: " + IntegerToString(ArraySize(m_families));
       if(m_panel != NULL)
          m_panel.UpdateStatus(status);
+   }
+
+   void HFiboOnNewBar()
+   {
+      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      datetime current_time = TimeCurrent();
+      for(int i = ArraySize(m_families) - 1; i >= 0; i--)
+      {
+         if(m_families[i] != NULL && !m_families[i].Update(current_price, current_time))
+         {
+            m_families[i].Destroy();
+            delete m_families[i];
+            m_families[i] = NULL;
+         }
+      }
+      Log("رویداد کندل جدید دریافت شد");
    }
 
    bool CreateNewStructure(ENUM_DIRECTION direction)
