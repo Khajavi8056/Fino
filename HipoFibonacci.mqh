@@ -1626,6 +1626,21 @@ public:
    }
 
 
+   void StopCurrentStructure()
+   {
+      for(int i = ArraySize(m_families) - 1; i >= 0; i--)
+      {
+         if(m_families[i] != NULL)
+         {
+            m_families[i].Destroy();
+            delete m_families[i];
+            m_families[i] = NULL;
+            Log("دستور توقف از اکسپرت دریافت و ساختار فعال متوقف شد.");
+         }
+      }
+      ArrayResize(m_families, 0);
+   }
+
 };
 
 //+------------------------------------------------------------------+
@@ -1705,4 +1720,9 @@ double HFiboGetMotherZeroPoint()
    if(g_manager != NULL)
       return g_manager.GetMotherZeroPoint();
    return 0.0;
+}
+void HFiboStopCurrentStructure()
+{
+   if(g_manager != NULL)
+      g_manager.StopCurrentStructure();
 }
