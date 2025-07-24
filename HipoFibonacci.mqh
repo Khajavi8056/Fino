@@ -1348,6 +1348,14 @@ public:
       if(InpVisualDebug)
          ClearDebugObjects(m_is_test);
    }
+  //اضافه کن
+
+   double GetMotherPrice0()
+   {
+      if(m_mother != NULL)
+         return m_mother.GetPrice0();
+      return 0.0;
+   }
 
    ENUM_STRUCTURE_STATE GetState() { return m_state; }
 };
@@ -1605,6 +1613,19 @@ public:
          }
       }
    }
+
+// این متد رو به انتهای کلاس CStructur
+   double GetMotherZeroPoint()
+   {
+      // ما فقط یک ساختار فعال داریم، پس همیشه سراغ اولین عضو آرایه میریم
+      if(ArraySize(m_families) > 0 && m_families[0] != NULL)
+      {
+         return m_families[0].GetMotherPrice0();
+      }
+      return 0.0; // اگر ساختاری وجود نداشت، صفر برگردون
+   }
+
+
 };
 
 //+------------------------------------------------------------------+
@@ -1674,4 +1695,14 @@ bool HFiboCreateNewStructure(ENUM_DIRECTION direction)
    if(g_manager != NULL)
       return g_manager.CreateNewStructure(direction);
    return false;
+}
+
+
+// این تابع جدید رو به انتهای فایل، کنار بقیه توابع HFibo اضافه کن
+
+double HFiboGetMotherZeroPoint()
+{
+   if(g_manager != NULL)
+      return g_manager.GetMotherZeroPoint();
+   return 0.0;
 }
