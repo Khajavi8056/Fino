@@ -1,25 +1,21 @@
-
+```
 //+------------------------------------------------------------------+
 //|                                                  HipoFibonacci.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۷.۲                          |
+//|                              نسخه: ۱.۷.۳                          |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۴                   |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.7.2"
+#property version   "1.7.3"
 
 //+------------------------------------------------------------------+
 //| تابع بررسی وجود شیء                                             |
 //+------------------------------------------------------------------+
 bool CheckObjectExists(string name)
 {
-   for(int i = 0; i < 3; i++)
-   {
-      if(ObjectFind(0, name) >= 0) return true;
-      Sleep(100);
-   }
+   if(ObjectFind(0, name) >= 0) return true;
    Print("خطا: عدم رندر شیء ", name, "، کد خطا: ", GetLastError());
    return false;
 }
@@ -198,7 +194,7 @@ public:
    {
       return CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
              CreateHeader(m_name + "_Header", m_offset_x, m_offset_y) &&
-             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.7.2 - 2025/07/24", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
+             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.7.3 - 2025/07/24", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
              CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 35, clrLightGray, 9, "Calibri") &&
              CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 65, clrLightGray, 9, "Calibri");
    }
@@ -319,7 +315,6 @@ public:
       {
          ObjectSetInteger(0, button, OBJPROP_STATE, false);
          ObjectSetInteger(0, button, OBJPROP_BGCOLOR, C'100,100,100');
-         Sleep(100);
          if(StringFind(button, "_StartLong") >= 0)
          {
             command = "StartLong";
@@ -840,17 +835,22 @@ public:
    bool CheckSuccessChild2(double current_price)
    {
       if(!m_is_success_child2 || m_parent_mother == NULL) return false;
-      double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
-      double level_618 = m_price100 + (m_price0 - m_price100) * 0.618;
-      bool success_condition = (m_parent_mother.GetDirection() == LONG && current_price >= level_50 && current_price <= level_618) ||
-                               (m_parent_mother.GetDirection() == SHORT && current_price <= level_50 && current_price >= level_618);
+      string temp_levels[];
+      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+      if(count < 2) return false;
+      double level_min = StringToDouble(temp_levels[0]) / 100.0;
+      double level_max = StringToDouble(temp_levels[1]) / 100.0;
+      double price_min = m_price100 + (m_price0 - m_price100) * level_min;
+      double price_max = m_price100 + (m_price0 - m_price100) * level_max;
+      bool success_condition = (m_parent_mother.GetDirection() == LONG && current_price >= price_min && current_price <= price_max) ||
+                              (m_parent_mother.GetDirection() == SHORT && current_price <= price_min && current_price >= price_max);
       if(success_condition)
       {
          Log("فرزند دوم موفق شد (ناحیه طلایی)");
          if(InpVisualDebug)
          {
             string rect_name = "Debug_Rect_GoldenZone_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            if(ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, TimeCurrent(), level_50, TimeCurrent() + PeriodSeconds(m_timeframe), level_618))
+            if(ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, TimeCurrent(), price_min, TimeCurrent() + PeriodSeconds(m_timeframe), price_max))
             {
                ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrLightYellow);
                ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
