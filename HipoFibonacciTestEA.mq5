@@ -1,95 +1,81 @@
 //+------------------------------------------------------------------+
-//|                                           HipoFibonacciTestEA.mq5 |
+//|                                              HipoFibonacciTest.mq5 |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۵                            |
-//|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
-//| اکسپرت ساده برای اجرای حالت تست دستی کتابخانه HipoFibonacci   |
+//|                              نسخه: ۱.۰.۰                          |
+//|                              تاریخ: ۲۰۲۵/۰۷/۲۵                   |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.5"
+#property version   "1.0.0"
 
+//+------------------------------------------------------------------+
+//| شامل کردن کتابخانه HipoFibonacci                                |
+//+------------------------------------------------------------------+
 #include <HipoFibonacci.mqh>
 
 //+------------------------------------------------------------------+
-//| Expert initialization function                                     |
+//| متغیرهای سراسری                                                |
+//+------------------------------------------------------------------+
+CStructureManager g_manager;
+
+//+------------------------------------------------------------------+
+//| تابع اولیه‌سازی اکسپرت                                          |
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   if(!InpTestMode)
-   {
-      Print("خطا: حالت تست (InpTestMode) باید فعال باشد");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-
-   g_manager = new CStructureManager();
-   if(g_manager == NULL)
-   {
-      Print("خطا: نمی‌توان CStructureManager را ایجاد کرد");
-      return(INIT_FAILED);
-   }
-
+   // فعال‌سازی حالت تست
+   g_manager.EnableTestMode(true);
+   
+   // راه‌اندازی کتابخانه
    if(!g_manager.HFiboOnInit())
    {
-      delete g_manager;
-      g_manager = NULL;
-      Print("خطا: راه‌اندازی کتابخانه HipoFibonacci ناموفق بود");
+      Print("خطا در راه‌اندازی HipoFibonacci");
       return(INIT_FAILED);
    }
-
-   EventSetTimer(1); // تنظیم تایمر برای اطمینان از آپدیت‌های منظم
+   
    Print("اکسپرت تست HipoFibonacci راه‌اندازی شد");
    return(INIT_SUCCEEDED);
 }
 
 //+------------------------------------------------------------------+
-//| Expert deinitialization function                                   |
+//| تابع خاتمه اکسپرت                                              |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   if(g_manager != NULL)
-   {
-      g_manager.HFiboOnDeinit(reason);
-      delete g_manager;
-      g_manager = NULL;
-   }
-   EventKillTimer();
+   g_manager.HFiboOnDeinit(reason);
    Print("اکسپرت تست HipoFibonacci متوقف شد. دلیل: ", reason);
 }
 
 //+------------------------------------------------------------------+
-//| Expert tick function                                              |
+//| تابع تیک                                                       |
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   if(g_manager != NULL)
-      g_manager.HFiboOnTick();
-}
-
-//+------------------------------------------------------------------+
-//| Expert timer function                                             |
-//+------------------------------------------------------------------+
-void OnTimer()
-{
-   if(g_manager != NULL)
+   g_manager.HFiboOnTick();
+   
+   // بررسی سیگنال‌ها
+   SSignal signal = g_manager.HFiboCheckSignal();
+   if(signal.type != "")
    {
-      g_manager.HFiboOnTick(); // اطمینان از آپدیت در بازارهای کم‌حرکت
-      if(iTime(_Symbol, _Period, 0) != iTime(_Symbol, _Period, 1))
-         g_manager.HFiboOnNewBar();
+      Print("سیگنال دریافت شد: نوع=", signal.type, ", ID=", signal.id);
+      // تأیید سیگنال برای جلوگیری از تکرار
+      g_manager.HFiboAcknowledgeSignal(signal.id);
    }
 }
 
 //+------------------------------------------------------------------+
-//| Expert chart event function                                       |
+//| تابع رویداد چارت                                               |
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
-   if(g_manager != NULL)
-   {
-      g_manager.HFiboOnChartEvent(id, lparam, dparam, sparam);
-      Print("اکسپرت تست: رویداد چارت دریافت شد! ID=", id, ", sparam=", sparam, ", زمان=", TimeToString(TimeCurrent()));
-   }
+   g_manager.HFiboOnChartEvent(id, lparam, dparam, sparam);
 }
 
 //+------------------------------------------------------------------+
+//| تابع تایمر                                                     |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   // در صورت نیاز می‌توانید عملکردهای دوره‌ای را اینجا اضافه کنید
+}
