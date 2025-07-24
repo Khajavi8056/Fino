@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                                  HipoFibonacci.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۶.۲                          |
-//|                              تاریخ: ۲۰۲۵/۰۷/۲۳                   |
+//|                              نسخه: ۱.۶.۴                          |
+//|                              تاریخ: ۲۰۲۵/۰۷/۲۴                   |
 //| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.6.2"
+#property version   "1.6.4"
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -59,7 +59,7 @@ input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصل
 input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
 input bool InpTestMode = true;            // فعال‌سازی حالت تست داخلی
 input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
-input int InpTestPanelOffsetX = 153;        // فاصله افقی پنل تست از مرکز (حداقل 0)
+input int InpTestPanelOffsetX = 153;      // فاصله افقی پنل تست از مرکز (حداقل 0)
 input int InpTestPanelOffsetY = 39;       // فاصله عمودی پنل تست از بالا (حداقل 0)
 input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
 input color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Start Short
@@ -236,7 +236,7 @@ public:
    {
       return CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
              CreateHeader(m_name + "_Header", m_offset_x, m_offset_y) &&
-             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.6.2 - 2025/07/23", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
+             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.6.4 - 2025/07/24", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
              CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 35, clrLightGray, 9, "Calibri") &&
              CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 65, clrLightGray, 9, "Calibri");
    }
@@ -489,6 +489,18 @@ public:
       m_direction = dir;
    }
 
+   virtual bool Draw() override
+   {
+      string obj_name = m_name + (m_is_test ? "_Test" : "");
+      if(!ObjectCreate(0, obj_name, OBJ_FIBO, 0, m_time100, m_price100, m_time0, m_price0))
+         return false;
+      ObjectSetInteger(0, obj_name, OBJPROP_COLOR, m_color);
+      ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_SOLID);
+      for(int i = 0; i < ArraySize(m_levels); i++)
+         ObjectSetDouble(0, obj_name, OBJPROP_LEVELVALUE, i, m_levels[i] / 100.0);
+      return CheckObjectExists(obj_name);
+   }
+
    bool Initialize(SFractal &fractal, datetime current_time)
    {
       m_time100 = fractal.time;
@@ -544,10 +556,10 @@ public:
       if(m_price0 != old_price0)
       {
          m_time0 = new_time;
-         Delete();
-         if(Draw())
+         string obj_name = m_name + (m_is_test ? "_Test" : "");
+         if(CheckObjectExists(obj_name) && ObjectMove(0, obj_name, 1, m_time0, m_price0))
          {
-            Log("صفر مادر آپدیت شد: صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(new_time));
+            Log("صفر مادر آپدیت شد [Move]: صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(new_time));
             if(InpVisualDebug)
             {
                string line_name = "Debug_HLine_MotherZero_" + TimeToString(new_time) + (m_is_test ? "_Test" : "");
@@ -627,7 +639,7 @@ public:
 
    bool CheckStructureFailure(double current_price)
    {
-      if(!m_is_fixed) return false; // فقط بعد از فیکس شدن مادر بررسی می‌شود
+      if(!m_is_fixed) return false;
       double level_0 = m_price0;
       bool fail_condition = (m_direction == LONG && current_price <= level_0) ||
                             (m_direction == SHORT && current_price >= level_0);
@@ -731,11 +743,11 @@ public:
       if(m_price100 != old_price100)
       {
          m_time100 = new_time;
-         Delete();
-         if(Draw())
+         string obj_name = m_name + (m_is_test ? "_Test" : "");
+         if(CheckObjectExists(obj_name) && ObjectMove(0, obj_name, 1, m_time100, m_price100))
          {
             Log("صد فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : (m_is_success_child2 ? "دوم (موفق)" : "دوم (ناموفق)")) +
-                " آپدیت شد: صد=" + DoubleToString(m_price100, _Digits) + ", زمان=" + TimeToString(new_time));
+                " آپدیت شد [Move]: صد=" + DoubleToString(m_price100, _Digits) + ", زمان=" + TimeToString(new_time));
             if(InpVisualDebug)
             {
                string line_name = "Debug_HLine_" + (StringFind(m_name, "Child1") >= 0 ? "Child1Hundred_" : "Child2Hundred_") +
@@ -884,7 +896,7 @@ public:
       {
          string temp_levels[];
          int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
-         double max_level = StringToDouble(temp_levels[count - 1]); // استفاده از حداکثر سطح
+         double max_level = StringToDouble(temp_levels[count - 1]);
          double break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * max_level / 100.0;
          bool break_condition = (m_parent_mother.GetDirection() == LONG && iClose(_Symbol, _Period, 1) >= break_level) ||
                                 (m_parent_mother.GetDirection() == SHORT && iClose(_Symbol, _Period, 1) <= break_level);
@@ -911,7 +923,7 @@ public:
       if(m_is_success_child2 || m_parent_mother == NULL) return false;
       string temp_levels[];
       int count = StringSplit(InpChild2BreakLevels, StringGetCharacter(",", 0), temp_levels);
-      double min_level = StringToDouble(temp_levels[0]); // استفاده از حداقل سطح
+      double min_level = StringToDouble(temp_levels[0]);
       double break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * min_level / 100.0;
       bool trigger_condition = (m_parent_mother.GetDirection() == LONG && current_price >= break_level) ||
                                (m_parent_mother.GetDirection() == SHORT && current_price <= break_level);
@@ -1282,7 +1294,6 @@ public:
             m_families[i] = NULL;
          }
       }
-      Log("رویداد کندل جدید دریافت شد");
    }
 
    bool CreateNewStructure(ENUM_DIRECTION direction)
@@ -1444,5 +1455,3 @@ bool HFiboAcknowledgeSignal(string id)
    if(g_manager != NULL) return g_manager.AcknowledgeSignal(id);
    return false;
 }
-
-//+------------------------------------------------------------------+
