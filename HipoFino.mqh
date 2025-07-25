@@ -9,15 +9,17 @@
 #ifndef HIPO_FINO_MQH
 #define HIPO_FINO_MQH
 
+#include <Trade\Trade.mqh>
 #include <HipoFibonacci.mqh>
 #include "HipoDashboard.mqh"
 #include "HipoMomentumFractals.mqh"
 #include "HipoCvtChannel.mqh"
 
 //+------------------------------------------------------------------+
-//| ثابت‌ها و ساختارها                                             |
+//| ثابت‌ها و ساختارها                                                         |
+//|     در سایر کتابخانه و فایل ها این ساختار ها وجود دارد                                       |
 //+------------------------------------------------------------------+
-enum ENUM_HIPO_STATE
+/*/*enum ENUM_HIPO_STATE
 {
    HIPO_IDLE,              // حالت بیکار
    HIPO_WAITING_FOR_HIPO,  // در انتظار سیگنال فیبوناچی
@@ -36,8 +38,8 @@ enum ENUM_STOP_METHOD
    STOP_SAR,      // استفاده از Parabolic SAR
    STOP_CVT,      // استفاده از کانال دینامیک CVT
    STOP_FRACTAL   // استفاده از فراکتال مومنتوم
-};
-
+};*/
+//در سایر کتابخانه و فایل ها این ساختار ها وجود دارد 
 //+------------------------------------------------------------------+
 //| ساختار برای ذخیره زمان کندل‌ها                                 |
 //+------------------------------------------------------------------+
@@ -67,7 +69,7 @@ private:
    string m_log_buffer;           // بافر لاگ
    datetime m_last_flush_time;    // زمان آخرین فلاش لاگ
    ENUM_HIPO_STATE m_state;       // حالت فعلی اکسپرت
-   long m_position_ticket;        // تیکت معامله باز
+   ulong m_position_ticket;       // تیکت معامله باز (تغییر از long به ulong)
    ENUM_DIRECTION m_active_direction; // جهت فعال تحلیل
    // متغیرهای فیلتر سشن
    bool m_use_session_filter;     // استفاده از فیلتر سشن
@@ -168,7 +170,7 @@ private:
    //+------------------------------------------------------------------+
    double CalculateVolume(double entry_price, double sl_price)
    {
-      double account_balance = AccountBalance();
+      double account_balance = AccountInfoDouble(ACCOUNT_BALANCE);
       double risk_amount = account_balance * m_risk_percent / 100.0;
       double pip_value = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
       double pip_distance = MathAbs(entry_price - sl_price) / _Point;
@@ -187,11 +189,11 @@ private:
    //+------------------------------------------------------------------+
    //| تابع ارسال معامله به بروکر                                     |
    //+------------------------------------------------------------------+
-   bool SendTrade(SSignal signal, double entry_price, double sl_price)
+   bool SendTrade(SSignal &signal, double entry_price, double sl_price)
    {
-      MqlTradeRequest request = {0};
-      MqlTradeResult result = {0};
-      request.action = TRADE_ACTION_DEAL;
+      MqlTradeRequest request = {};
+      MqlTradeResult result = {};
+      request.action = TRADE_ACTION_DEAL; // مقدار صفر به مقدار صحیح تغییر کرد
       request.symbol = _Symbol;
       request.volume = CalculateVolume(entry_price, sl_price);
       request.type = (signal.type == "Buy") ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
@@ -207,7 +209,7 @@ private:
          return false;
       }
       
-      m_position_ticket = result.deal;
+      m_position_ticket = result.deal; // حالا نوع داده‌ها همخوانی دارد
       Log("معامله باز شد: تیکت=" + IntegerToString(m_position_ticket) + ", نوع=" + signal.type +
           ", حجم=" + DoubleToString(request.volume, 2) + ", ورود=" + DoubleToString(entry_price, _Digits) +
           ", حد ضرر=" + DoubleToString(sl_price, _Digits) + ", حد سود=" + DoubleToString(request.tp, _Digits));
@@ -222,8 +224,10 @@ private:
       if(!m_use_session_filter) return true;
       
       datetime gmt_time = TimeGMT();
-      int hour = TimeHour(gmt_time);
-      int minute = TimeMinute(gmt_time);
+      MqlDateTime time_struct;
+      TimeToStruct(gmt_time, time_struct);
+      int hour = time_struct.hour;
+      int minute = time_struct.min;
       int current_time = hour * 60 + minute;
       
       // بازه‌های سشن به وقت GMT (دقیقه)
@@ -466,9 +470,9 @@ public:
                if((pos_type == POSITION_TYPE_BUY && new_sl > current_sl) ||
                   (pos_type == POSITION_TYPE_SELL && new_sl < current_sl && new_sl > 0))
                {
-                  MqlTradeRequest request = {0};
-                  MqlTradeResult result = {0};
-                  request.action = TRADE_ACTION_SLTP;
+                  MqlTradeRequest request = {};
+                  MqlTradeResult result = {};
+                  request.action = TRADE_ACTION_SLTP; // مقدار صفر به مقدار صحیح تغییر کرد
                   request.position = m_position_ticket;
                   request.symbol = _Symbol;
                   request.sl = new_sl;
