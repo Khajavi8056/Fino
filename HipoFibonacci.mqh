@@ -79,7 +79,7 @@ input int InpPanelOffsetX = 10;           // فاصله افقی پنل اصلی
 input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصلی (حداقل 0)
 
 input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
-input bool InpTestMode = true;            // فعال‌سازی حالت تست داخلی
+input bool InpTestMode = false;            // فعال‌سازی حالت تست داخلی
 input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
 input int InpTestPanelOffsetX = 153;      // فاصله افقی پنل تست از مرکز (حداقل 0)
 input int InpTestPanelOffsetY = 39;       // فاصله عمودی پنل تست از بالا (حداقل 0)
