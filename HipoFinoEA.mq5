@@ -1,3 +1,10 @@
+//+------------------------------------------------------------------+
+//|                                                  HipoFinoExpert.mq5 |
+//|                              محصولی از: Hipo Algorithm           |
+//|                              نسخه: ۱.۱.۰                          |
+//|                              تاریخ: ۲۰۲۵/۰۷/۲۵                   |
+//+------------------------------------------------------------------+
+
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
 #property version   "1.1.0"
@@ -5,6 +12,7 @@
 //+------------------------------------------------------------------+
 //| شامل کردن کتابخانه‌ها                                           |
 //+------------------------------------------------------------------+
+#include <Trade\Trade.mqh>
 #include <HipoFibonacci.mqh>
 #include "HipoFino.mqh"
 #include "HipoDashboard.mqh"
@@ -165,7 +173,7 @@ int OnInit()
    // ایجاد نمونه داشبورد
    if(InpShowPanel || InpShowMacd)
    {
-      g_dashboard = new CHipoDashboard(InpShowPanel, InpShowMacd, InpHTF, InpLTF);
+      g_dashboard = new CHipoDashboard(InpShowPanel, InpShowMacd, InpHTF, InpLTF, InpMagicNumber);
       if(g_dashboard == NULL || !g_dashboard.Initialize())
       {
          Print("خطا: راه‌اندازی داشبورد گرافیکی ناموفق بود");
