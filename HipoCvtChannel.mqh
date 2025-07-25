@@ -9,7 +9,16 @@
 #ifndef HIPO_CVT_CHANNEL_MQH
 #define HIPO_CVT_CHANNEL_MQH
 
+#include <Trade\Trade.mqh>
+#include "HipoFino.mqh"
 #include "HipoMomentumFractals.mqh"
+
+enum ENUM_STOP_METHOD
+{
+   STOP_SAR,      // استفاده از Parabolic SAR
+   STOP_CVT,      // استفاده از کانال دینامیک CVT
+   STOP_FRACTAL   // استفاده از فراکتال مومنتوم
+};
 
 //+------------------------------------------------------------------+
 //| کلاس CHipoCvtChannel                                            |
