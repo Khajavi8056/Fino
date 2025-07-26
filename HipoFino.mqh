@@ -377,121 +377,126 @@ public:
    //+------------------------------------------------------------------+
    //| تابع پردازش تیک                                              |
    //+------------------------------------------------------------------+
-   void OnTick()
+void OnTick()
+{
+   // فلاش لاگ هر ۵ ثانیه
+   if(TimeCurrent() - m_last_flush_time >= 5)
+      FlushLog();
+   
+   // بررسی کندل جدید
+   bool new_htf_candle = IsNewCandle(m_htf, m_candle_times.htf_last_candle);
+   bool new_ltf_candle = IsNewCandle(m_ltf, m_candle_times.ltf_last_candle);
+   if(new_htf_candle || new_ltf_candle)
    {
-      // فلاش لاگ هر ۵ ثانیه
-      if(TimeCurrent() - m_last_flush_time >= 5)
-         FlushLog();
-      
-      // بررسی کندل جدید
-      bool new_htf_candle = IsNewCandle(m_htf, m_candle_times.htf_last_candle);
-      bool new_ltf_candle = IsNewCandle(m_ltf, m_candle_times.ltf_last_candle);
-      if(new_htf_candle || new_ltf_candle)
-      {
-         HFiboOnNewBar();
-         m_fractals.CalculateFractals();
-      }
-      
-      // دریافت بایاس مکدی
-      ENUM_MACD_BIAS htf_bias = GetMacdBias(m_htf_macd_handle, m_htf);
-      ENUM_MACD_BIAS ltf_bias = GetMacdBias(m_ltf_macd_handle, m_ltf);
-      
-      // به‌روزرسانی داشبورد
-      if(g_dashboard != NULL)
-         g_dashboard.UpdateMacdBias(htf_bias, ltf_bias, m_state);
-      
-      // مدیریت حالت‌ها
-      switch(m_state)
-      {
-         case HIPO_IDLE:
-            if(!IsSessionActive()) return;
-            if((htf_bias == MACD_BULLISH && ltf_bias == MACD_BULLISH) ||
-               (htf_bias == MACD_BEARISH && ltf_bias == MACD_BEARISH))
+      HFiboOnNewBar();
+      m_fractals.CalculateFractals();
+   }
+   
+   // دریافت بایاس مکدی
+   ENUM_MACD_BIAS htf_bias = GetMacdBias(m_htf_macd_handle, m_htf);
+   ENUM_MACD_BIAS ltf_bias = GetMacdBias(m_ltf_macd_handle, m_ltf);
+   
+   // به‌روزرسانی داشبورد
+   if(g_dashboard != NULL)
+      g_dashboard.UpdateMacdBias(htf_bias, ltf_bias, m_state);
+   
+   // مدیریت حالت‌ها
+   switch(m_state)
+   {
+      case HIPO_IDLE:
+         if(!IsSessionActive()) return;
+         if((htf_bias == MACD_BULLISH && ltf_bias == MACD_BULLISH) ||
+            (htf_bias == MACD_BEARISH && ltf_bias == MACD_BEARISH))
+         {
+            ENUM_DIRECTION direction = (htf_bias == MACD_BULLISH) ? LONG : SHORT;
+            if(HFiboCreateNewStructure(direction))
             {
-               ENUM_DIRECTION direction = (htf_bias == MACD_BULLISH) ? LONG : SHORT;
-               if(HFiboCreateNewStructure(direction))
+               m_active_direction = direction;
+               m_state = HIPO_WAITING_FOR_HIPO;
+               Log("دستور ایجاد ساختار جدید ارسال شد: جهت=" + (direction == LONG ? "خرید" : "فروش"));
+            }
+            else
+            {
+               Log("خطا در ایجاد ساختار جدید");
+            }
+         }
+         break;
+         
+      case HIPO_WAITING_FOR_HIPO:
+         if((m_active_direction == LONG && htf_bias == MACD_BEARISH) ||
+            (m_active_direction == SHORT && htf_bias == MACD_BULLISH))
+         {
+            HFiboStopCurrentStructure();
+            m_state = HIPO_IDLE;
+            Log("روند HTF کاملاً معکوس شد، ساختار متوقف شد");
+         }
+         else if(HFiboIsStructureBroken())
+         {
+            HFiboStopCurrentStructure();
+            m_state = HIPO_IDLE;
+            Log("ساختار به دلیل عبور از سطح شکست تخریب شد، بازگشت به حالت بیکار");
+         }
+         else
+         {
+            SSignal signal = HFiboGetSignal();
+            if(signal.id != "")
+            {
+               double mother_zero = HFiboGetMotherZeroPoint();
+               double entry_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+               double sl_price = (signal.type == "Buy") ? mother_zero - m_sl_buffer_pips * _Point :
+                                                        mother_zero + m_sl_buffer_pips * _Point;
+               if(SendTrade(signal, entry_price, sl_price))
                {
-                  m_active_direction = direction;
-                  m_state = HIPO_WAITING_FOR_HIPO;
-                  Log("دستور ایجاد ساختار جدید ارسال شد: جهت=" + (direction == LONG ? "خرید" : "فروش"));
+                  m_state = HIPO_MANAGING_POSITION;
+                  Log("وارد حالت مدیریت معامله شد");
                }
                else
                {
-                  Log("خطا در ایجاد ساختار جدید");
+                  HFiboStopCurrentStructure();
+                  m_state = HIPO_IDLE;
+                  Log("خطا در ارسال معامله، بازگشت به حالت بیکار");
                }
             }
-            break;
-            
-         case HIPO_WAITING_FOR_HIPO:
-            if((m_active_direction == LONG && htf_bias == MACD_BEARISH) ||
-               (m_active_direction == SHORT && htf_bias == MACD_BULLISH))
+         }
+         break;
+         
+      case HIPO_MANAGING_POSITION:
+         if(!PositionSelectByTicket(m_position_ticket))
+         {
+            HFiboAcknowledgeSignal("");
+            m_trailing.UpdateVisuals(0.0, POSITION_TYPE_BUY);
+            m_state = HIPO_IDLE;
+            Log("معامله بسته شد (حد سود یا ضرر)، بازگشت به حالت بیکار");
+         }
+         else
+         {
+            ENUM_POSITION_TYPE pos_type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+            double current_sl = PositionGetDouble(POSITION_SL);
+            double new_sl = m_trailing.CalculateNewStopLoss(pos_type, current_sl);
+            if((pos_type == POSITION_TYPE_BUY && new_sl > current_sl) ||
+               (pos_type == POSITION_TYPE_SELL && new_sl < current_sl && new_sl > 0))
             {
-               HFiboStopCurrentStructure();
-               m_state = HIPO_IDLE;
-               Log("روند HTF کاملاً معکوس شد، ساختار متوقف شد");
-            }
-            else
-            {
-               SSignal signal = HFiboGetSignal();
-               if(signal.id != "")
+               MqlTradeRequest request = {};
+               MqlTradeResult result = {};
+               request.action = TRADE_ACTION_SLTP;
+               request.position = m_position_ticket;
+               request.symbol = _Symbol;
+               request.sl = new_sl;
+               request.tp = PositionGetDouble(POSITION_TP);
+               if(OrderSend(request, result) && result.retcode == TRADE_RETCODE_DONE)
                {
-                  double mother_zero = HFiboGetMotherZeroPoint();
-                  double entry_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-                  double sl_price = (signal.type == "Buy") ? mother_zero - m_sl_buffer_pips * _Point :
-                                                           mother_zero + m_sl_buffer_pips * _Point;
-                  if(SendTrade(signal, entry_price, sl_price))
-                  {
-                     m_state = HIPO_MANAGING_POSITION;
-                     Log("وارد حالت مدیریت معامله شد");
-                  }
-                  else
-                  {
-                     HFiboStopCurrentStructure();
-                     m_state = HIPO_IDLE;
-                     Log("خطا در ارسال معامله، بازگشت به حالت بیکار");
-                  }
+                  Log("حد ضرر به‌روزرسانی شد: تیکت=" + IntegerToString(m_position_ticket) +
+                      ", حد ضرر جدید=" + DoubleToString(new_sl, _Digits));
                }
-            }
-            break;
-            
-         case HIPO_MANAGING_POSITION:
-            if(!PositionSelectByTicket(m_position_ticket))
-            {
-               HFiboAcknowledgeSignal("");
-               m_trailing.UpdateVisuals(0.0, POSITION_TYPE_BUY);
-               m_state = HIPO_IDLE;
-               Log("معامله بسته شد (حد سود یا ضرر)، بازگشت به حالت بیکار");
-            }
-            else
-            {
-               ENUM_POSITION_TYPE pos_type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-               double current_sl = PositionGetDouble(POSITION_SL);
-               double new_sl = m_trailing.CalculateNewStopLoss(pos_type, current_sl);
-               if((pos_type == POSITION_TYPE_BUY && new_sl > current_sl) ||
-                  (pos_type == POSITION_TYPE_SELL && new_sl < current_sl && new_sl > 0))
+               else
                {
-                  MqlTradeRequest request = {};
-                  MqlTradeResult result = {};
-                  request.action = TRADE_ACTION_SLTP; // مقدار صفر به مقدار صحیح تغییر کرد
-                  request.position = m_position_ticket;
-                  request.symbol = _Symbol;
-                  request.sl = new_sl;
-                  request.tp = PositionGetDouble(POSITION_TP);
-                  if(OrderSend(request, result) && result.retcode == TRADE_RETCODE_DONE)
-                  {
-                     Log("حد ضرر به‌روزرسانی شد: تیکت=" + IntegerToString(m_position_ticket) +
-                         ", حد ضرر جدید=" + DoubleToString(new_sl, _Digits));
-                  }
-                  else
-                  {
-                     Log("خطا در به‌روزرسانی حد ضرر: کد=" + IntegerToString(result.retcode));
-                  }
+                  Log("خطا در به‌روزرسانی حد ضرر: کد=" + IntegerToString(result.retcode));
                }
-               m_trailing.UpdateVisuals(new_sl, pos_type);
             }
-            break;
-      }
+            m_trailing.UpdateVisuals(new_sl, pos_type);
+         }
+         break;
    }
+}
 };
-
 #endif
