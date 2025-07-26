@@ -525,7 +525,7 @@ public:
       m_time100 = time100;
       m_price100 = price100;
    }
-
+datetime GetTime100() { return m_time100; }
    datetime GetTime0() { return m_time0; }
    double GetPrice0() { return m_price0; }
    double GetPrice100() { return m_price100; }
@@ -1543,10 +1543,9 @@ bool CFamily::UpdateOnTick(double current_price, datetime current_time)
 
 
 //==================================================================
-// >> کد جدید برای اضافه شدن به کلاس CFamily <<
-// این تابع وظیفه دارد مادر را در صورت یافتن فراکتال جدیدتر، ریست کند
+// >> نسخه اصلاح شده و نهایی تابع نگهبان مادر <<
 //==================================================================
-
+private:
 bool CFamily::TryUpdateMotherFractal()
 {
    // اگر مادری وجود ندارد یا از قبل فیکس شده، کاری انجام نده
@@ -1566,15 +1565,14 @@ bool CFamily::TryUpdateMotherFractal()
    // ۳. بررسی کن که آیا یک فراکتال معتبر و *جدیدتر* پیدا شده است
    if(new_fractal.price != 0.0 && new_fractal.time > current_mother_time)
    {
-      // یک فراکتال جدیدتر و معتبرتر پیدا شد! وقت ریست کردنه
       Log("نگهبان مادر: فراکتال بی‌اعتبار در " + TimeToString(current_mother_time) + " شناسایی شد.");
       Log("--> فراکتال جدید در " + TimeToString(new_fractal.time) + " یافت شد. در حال ریست کردن مادر...");
 
       // ۴. مادر قدیمی را با تمام متعلقاتش از بین ببر
-      m_mother.Destroy();
+      m_mother.Delete(); // <<-- اصلاح شد: از Destroy به Delete تغییر کرد
       delete m_mother;
       m_mother = NULL;
-      // اشیاء گرافیکی دیباگ قدیمی را هم پاک کن
+      
       if(InpVisualDebug)
          ClearDebugObjects(m_is_test);
 
@@ -1584,14 +1582,13 @@ bool CFamily::TryUpdateMotherFractal()
       {
          Log("خطای حیاتی: ایجاد مادر جدید پس از ریست ناموفق بود.");
          m_state = FAILED;
-         return false; // ریست ناموفق بود
+         return false;
       }
 
       if(m_mother.Initialize(new_fractal, TimeCurrent()))
       {
          Log("مادر با موفقیت بر اساس فراکتال جدید در " + DoubleToString(new_fractal.price, _Digits) + " ریست شد.");
-         // حالت اکسپرت همچنان MOTHER_ACTIVE باقی می‌ماند
-         return true; // به تابع اصلی خبر می‌دهیم که ریست انجام شده
+         return true;
       }
       else
       {
@@ -1599,11 +1596,10 @@ bool CFamily::TryUpdateMotherFractal()
          delete m_mother;
          m_mother = NULL;
          m_state = FAILED;
-         return false; // ریست ناموفق بود
+         return false;
       }
    }
 
-   // اگر هیچ فراکتال جدیدتری پیدا نشد، به کار عادی ادامه بده
    return false;
 }
 
