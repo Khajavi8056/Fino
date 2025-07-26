@@ -1373,9 +1373,10 @@ public:
    }
 
 //+------------------------------------------------------------------+
-//| CFamily::UpdateOnTick (نسخه نهایی، کامل و بازنویسی شده)           |
+//| CFamily::UpdateOnTick (نسخه نهایی با منطق نگهبان مادر)            |
+//| این تابع را به طور کامل با نسخه فعلی جایگزین کنید                 |
 //+------------------------------------------------------------------+
-bool UpdateOnTick(double current_price, datetime current_time)
+bool CFamily::UpdateOnTick(double current_price, datetime current_time)
 {
    // --- بخش اول: جستجو برای مادر ---
    if(m_state == SEARCHING)
@@ -1384,6 +1385,7 @@ bool UpdateOnTick(double current_price, datetime current_time)
    }
    
    // --- بخش دوم: بررسی شکست کلی ساختار (سطح نهایی مادر) ---
+   // این بخش برای هر دو حالت مادر و فرزند اول فعال است
    else if(m_state == MOTHER_ACTIVE || m_state == CHILD1_ACTIVE)
    {
       if(m_mother != NULL && m_mother.CheckBreakoutFailure(current_price))
@@ -1397,6 +1399,19 @@ bool UpdateOnTick(double current_price, datetime current_time)
    // --- بخش سوم: مدیریت وضعیت مادر ---
    if(m_state == MOTHER_ACTIVE)
    {
+      //==================================================================
+      // >> بخش جدید: فراخوانی نگهبان مادر <<
+      // اولین و مهم‌ترین کار در هر تیک، چک کردن اعتبار مادر فعلی است
+      //==================================================================
+      if(TryUpdateMotherFractal())
+      {
+         // اگر مادر با موفقیت ریست شد، در این تیک کار دیگری انجام نمی‌دهیم
+         // و منتظر تیک بعدی با مادر جدید و تازه نفس می‌مانیم.
+         return true;
+      }
+      //==================================================================
+      
+      // اگر مادر ریست نشد، به منطق عادی ادامه می‌دهیم
       if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
       {
          m_state = FAILED;
@@ -1431,8 +1446,8 @@ bool UpdateOnTick(double current_price, datetime current_time)
       if(m_child1 != NULL && m_child1.CheckFailure(current_price))
       {
          m_child1.Delete();
-         delete m_child1;      // اصلاح شد: جلوگیری از نشت حافظه
-         m_child1 = NULL;      // اصلاح شد: جلوگیری از نشت حافظه
+         delete m_child1;
+         m_child1 = NULL;
          m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
          if(m_child2 == NULL || !m_child2.Initialize(current_time))
          {
@@ -1450,8 +1465,8 @@ bool UpdateOnTick(double current_price, datetime current_time)
          if(m_child1.IsFixed() && m_child1.CheckChild1TriggerChild2(current_price))
          {
             m_child1.Delete();
-            delete m_child1;      // اصلاح شد: جلوگیری از نشت حافظه
-            m_child1 = NULL;      // اصلاح شد: جلوگیری از نشت حافظه
+            delete m_child1;
+            m_child1 = NULL;
             m_child2 = new CChildFibo(m_id + "_SuccessChild2", InpChild2Color, InpChildLevels, m_mother, true, m_is_test);
             if(m_child2 == NULL || !m_child2.Initialize(current_time))
             {
@@ -1480,16 +1495,14 @@ bool UpdateOnTick(double current_price, datetime current_time)
          return false;
       }
       
-      // آپدیت فرزند دوم و بررسی شرط تکمیل شدن
       if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
       {
-         // الان برای هر دو نوع فرزند (موفق و ناموفق) ورود به ناحیه طلایی چک می‌شود.
          if(m_child2.CheckSuccessChild2(current_price))
          {
             m_state = COMPLETED;
             Log("ساختار با ورود به ناحیه طلایی کامل شد.");
-            return true; // ساختار کامل شده و دیگر نیازی به پردازش در این تیک نیست.
-         }
+            return true;
+        }
       }
    }
    
@@ -1527,6 +1540,74 @@ bool UpdateOnTick(double current_price, datetime current_time)
       }
       return true;
    }
+
+
+//==================================================================
+// >> کد جدید برای اضافه شدن به کلاس CFamily <<
+// این تابع وظیفه دارد مادر را در صورت یافتن فراکتال جدیدتر، ریست کند
+//==================================================================
+
+bool CFamily::TryUpdateMotherFractal()
+{
+   // اگر مادری وجود ندارد یا از قبل فیکس شده، کاری انجام نده
+   if(m_mother == NULL || m_mother.IsFixed())
+      return false;
+
+   // ۱. زمان فراکتال مادر فعلی را برای مقایسه ذخیره کن
+   datetime current_mother_time = m_mother.GetTime100();
+
+   // ۲. با استفاده از همان ابزار قبلی، جدیدترین فراکتال را پیدا کن
+   SFractal new_fractal;
+   if(m_direction == LONG)
+      m_fractal_finder.FindRecentHigh(TimeCurrent(), InpFractalLookback, InpFractalPeers, new_fractal);
+   else // SHORT
+      m_fractal_finder.FindRecentLow(TimeCurrent(), InpFractalLookback, InpFractalPeers, new_fractal);
+
+   // ۳. بررسی کن که آیا یک فراکتال معتبر و *جدیدتر* پیدا شده است
+   if(new_fractal.price != 0.0 && new_fractal.time > current_mother_time)
+   {
+      // یک فراکتال جدیدتر و معتبرتر پیدا شد! وقت ریست کردنه
+      Log("نگهبان مادر: فراکتال بی‌اعتبار در " + TimeToString(current_mother_time) + " شناسایی شد.");
+      Log("--> فراکتال جدید در " + TimeToString(new_fractal.time) + " یافت شد. در حال ریست کردن مادر...");
+
+      // ۴. مادر قدیمی را با تمام متعلقاتش از بین ببر
+      m_mother.Destroy();
+      delete m_mother;
+      m_mother = NULL;
+      // اشیاء گرافیکی دیباگ قدیمی را هم پاک کن
+      if(InpVisualDebug)
+         ClearDebugObjects(m_is_test);
+
+      // ۵. یک مادر کاملاً جدید با فراکتال جدید بساز
+      m_mother = new CMotherFibo(m_id + "_Mother", InpMotherColor, InpMotherLevels, m_direction, m_is_test);
+      if(m_mother == NULL)
+      {
+         Log("خطای حیاتی: ایجاد مادر جدید پس از ریست ناموفق بود.");
+         m_state = FAILED;
+         return false; // ریست ناموفق بود
+      }
+
+      if(m_mother.Initialize(new_fractal, TimeCurrent()))
+      {
+         Log("مادر با موفقیت بر اساس فراکتال جدید در " + DoubleToString(new_fractal.price, _Digits) + " ریست شد.");
+         // حالت اکسپرت همچنان MOTHER_ACTIVE باقی می‌ماند
+         return true; // به تابع اصلی خبر می‌دهیم که ریست انجام شده
+      }
+      else
+      {
+         Log("خطا: راه‌اندازی مادر جدید پس از ریست ناموفق بود.");
+         delete m_mother;
+         m_mother = NULL;
+         m_state = FAILED;
+         return false; // ریست ناموفق بود
+      }
+   }
+
+   // اگر هیچ فراکتال جدیدتری پیدا نشد، به کار عادی ادامه بده
+   return false;
+}
+
+
 
    //+------------------------------------------------------------------+
 //| CFamily::GetSignal (نسخه کامل و نهایی)                           |
