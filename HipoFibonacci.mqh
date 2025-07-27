@@ -46,10 +46,10 @@ input int InpFractalLookback = 200;       // حداکثر تعداد کندل ب
 input int InpFractalPeers = 3;            // تعداد کندل‌های چپ/راست برای فراکتال (حداقل 1)
 
 input group "سطوح فیبوناچی"
-input string InpMotherLevels = "0,50,68,100,150,200,250"; // سطوح فیبو مادر (اعداد مثبت، با کاما)
-input string InpChildLevels = "0,50,68,100,150,200,250";  // سطوح فیبو فرزندان (اعداد مثبت)
-input string InpChild2BreakLevels = "";              // سطوح شکست فرزند دوم (اختیاری، اعداد مثبت، با کاما)
-input string InpGoldenZone = "50,68";                // ناحیه طلایی برای سیگنال (اعداد مثبت)
+input string InpMotherLevels = "0,38,50,68,100,150,200,250"; // سطوح فیبو مادر (اعداد مثبت، با کاما)
+input string InpChildLevels = "0,38,50,68,100,150,200,250";  // سطوح فیبو فرزندان (اعداد مثبت)
+/*input*/ string InpChild2BreakLevels = "";              // سطوح شکست فرزند دوم (اختیاری، اعداد مثبت، با کاما)
+input string InpGoldenZone = "38,50";                // ناحیه طلایی برای سیگنال (اعداد مثبت)
 
 input group "فیکس شدن مادر"
 enum ENUM_FIX_MODE
@@ -78,24 +78,24 @@ input int InpMaxBreakoutCandles = 3;                            // حداکثر 
 
 input group "رنگ‌بندی اشیاء"
 input color InpMotherColor = clrWhite;    // رنگ فیبوناچی مادر
-input color InpChild1Color = clrLime;     // رنگ فیبوناچی فرزند اول
+input color InpChild1Color = clrMagenta;     // رنگ فیبوناچی فرزند اول
 input color InpChild2Color = clrGreen;    // رنگ فیبوناچی فرزند دوم
 
-input group "تنظیمات پنل اصلی"
-input bool InpShowPanelEa = true;           // نمایش پنل اصلی اطلاعاتی
-input ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل اصلی
-input int InpPanelOffsetX = 10;           // فاصله افقی پنل اصلی (حداقل 0)
-input int InpPanelOffsetY = 20;           // فاصله عمودی پنل اصلی (حداقل 0)
+/*input*/// group "تنظیمات پنل اصلی"
+/*input*/ bool InpShowPanelEa = true;           // نمایش پنل اصلی اطلاعاتی
+/*input*/ ENUM_BASE_CORNER InpPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل اصلی
+/*input*/ int InpPanelOffsetX = 160;           // فاصله افقی پنل اصلی (حداقل 0)
+/*input*/ int InpPanelOffsetY = 6;           // فاصله عمودی پنل اصلی (حداقل 0)
 
-input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
-input bool InpTestMode = false;            // فعال‌سازی حالت تست داخلی
-input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
-input int InpTestPanelOffsetX = 153;      // فاصله افقی پنل تست از مرکز (حداقل 0)
-input int InpTestPanelOffsetY = 39;       // فاصله عمودی پنل تست از بالا (حداقل 0)
-input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
-input color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Stop
-input color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
-input color InpTestPanelBgColor = clrDarkGray;      // رنگ پس‌زمینه پنل تست
+//input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
+/*input*/ bool InpTestMode = false;            // فعال‌سازی حالت تست داخلی
+/*input*/ ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
+/*input*/ int InpTestPanelOffsetX = 153;      // فاصله افقی پنل تست از مرکز (حداقل 0)
+/*input*/ int InpTestPanelOffsetY = 39;       // فاصله عمودی پنل تست از بالا (حداقل 0)
+/*input*/ color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
+/*input*/ color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Stop
+/*input*/ color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
+/*input*/ color InpTestPanelBgColor = clrDarkGray;      // رنگ پس‌زمینه پنل تست
 
 input group "تنظیمات دیباگ"
 input bool InpVisualDebug = false;        // فعال‌سازی حالت تست بصری
