@@ -501,7 +501,9 @@ public:
       }
       request.magic = m_magic_number;
       
-      if(!m_trade.Trade(request, result))
+ 
+      if(!m_trade.OrderSend(request, result))
+
       {
          Log("خطا در ارسال معامله: " + (string)GetLastError() + ", comment: " + result.comment);
          return false;
@@ -538,7 +540,9 @@ public:
       if(IsNewCandle(m_htf, m_candle_times.htf_last_candle) || new_ltf_candle)
       {
          HFiboOnNewBar();
-         if(m_fractals != NULL) m_fractals.CalculateFractals();
+     
+     if(m_fractals != NULL) m_fractals.Calculate();
+
       }
       
       ENUM_MACD_BIAS htf_bias = GetMacdBias(m_htf_macd_handle, m_htf);
