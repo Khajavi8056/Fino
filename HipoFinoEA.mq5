@@ -112,7 +112,7 @@ int OnInit()
       Print("خطا: درصد ریسک باید بین 0.1 تا 10.0 باشد");
       return(INIT_PARAMETERS_INCORRECT);
    }
-   if(InpRiskRewardRatio < 1.0 || InpRiskRewardRatio > 5.0)
+   if(InpFixedTP_RR < 1.0 || InpFixedTP_RR > 5.0)
    {
       Print("خطا: نسبت ریسک به ریوارد باید بین 1.0 تا 5.0 باشد");
       return(INIT_PARAMETERS_INCORRECT);
