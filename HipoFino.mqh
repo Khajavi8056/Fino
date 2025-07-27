@@ -1,9 +1,9 @@
 //+------------------------------------------------------------------+
 //|                                                    HipoFino.mqh  |
 //|                              محصولی از: Hipo Algorithm           |
-//|                           نسخه ۱.۲.۰ با مدیریت معامله پیشرفته      |
-//|                              تاریخ: ۲۰۲۵/۰۷/۲۵                   |
-//| موتور اصلی اکسپرت HipoFino برای مدیریت معاملات و مکدی‌ها       |
+//|                              نسخه: ۱.۳.۰                          |
+//|                              تاریخ: ۲۰۲۵/۰۷/۲۷                   |
+//| موتور اصلی اکسپرت HipoFino با مدیریت معامله پیشرفته      |
 //+------------------------------------------------------------------+
 
 #ifndef HIPO_FINO_MQH
@@ -48,7 +48,7 @@ private:
    string m_custom_session_start;
    string m_custom_session_end;
 
-   // --- تنظیمات تریلینگ استاپ (از فایل اصلی) ---
+   // --- تنظیمات تریلینگ استاپ ---
    ENUM_STOP_METHOD m_stop_method;
    double m_sar_step;
    double m_sar_maximum;
@@ -84,7 +84,6 @@ private:
    double m_entry_price;
    double m_initial_volume;
    bool   m_is_trailing_active;
-   bool   m_is_risk_free;
    int    m_partial_tp_stage_hit;
    double m_tp_levels_price[3];
    
@@ -226,7 +225,7 @@ private:
          Log("خارج از سشن معاملاتی مجاز");
       return in_session;
    }
-   
+
    // --- توابع خصوصی جدید برای مدیریت معامله ---
    void ResetTradeManagementState()
    {
@@ -235,7 +234,6 @@ private:
       m_entry_price = 0;
       m_initial_volume = 0;
       m_is_trailing_active = false;
-      m_is_risk_free = false;
       m_partial_tp_stage_hit = 0;
       ArrayInitialize(m_tp_levels_price, 0.0);
       ClearTPVisuals();
@@ -301,6 +299,7 @@ private:
             double volume_to_close = NormalizeDouble(m_initial_volume * (StringToDouble(percentages_str[i]) / 100.0), 2);
             double remaining_volume = PositionGetDouble(POSITION_VOLUME);
             
+            // اگر این آخرین پله نباشد و حجم درخواستی بیشتر از حجم باقیمانده باشد، کمی فضا برای ادامه معامله بگذار
             if(volume_to_close >= remaining_volume && i < num_levels - 1)
                volume_to_close = NormalizeDouble(remaining_volume - SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN), 2);
             
@@ -384,6 +383,12 @@ public:
       m_custom_session_start = custom_start;
       m_custom_session_end = custom_end;
       
+      m_use_partial_tp = use_partial_tp;
+      m_partial_tp_percentages = partial_tp_percentages;
+      m_fixed_tp_rr = fixed_tp_rr;
+      m_use_trailing_stop = use_trailing_stop;
+      m_trailing_activation_rr = trailing_activation_rr;
+      
       m_stop_method = stop_method;
       m_sar_step = sar_step;
       m_sar_maximum = sar_max;
@@ -393,12 +398,6 @@ public:
       m_fractal_buffer_pips = fractal_buffer_pips;
       m_show_stop_line = show_stop_line;
       m_show_fractals = show_fractals;
-      
-      m_use_partial_tp = use_partial_tp;
-      m_partial_tp_percentages = partial_tp_percentages;
-      m_fixed_tp_rr = fixed_tp_rr;
-      m_use_trailing_stop = use_trailing_stop;
-      m_trailing_activation_rr = trailing_activation_rr;
 
       m_htf_macd_handle = INVALID_HANDLE;
       m_ltf_macd_handle = INVALID_HANDLE;
@@ -498,7 +497,7 @@ public:
       }
       else
       {
-         request.tp = 0; // در حالت خروج پله‌ای، TP اصلی نداریم
+         request.tp = 0;
       }
       request.magic = m_magic_number;
       
@@ -554,6 +553,9 @@ public:
             if((htf_bias == MACD_BULLISH && ltf_bias == MACD_BULLISH) ||
                (htf_bias == MACD_BEARISH && ltf_bias == MACD_BEARISH))
             {
+               // دستور جدید: پاکسازی چارت قبل از تحلیل جدید
+               HFiboStopCurrentStructure(); 
+               
                ENUM_DIRECTION direction = (htf_bias == MACD_BULLISH) ? LONG : SHORT;
                if(HFiboCreateNewStructure(direction))
                {
@@ -610,7 +612,7 @@ public:
             if(!PositionSelectByTicket(m_position_ticket))
             {
                HFiboAcknowledgeSignal("");
-               m_trailing.UpdateVisuals(0.0, POSITION_TYPE_BUY);
+               if(m_trailing != NULL) m_trailing.UpdateVisuals(0.0, POSITION_TYPE_BUY);
                ResetTradeManagementState();
                m_state = HIPO_IDLE;
                Log("معامله بسته شد، بازگشت به حالت بیکار");
@@ -627,6 +629,7 @@ public:
             
             if(m_use_trailing_stop)
             {
+               // فاز ۱: فعال‌سازی
                if(!m_is_trailing_active)
                {
                   double current_price = (pos_type == POSITION_TYPE_BUY) ? SymbolInfoDouble(_Symbol, SYMBOL_BID) : SymbolInfoDouble(_Symbol, SYMBOL_ASK);
@@ -646,40 +649,28 @@ public:
                   }
                }
                
+               // فاز ۲: تریلینگ با قانون کف سیمانی
                if(m_is_trailing_active)
                {
-                  double new_sl = 0;
-                  if(!m_is_risk_free)
+                  double suggested_sl = m_trailing.CalculateNewStopLoss(pos_type, current_sl);
+                  bool is_valid_sl = false;
+
+                  if((pos_type == POSITION_TYPE_BUY && suggested_sl >= m_entry_price) ||
+                     (pos_type == POSITION_TYPE_SELL && suggested_sl <= m_entry_price && suggested_sl > 0))
                   {
-                     new_sl = m_entry_price;
+                     is_valid_sl = true;
                   }
-                  else
+
+                  if(is_valid_sl && suggested_sl != current_sl)
                   {
-                     double suggested_sl = m_trailing.CalculateNewStopLoss(pos_type, current_sl);
-                     if((pos_type == POSITION_TYPE_BUY && suggested_sl >= m_entry_price) ||
-                        (pos_type == POSITION_TYPE_SELL && suggested_sl <= m_entry_price && suggested_sl > 0))
+                     if(m_trade.PositionModify(m_position_ticket, suggested_sl, PositionGetDouble(POSITION_TP)))
                      {
-                        new_sl = suggested_sl;
-                     }
-                  }
-                  
-                  if(new_sl != 0 &&
-                    ((pos_type == POSITION_TYPE_BUY && new_sl > current_sl) ||
-                     (pos_type == POSITION_TYPE_SELL && new_sl < current_sl)))
-                  {
-                     if(m_trade.PositionModify(m_position_ticket, new_sl, PositionGetDouble(POSITION_TP)))
-                     {
-                        Log("حد ضرر به‌روزرسانی شد: " + DoubleToString(new_sl, _Digits));
-                        if(!m_is_risk_free)
-                        {
-                           m_is_risk_free = true;
-                           Log("معامله ریسک-فری شد.");
-                        }
+                        Log("حد ضرر به‌روزرسانی شد: " + DoubleToString(suggested_sl, _Digits));
                      }
                   }
                }
             }
-            m_trailing.UpdateVisuals(PositionGetDouble(POSITION_SL), pos_type);
+            if(m_trailing != NULL) m_trailing.UpdateVisuals(PositionGetDouble(POSITION_SL), pos_type);
             break;
          }
       }
