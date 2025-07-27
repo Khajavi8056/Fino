@@ -125,14 +125,8 @@ enum ENUM_DIRECTION
 
 struct SSignal
 {
-   string type;                // "Buy" یا "Sell" (فقط وقتی سیگنال هست پر میشه)
-   string id;                  // شناسه منحصربه‌فرد (فقط وقتی سیگنال هست پر میشه)
-   
-   // --- بخش جدید ---
-   bool   isStructureActive;   // آیا ساختار فیبوناچی معتبری فعال است؟
-   double goldenZoneTop;       // سقف ناحیه طلایی
-   double goldenZoneBottom;    // کف ناحیه طلایی
-   double motherAnchorPrice;   // قیمت نقطه صفر مادر (نقطه ابطال)
+   string type;    // "Buy" یا "Sell"
+   string id;      // شناسه منحصربه‌فرد
 };
 
 struct SFractal
@@ -1611,61 +1605,54 @@ bool CFamily::TryUpdateMotherFractal()
 
 
 
-//+------------------------------------------------------------------+
-//| CFamily::GetSignal (نسخه جدید با ارسال کامل داده‌ها)
+   //+------------------------------------------------------------------+
+//| CFamily::GetSignal (نسخه کامل و نهایی)                           |
 //+------------------------------------------------------------------+
 SSignal GetSignal()
 {
-   SSignal signal;
-   // مقداردهی اولیه به مقادیر پیش‌فرض
-   signal.type = "";
-   signal.id = "";
-   signal.isStructureActive = false;
-   signal.goldenZoneTop = 0;
-   signal.goldenZoneBottom = 0;
-   signal.motherAnchorPrice = 0;
-
-   // اگر ساختار معتبر نیست، یک سیگنال خالی برگردان
-   if(m_state == FAILED || m_state == COMPLETED || m_mother == NULL)
-      return signal;
-
-   // اگر ساختار معتبر است، اطلاعات پایه را پر کن
-   signal.isStructureActive = true;
-   signal.motherAnchorPrice = m_mother.GetPrice0();
-
-   // اگر هنوز به ناحیه طلایی نرسیده‌ایم، فقط اطلاعات پایه را برگردان
-   if(m_state != CHILD2_ACTIVE || m_child2 == NULL)
-      return signal;
+   SSignal signal = {"", ""};
    
-   // --- اینجا یعنی به ناحیه طلایی رسیده‌ایم، پس مرزها را محاسبه کن ---
-   string temp_levels[];
-   if(StringSplit(InpGoldenZone, ',', temp_levels) < 2)
-      return signal; // اگر تنظیمات ناحیه طلایی اشتباه بود، ادامه نده
-      
-   double level_1_percent = StringToDouble(temp_levels[0]) / 100.0;
-   double level_2_percent = StringToDouble(temp_levels[1]) / 100.0;
-      
-   double price0 = m_child2.GetPrice0();
-   double price100 = m_child2.GetPrice100();
-
-   double price_level_1 = price100 + (price0 - price100) * level_1_percent;
-   double price_level_2 = price100 + (price0 - price100) * level_2_percent;
-      
-   signal.goldenZoneTop = MathMax(price_level_1, price_level_2);
-   signal.goldenZoneBottom = MathMin(price_level_1, price_level_2);
-      
-   // --- حالا بررسی کن آیا قیمت فعلی داخل ناحیه هست تا سیگنال صادر شود ---
-   double current_price = (m_direction == LONG) ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   
-   if(current_price <= signal.goldenZoneTop && current_price >= signal.goldenZoneBottom)
+   // شرط IsSuccessChild2 حذف شد تا برای هر دو نوع فرزند دوم سیگنال بررسی شود
+   if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
    {
-      signal.type = (m_direction == LONG) ? "Buy" : "Sell";
-      signal.id = m_id + "_" + TimeToString(TimeCurrent());
+      string temp_levels[];
+      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+      if(count < 2)
+      {
+         Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone);
+         return signal;
+      }
+      
+      double level_1 = StringToDouble(temp_levels[0]) / 100.0;
+      double level_2 = StringToDouble(temp_levels[1]) / 100.0;
+      
+      if(level_1 >= level_2)
+      {
+         Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone);
+         return signal;
+      }
+      
+      // منطق محاسبه ناحیه طلایی در اینجا هم اصلاح شد
+      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
+      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
+      
+      double zone_lower_bound = MathMin(price_level_1, price_level_2);
+      double zone_upper_bound = MathMax(price_level_1, price_level_2);
+      
+      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      
+      bool in_golden_zone = (current_price >= zone_lower_bound && current_price <= zone_upper_bound);
+                               
+      if(in_golden_zone)
+      {
+         signal.type = m_direction == LONG ? "Buy" : "Sell";
+         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure");
+         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits));
+      }
    }
    
    return signal;
 }
-
 
    bool IsActive()
    {
