@@ -167,14 +167,31 @@ int OnInit()
    }
    
    // ایجاد نمونه موتور اصلی
-   g_engine = new CHipoFino(InpHTF, InpLTF, InpHTFFastEMA, InpHTFSlowEMA, InpHTFSignal,
-                            InpLTFFastEMA, InpLTFSlowEMA, InpLTFSignal, InpRiskPercent,
-                            InpRiskRewardRatio, InpSLBufferPips, InpMagicNumber,
-                            InpUseSessionFilter, InpTokyoSession, InpLondonSession, InpNewYorkSession,
-                            InpCustomSessionStart, InpCustomSessionEnd,
-                            InpStopMethod, InpSarStep, InpSarMaximum, InpMinLookback,
-                            InpMaxLookback, InpFractalBars, InpFractalBufferPips,
-                            InpShowStopLine, InpShowFractals);
+   // در فایل HipoFinoExpert.mq5 - تابع OnInit
+
+// <<<< این خط را جایگزین کنید >>>>
+g_engine = new CHipoFino(
+    // تنظیمات عمومی و مکدی
+    InpHTF, InpLTF,
+    InpHTFFastEMA, InpHTFSlowEMA, InpHTFSignal,
+    InpLTFFastEMA, InpLTFSlowEMA, InpLTFSignal,
+    InpRiskPercent, InpSLBufferPips, InpMagicNumber,
+    // تنظیمات خروج پله‌ای
+    InpUsePartialTP, InpPartialTP_Percentages, InpFixedTP_RR,
+    // تنظیمات تریلینگ استاپ
+    InpUseTrailingStop, InpTrailingActivationRR, InpStopMethod,
+    // تنظیمات فیلتر سشن
+    InpUseSessionFilter, InpTokyoSession, InpLondonSession, InpNewYorkSession,
+    InpCustomSessionStart, InpCustomSessionEnd,
+    // تنظیمات اندیکاتورهای تریلینگ
+    InpSarStep, InpSarMaximum,
+    InpMinLookback, InpMaxLookback,
+    InpFractalBars, InpFractalBufferPips,
+    // تنظیمات نمایش
+    InpShowStopLine, InpShowFractals
+);
+// <<<<ا  >>>>
+
    if(g_engine == NULL || !g_engine.Initialize())
    {
       Print("خطا: راه‌اندازی موتور اصلی ناموفق بود");
