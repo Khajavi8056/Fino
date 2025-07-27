@@ -20,7 +20,7 @@
 #include "HipoCvtChannel.mqh"
 
 //+------------------------------------------------------------------+
-//| ورودی‌های اکسپرت                                                |
+//| ورودی‌های اکسپرت (نسخه بازنویسی شده با گروه‌بندی جدید)            |
 //+------------------------------------------------------------------+
 input group "تنظیمات عمومی"
 input bool InpShowPanel = true;           // نمایش پنل گرافیکی
@@ -28,38 +28,50 @@ input bool InpShowMacd = true;            // نمایش اندیکاتورهای
 input ENUM_TIMEFRAMES InpHTF = PERIOD_H1; // تایم‌فریم مکدی روند (HTF)
 input ENUM_TIMEFRAMES InpLTF = PERIOD_M5; // تایم‌فریم مکدی تریگر (LTF)
 input double InpRiskPercent = 1.0;        // درصد ریسک از موجودی (0.1-10.0)
-input double InpRiskRewardRatio = 2.0;    // نسبت ریسک به ریوارد (1.0-5.0)
 input int InpSLBufferPips = 10;           // بافر حد ضرر (پیپ)
 input long InpMagicNumber = 123456;       // شماره جادویی (Magic Number)
 
 input group "تنظیمات مکدی HTF (روند)"
-input int InpHTFFastEMA = 48;             // دوره سریع EMA (پیش‌فرض: 12 × 4)
-input int InpHTFSlowEMA = 104;            // دوره کند EMA (پیش‌فرض: 26 × 4)
-input int InpHTFSignal = 36;              // دوره سیگنال (پیش‌فرض: 9 × 4)
+input int InpHTFFastEMA = 48;             // دوره سریع EMA
+input int InpHTFSlowEMA = 104;            // دوره کند EMA
+input int InpHTFSignal = 36;              // دوره سیگنال
 
 input group "تنظیمات مکدی LTF (تریگر)"
-input int InpLTFFastEMA = 6;              // دوره سریع EMA (پیش‌فرض: 12 ÷ 2)
-input int InpLTFSlowEMA = 13;             // دوره کند EMA (پیش‌فرض: 26 ÷ 2)
-input int InpLTFSignal = 5;               // دوره سیگنال (پیش‌فرض: 9 ÷ 2)
+input int InpLTFFastEMA = 6;              // دوره سریع EMA
+input int InpLTFSlowEMA = 13;             // دوره کند EMA
+input int InpLTFSignal = 5;               // دوره سیگنال
 
 input group "فیلتر سشن معاملاتی"
-input bool InpUseSessionFilter = false;        // استفاده از فیلتر سشن
+input bool InpUseSessionFilter = false;        // >>> فعال‌سازی فیلتر سشن
 input bool InpTokyoSession = true;            // فعال کردن سشن توکیو
 input bool InpLondonSession = true;           // فعال کردن سشن لندن
 input bool InpNewYorkSession = true;          // فعال کردن سشن نیویورک
 input string InpCustomSessionStart = "00:00"; // ساعت شروع سشن سفارشی (HH:MM)
 input string InpCustomSessionEnd = "23:59";   // ساعت پایان سشن سفارشی (HH:MM)
 
-input group "تنظیمات تریلینگ استاپ"
+// --- گروه جدید برای خروج پله‌ای ---
+input group "مدیریت خروج پله‌ای (Partial TP)"
+input bool InpUsePartialTP = true;             // >>> فعال‌سازی خروج پله‌ای
+input string InpPartialTP_Percentages = "33, 33, 34"; // درصدهای حجم برای ۳ پله خروج (با کاما جدا شود)
+input double InpFixedTP_RR = 2.0;              // نسبت ریسک به ریوارد (برای حالت خروج یکجا)
+
+// --- گروه جدید برای تریلینگ استاپ ---
+input group "مدیریت حد ضرر متحرک (Trailing Stop)"
+input bool InpUseTrailingStop = true;          // >>> فعال‌سازی تریلینگ استاپ
+input double InpTrailingActivationRR = 1.5;    // نسبت ریوارد برای فعال‌سازی تریلینگ
 input ENUM_STOP_METHOD InpStopMethod = STOP_CVT; // روش تریلینگ استاپ
+input bool InpShowStopLine = true;             // نمایش خط استاپ
+input group "   تنظیمات روش SAR"
 input double InpSarStep = 0.02;                // گام SAR
 input double InpSarMaximum = 0.2;              // حداکثر SAR
+input group "   تنظیمات روش CVT Channel"
 input int InpMinLookback = 5;                  // حداقل دوره کانال CVT
 input int InpMaxLookback = 20;                 // حداکثر دوره کانال CVT
+input group "   تنظیمات روش Fractal"
+input bool InpShowFractals = true;             // نمایش فراکتال‌ها (برای حالت بصری)
 input int InpFractalBars = 3;                  // تعداد کندل‌های فراکتال
 input int InpFractalBufferPips = 5;            // بافر فراکتال (پیپ)
-input bool InpShowStopLine = true;             // نمایش خط استاپ
-input bool InpShowFractals = true;             // نمایش فراکتال‌ها
+
 
 //+------------------------------------------------------------------+
 //| متغیرهای سراسری                                                |
