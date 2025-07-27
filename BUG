@@ -1,50 +1,169 @@
-SSignal CFamily::GetSignal() //
+اوکی محمد جان، چشم رفیق! حق با توئه، آزمون و خطا تو بازار مالی و کدنویسی اکسپرت یعنی ضرر و وقت تلف کردن. بیا دقیق و ریزبینانه مشکل رو ریشه‌یابی کنیم و بدون چون و چرا بریم سراغش.
+از لاگ‌هایی که دادی و توضیحاتت، وضعیت اینه:
+ * اکسپرت داره مراحل تحلیل فیبوناچی رو درست میره:
+   * [cite_start]مادر متولد میشه و فیکس میشه.
+   * [cite_start]فرزند اول متولد میشه و فیکس میشه.
+   * [cite_start]فرزند دوم متولد میشه و وارد "ناحیه طلایی" میشه.
+   * [cite_start]اینجا لاگ می‌خوره: "فرزند دوم وارد ناحیه طلایی شد".
+   * [cite_start]بلافاصله بعدش لاگ می‌خوره: "ساختار با ورود به ناحیه طلایی کامل شد.".
+ * [cite_start]اینجای کاره که گره می‌خوره: "هیچ لاگی از ارسال معامله نیست". [cite_start]نه لاگ موفقیت‌آمیز معامله باز شد هست، نه لاگ خطا خطا در ارسال معامله.
+خب، با این تفاسیر، سناریوی دقیق اشکال اینه:
+ * تولید سیگنال از دست می‌رود:
+   * [cite_start]کلاس CFamily مسئول مدیریت ساختار فیبوناچیه و وقتی فرزند دوم وارد ناحیه طلایی میشه، CFamily::CheckSuccessChild2 مقدار true رو برمی‌گردونه.
+   * [cite_start]در CFamily::UpdateOnTick[cite_start]، وقتی m_child2.CheckSuccessChild2(current_price) [cite_start]مقدار true برگردونه، بلافاصله وضعیت (m_state) خانواده به COMPLETED تغییر می‌کنه. این لاگ "ساختار با ورود به ناحیه طلایی کامل شد." [cite_start]هم دقیقا به همین خاطر نمایش داده میشه.
+   * [cite_start]حالا، تابع CFamily::GetSignal() [cite_start](که اکسپرت ازش سیگنال می‌گیره) یه شرطی داره که میگه: if(m_state == CHILD2_ACTIVE && m_child2 != NULL).
+   * [cite_start]مشکل اینجاست که وقتی CFamily::GetSignal() در تیک بعدی صدا زده میشه، m_state دیگه CHILD2_ACTIVE نیست، چون تو تیک قبلی (یا حتی تو همون تیک اگر ترتیب اجرا سریع باشه) به COMPLETED تغییر کرده.
+   * پس، HFiboGetSignal() همیشه یه سیگنال خالی (signal.id = "") برمی‌گردونه و اکسپرت هیچوقت سیگنال Buy یا Sell رو دریافت نمی‌کنه تا SendTrade رو صدا بزنه.
+راه حل دقیق و هدفمند:
+برای اینکه این مشکل حل بشه، باید ترتیب تغییر وضعیت m_state به COMPLETED رو عوض کنیم. نباید به محض ورود به ناحیه طلایی، ساختار رو COMPLETED اعلام کنیم. این کار باید بعد از اینکه اکسپرت سیگنال رو گرفت و معامله رو با موفقیت ارسال کرد انجام بشه.
+این تغییرات رو قدم به قدم تو کد HipoFibonacci.mqh انجام بده:
+قدم 1: اصلاح CFamily::UpdateOnTick
+[cite_start]تابع CFamily::UpdateOnTick رو در فایل HipoFibonacci.mqh پیدا کن.
+[cite_start]داخل بلوک else if(m_state == CHILD2_ACTIVE)، قسمتی که m_child2.CheckSuccessChild2(current_price) رو چک می‌کنی:
+کد فعلی (قسمت مربوطه):
+         if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
+         {
+            if(m_child2.CheckSuccessChild2(current_price))
+            {
+               m_state = COMPLETED; // 👈 این خط مشکل‌ساز است
+               Log("ساختار با ورود به ناحیه طلایی کامل شد."); // 👈 این لاگ هم باید جابجا شود
+               return true; // 👈 این return هم باید جابجا شود
+           }
+         }
+
+کد اصلاح شده (جایگزین کن):
+         if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
+         {
+            if(m_child2.CheckSuccessChild2(current_price))
+            {
+               // m_state = COMPLETED; // 👈 این خط رو حذف کن
+               // Log("ساختار با ورود به ناحیه طلایی کامل شد."); // 👈 این لاگ رو هم حذف کن
+               // return true; // 👈 این return رو هم حذف کن
+               
+               // نیازی به تغییر وضعیت در اینجا نیست، چون سیگنال باید یک مرحله جلوتر دریافت شود.
+               // فقط اطمینان حاصل میکنیم که متد CheckSuccessChild2 سیگنال را آماده کرده است.
+               Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time) + " (سیگنال آماده)"); // 👈 این لاگ رو اینجا بزار
+            }
+         }
+
+توضیح: ما دیگه در این مرحله m_state رو به COMPLETED تغییر نمی‌دیم. فقط لاگ می‌زنیم که سیگنال آماده هست.
+قدم 2: اصلاح CFamily::GetSignal()
+[cite_start]تابع CFamily::GetSignal() رو در فایل HipoFibonacci.mqh پیدا کن.
+اینجا باید m_state رو به COMPLETED تغییر بدیم، اما فقط پس از اینکه سیگنال واقعاً تولید شد.
+کد فعلی (قسمت مربوطه):
+SSignal CFamily::GetSignal()
+{
+   SSignal signal = {"", ""};
+   
+   if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
+   {
+      // ... منطق محاسبه ناحیه طلایی ...
+      if(in_golden_zone)
+      {
+         signal.type = m_direction == LONG ? "Buy" : "Sell";
+         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure");
+         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits));
+         // m_state = COMPLETED; // 👈 این خط رو اینجا گذاشتی ولی باید منتقل بشه پایین تر
+      }
+   }
+   
+   return signal;
+}
+
+کد اصلاح شده (جایگزین کن):
+SSignal CFamily::GetSignal()
 {
    SSignal signal = {"", ""};
    
    // سیگنال فقط وقتی صادر میشه که در حالت CHILD2_ACTIVE باشیم
-   // و تازه وارد ناحیه طلایی شده باشیم.
-   // و هنوز سیگنالی از این فاز صادر نکرده باشیم.
-   if(m_state == CHILD2_ACTIVE && m_child2 != NULL) //
+   // و سیگنال واقعاً در ناحیه طلایی باشه (این شرط در CheckSuccessChild2 چک شده)
+   // اما از این تابع (GetSignal) فقط یکبار سیگنال صادر شود.
+   // ما فقط یکبار سیگنال می‌دهیم، بعد از آن وضعیت را به COMPLETED تغییر می‌دهیم.
+   if(m_state == CHILD2_ACTIVE && m_child2 != NULL) // 👈 شرط اولیه باقی می ماند
    {
-      string temp_levels[]; //
-      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels); //
-      if(count < 2) //
+      string temp_levels[];
+      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+      if(count < 2)
       {
-         Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone); //
-         return signal; //
+         Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone);
+         return signal;
       }
       
-      double level_1 = StringToDouble(temp_levels[0]) / 100.0; //
-      double level_2 = StringToDouble(temp_levels[1]) / 100.0; //
+      double level_1 = StringToDouble(temp_levels[0]) / 100.0;
+      double level_2 = StringToDouble(temp_levels[1]) / 100.0;
       
-      if(level_1 >= level_2) //
+      if(level_1 >= level_2)
       {
-         Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone); //
-         return signal; //
+         Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone);
+         return signal;
       }
       
-      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1; //
-      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2; //
+      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
+      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
       
-      double zone_lower_bound = MathMin(price_level_1, price_level_2); //
-      double zone_upper_bound = MathMax(price_level_1, price_level_2); //
+      double zone_lower_bound = MathMin(price_level_1, price_level_2);
+      double zone_upper_bound = MathMax(price_level_1, price_level_2);
       
-      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID); //
+      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
       
-      bool in_golden_zone = (current_price >= zone_lower_bound && current_price <= zone_upper_bound); //
+      bool in_golden_zone = (current_price >= zone_lower_bound && current_price <= zone_upper_bound);
                                
-      if(in_golden_zone) //
+      if(in_golden_zone)
       {
-         signal.type = m_direction == LONG ? "Buy" : "Sell"; //
-         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure"); //
-         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits)); //
+         signal.type = m_direction == LONG ? "Buy" : "Sell";
+         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure");
+         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits));
          
          // حالا که سیگنال رو صادر کردیم، وضعیت رو به COMPLETED تغییر میدیم.
          // این باعث میشه دفعه بعد دیگه این سیگنال صادر نشه.
-         m_state = COMPLETED; // 👈 این خط الان اینجاست!
+         m_state = COMPLETED; // 👈 این خط به جای قبلی بیاد
+         Log("ساختار با ورود به ناحیه طلایی کامل شد و سیگنال صادر گردید."); // 👈 لاگ جدید
       }
    }
    
-   return signal; //
+   return signal;
 }
+
+توضیح: با این تغییر، m_state فقط بعد از اینکه سیگنال id رو مقداردهی کردیم و لاگ "سیگنال صادر شد" رو زدیم به COMPLETED تغییر می‌کنه. این تضمین می‌کنه که اکسپرت حتماً سیگنال رو دریافت می‌کنه.
+قدم 3: بررسی CHipoFino::OnTick
+[cite_start]داخل CHipoFino::OnTick[cite_start]، تو حالت HIPO_WAITING_FOR_HIPO:
+         case HIPO_WAITING_FOR_HIPO:
+         {
+            // ... (چک کردن معکوس شدن روند و تخریب ساختار) ...
+            else
+            {
+               SSignal signal = HFiboGetSignal();
+               Log("وضعیت سیگنال دریافتی: ID=" + signal.id + ", Type=" + signal.type); // 👈 این لاگ رو اضافه کن برای دیباگ
+               if(signal.id != "")
+               {
+                  double mother_zero = HFiboGetMotherZeroPoint();
+                  double entry_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+                  double sl_price = (signal.type == "Buy") ? mother_zero - m_sl_buffer_pips * _Point :
+                                                           mother_zero + m_sl_buffer_pips * _Point;
+                  if(SendTrade(signal, entry_price, sl_price))
+                  {
+                     m_state = HIPO_MANAGING_POSITION;
+                     Log("وارد حالت مدیریت معامله شد");
+                     HFiboAcknowledgeSignal(signal.id); // 👈 مطمئن شو که این خط صدا زده میشه تا ساختار پاک بشه
+                  }
+                  else
+                  {
+                     // اگر ارسال معامله با خطا مواجه شد، ساختار رو متوقف کن
+                     HFiboStopCurrentStructure();
+                     m_state = HIPO_IDLE;
+                     Log("خطا در ارسال معامله، بازگشت به حالت بیکار");
+                  }
+               }
+            }
+            break;
+         }
+
+توضیح: لاگ "وضعیت سیگنال دریافتی" بهت کمک می‌کنه مطمئن بشی HFiboGetSignal() واقعا id غیرخالی برمی‌گردونه. خط HFiboAcknowledgeSignal(signal.id); هم مهمه تا بعد از ارسال موفق معامله، CStructureManager بفهمه که اون ساختار فیبوناچی دیگه نیازی نیست و می‌تونه پاکش کنه.
+بعد از اعمال این تغییرات:
+ * دوباره اکسپرت رو کامپایل کن.
+ * تو تست‌کننده (Strategy Tester) متاتریدر ۵، دوباره اجراش کن.
+ * خیلی دقیق لاگ‌ها رو چک کن.
+   * ببین آیا وضعیت سیگنال دریافتی: ID=... رو میبینی و آیا IDاش خالی نیست؟
+   * ببین آیا بعدش معامله باز شد: تیکت=... رو میبینی؟
+   * اگر معامله باز شد رو ندیدی، اما خطا در ارسال معامله رو دیدی، اون خطا رو بهم بگو (شماره خطا و پیامش).
+این بار باید دقیقاً مشکل مشخص بشه. منتظر لاگ‌های جدیدت هستم، محمد جان! 💪
