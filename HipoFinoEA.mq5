@@ -24,19 +24,19 @@
 //+------------------------------------------------------------------+
 input group "تنظیمات عمومی"
 input bool InpShowPanel = true;           // نمایش پنل گرافیکی
-input bool InpShowMacd = true;            // نمایش اندیکاتورهای مکدی
+/*input*/ bool InpShowMacd = false;            // نمایش اندیکاتورهای مکدی
 input ENUM_TIMEFRAMES InpHTF = PERIOD_H1; // تایم‌فریم مکدی روند (HTF)
 input ENUM_TIMEFRAMES InpLTF = PERIOD_M5; // تایم‌فریم مکدی تریگر (LTF)
 input double InpRiskPercent = 1.0;        // درصد ریسک از موجودی (0.1-10.0)
 input int InpSLBufferPips = 10;           // بافر حد ضرر (پیپ)
 input long InpMagicNumber = 123456;       // شماره جادویی (Magic Number)
 
-input group "تنظیمات مکدی HTF (روند)"
+input group " HTF (روند)"
 input int InpHTFFastEMA = 48;             // دوره سریع EMA
 input int InpHTFSlowEMA = 104;            // دوره کند EMA
 input int InpHTFSignal = 36;              // دوره سیگنال
 
-input group "تنظیمات مکدی LTF (تریگر)"
+input group "  LTF (تریگر)"
 input int InpLTFFastEMA = 6;              // دوره سریع EMA
 input int InpLTFSlowEMA = 13;             // دوره کند EMA
 input int InpLTFSignal = 5;               // دوره سیگنال
