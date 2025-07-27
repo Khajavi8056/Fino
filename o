@@ -1,173 +1,106 @@
-حتماً. این شما و این هم نقشه کامل و یکپارچه تمام تغییراتی که با هم به نتیجه رساندیم. تمام فایل‌هایی که نیاز به تغییر دارند رو به طور کامل برات بازنویسی کردم.
-کافیه محتوای هر فایل رو با کدی که در بخش مربوط به خودش قرار دادم، به طور کامل جایگزین کنی.
-## قدم اول: ارتقاء HipoCvtChannel.mqh (مخفی کردن ATR)
-فایل: HipoCvtChannel.mqh
-در تابع Initialize()، بخشی که هندل ATR گرفته می‌شود را با کد زیر جایگزین کن تا اندیکاتور از روی چارت مخفی شود.
-کد جدید و اصلاح شده برای تابع Initialize در این فایل:
-//+------------------------------------------------------------------+
-//| تابع راه‌اندازی                                              |
-//+------------------------------------------------------------------+
-bool Initialize()
+اوکی رفیق. کاملاً متوجه شدم. توضیحات قبلی من زیادی پیچیده بود. عذر می‌خوام. بیا از اول و خیلی ساده و شفاف، دقیقاً طبق چیزی که تو می‌خوای جلو بریم.
+نقشه ما اینه:
+ * تابع HFiboGetSignal رو نگه می‌داریم، اسمش عوض نمیشه.
+ * همین تابع رو آپدیت می‌کنیم تا علاوه بر سیگنال، اطلاعات ناحیه طلایی و نقطه صفر مادر رو هم به ما بده.
+ * تصمیم نهایی برای ورود (بعد از چک کردن کراس مووینگ) در HipoFino گرفته میشه.
+این راهنمای دقیق و قدم به قدم برای پیاده‌سازی این منطقه.
+## قدم اول: ارتقاء کتابخانه HipoFibonacci.mqh
+اینجا باید دو بخش رو تغییر بدیم.
+الف) تغییر ساختار SSignal
+اول باید ساختار SSignal رو آپدیت کنیم تا بتونه اطلاعات جدید رو هم داخل خودش نگه داره.
+ * فایل: HipoFibonacci.mqh
+ * مکان: حدوداً خط ۱۴۰، بالای تعریف کلاس CFractalFinder.
+این کد رو پیدا کن:
+struct SSignal
 {
-   if(m_stop_method == STOP_SAR || m_stop_method == STOP_CVT)
-   {
-      m_sar_handle = iSAR(_Symbol, PERIOD_CURRENT, m_sar_step, m_sar_maximum);
-      if(m_sar_handle == INVALID_HANDLE)
-      {
-         Log("خطا: ایجاد هندل SAR ناموفق بود");
-         return false;
-      }
-   }
-   if(m_stop_method == STOP_CVT)
-   {
-      m_atr_handle = iATR(_Symbol, PERIOD_CURRENT, 14);
-      if(m_atr_handle == INVALID_HANDLE)
-      {
-         Log("خطا: ایجاد هندل ATR ناموفق بود");
-         return false;
-      }
-      
-      // --- بخش جدید برای مخفی کردن اندیکاتور از چارت ---
-      string atr_indicator_name = IndicatorName(m_atr_handle);
-      int window_index = ChartWindowFind(0, atr_indicator_name);
-      if(window_index > 0) // فقط اگر در پنجره جداگانه بود حذف کن
-      {
-         ChartIndicatorDelete(0, window_index, atr_indicator_name);
-      }
-      // ---------------------------------------------------
-   }
-   Log("تریلینگ استاپ با موفقیت راه‌اندازی شد");
-   return true;
-}
+   string type;    // "Buy" یا "Sell"
+   string id;      // شناسه منحصربه‌فرد
+};
 
-## قدم دوم: بازنویسی کتابخانه HipoFibonacci.mqh
-در این کتابخانه، ساختار سیگنال‌دهی به کل تغییر کرده است. به جای ارسال سیگنال، حالا اطلاعات ناحیه طلایی و نقطه ابطال را در اختیار موتور اصلی قرار می‌دهد. کل محتوای فایل HipoFibonacci.mqh را پاک کرده و با کد زیر جایگزین کن.
-کد کامل و جدید فایل HipoFibonacci.mqh:
-//+------------------------------------------------------------------+
-//|                                                  HipoFibonacci.mqh |
-//|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه ۲.۰.۰ (معماری جدید)             |
-//| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
-//+------------------------------------------------------------------+
-
-#property copyright "Hipo Algorithm"
-#property link      "https://hipoalgorithm.com"
-#property version   "2.0.0"
-
-// --- ساختار جدید برای بسته‌بندی داده‌های خروجی ---
-struct HipoFiboData
+و با کد جدید زیر جایگزینش کن:
+// ساختار جدید و کامل‌تر SSignal
+struct SSignal
 {
-   bool   isZoneActive;        // آیا ناحیه طلایی فعال است؟
+   string type;                // "Buy" یا "Sell" (فقط وقتی سیگنال هست پر میشه)
+   string id;                  // شناسه منحصربه‌فرد (فقط وقتی سیگنال هست پر میشه)
+   
+   // --- بخش جدید ---
+   bool   isStructureActive;   // آیا ساختار فیبوناچی معتبری فعال است؟
    double goldenZoneTop;       // سقف ناحیه طلایی
    double goldenZoneBottom;    // کف ناحیه طلایی
    double motherAnchorPrice;   // قیمت نقطه صفر مادر (نقطه ابطال)
 };
 
-
-// ... (بقیه توابع و کلاس‌های فایل مثل CBaseFibo, CMotherFibo, CChildFibo و غیره بدون تغییر باقی می‌مانند، فقط تغییرات اصلی در CFamily و توابع سراسری است)
-// ... (برای جلوگیری از طولانی شدن بیش از حد، فقط بخش‌های تغییر یافته نمایش داده می‌شوند، اما در پیاده‌سازی نهایی، کل فایل باید بازنویسی شود)
-
-// --- در کلاس CFamily، متد GetSignal حذف و متد زیر جایگزین می‌شود ---
-class CFamily
-{
-// ... سایر متدها
-public:
-   // ...
-   bool GetActiveStructureData(HipoFiboData &data)
-   {
-      // مقداردهی اولیه
-      data.isZoneActive = false;
-      data.goldenZoneTop = 0;
-      data.goldenZoneBottom = 0;
-      data.motherAnchorPrice = 0;
-
-      if(m_mother != NULL)
-      {
-         data.motherAnchorPrice = m_mother.GetPrice0();
-      }
-
-      // فقط در صورتی که فرزند دوم فعال باشد، مرزهای ناحیه طلایی را محاسبه کن
-      if(m_state != CHILD2_ACTIVE || m_child2 == NULL)
-      {
-         return false; // هنوز ناحیه طلایی فعال نیست
-      }
-      
-      data.isZoneActive = true;
-      
-      // --- منطق محاسبه مرزها ---
-      string temp_levels[];
-      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
-      if(count < 2) return false;
-         
-      double level_1_percent = StringToDouble(temp_levels[0]) / 100.0;
-      double level_2_percent = StringToDouble(temp_levels[1]) / 100.0;
-         
-      double price0 = m_child2.GetPrice0();
-      double price100 = m_child2.GetPrice100();
-
-      double price_level_1 = price100 + (price0 - price100) * level_1_percent;
-      double price_level_2 = price100 + (price0 - price100) * level_2_percent;
-         
-      data.goldenZoneTop = MathMax(price_level_1, price_level_2);
-      data.goldenZoneBottom = MathMin(price_level_1, price_level_2);
-         
-      return true;
-   }
-   // ...
-};
-
-// --- در انتهای فایل، توابع سراسری زیر جایگزین یا اضافه می‌شوند ---
-
-// تابع HFiboGetSignal حذف می‌شود.
-
-// تابع جدید برای دریافت داده‌های ساختار
-bool HFiboGetActiveStructureData(HipoFiboData &data)
-{
-   if(g_manager != NULL && g_manager.GetActiveFamiliesCount() > 0)
-   {
-      // فرض بر این است که فقط یک ساختار فعال داریم
-      return g_manager.m_families[0].GetActiveStructureData(data);
-   }
-   return false;
-}
-
-// این تابع بدون تغییر باقی می‌ماند
-bool HFiboIsStructureBroken()
-{
-   if(g_manager != NULL && g_manager.GetActiveFamiliesCount() == 0)
-   {
-      return true;
-   }
-   return false;
-}
-
-توجه: برای سادگی، فقط بخش‌های کلیدی تغییر یافته در HipoFibonacci.mqh نمایش داده شد. شما باید متد GetSignal را از کلاس CFamily و تابع سراسری HFiboGetSignal را حذف کرده و متد و تابع جدید GetActiveStructureData را اضافه کنید.
-## قدم سوم: بازنویسی کتابخانه HipoFino.mqh
-اینجا موتور اصلی برای استفاده از معماری جدید و منطق "کراس تایید" بازنویسی می‌شود. کل محتوای فایل HipoFino.mqh را پاک کرده و با کد زیر جایگزین کن.
-کد کامل و جدید فایل HipoFino.mqh:
+ب) بازنویسی کامل متد CFamily::GetSignal
+حالا باید متد اصلی که این ساختار رو پر می‌کنه رو بازنویسی کنیم. این متد الان خیلی هوشمندتر میشه.
+ * فایل: HipoFibonacci.mqh
+ * مکان: داخل کلاس CFamily (حدوداً خط ۱۲۹۰).
+کل متد GetSignal فعلی رو پاک کن و کد کامل زیر رو به جاش قرار بده:
 //+------------------------------------------------------------------+
-//|                                                    HipoFino.mqh  |
-//|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۲.۰.۰ (معماری جدید)             |
-//| موتور اصلی اکسپرت HipoFino با مدیریت معامله پیشرفته      |
+//| CFamily::GetSignal (نسخه جدید با ارسال کامل داده‌ها)
 //+------------------------------------------------------------------+
-
-#ifndef HIPO_FINO_MQH
-#define HIPO_FINO_MQH
-
-#include <Trade\Trade.mqh>
-#include <HipoFibonacci.mqh> // باید نسخه آپدیت شده باشد
-#include "HipoDashboard.mqh"
-#include "HipoMomentumFractals.mqh"
-#include "HipoCvtChannel.mqh"
-
-// ... (بقیه ساختارها و تعاریف کلاس مثل قبل)
-
-class CHipoFino
+SSignal GetSignal()
 {
-private:
-   // ... (تمام متغیرهای خصوصی مثل قبل)
+   SSignal signal;
+   // مقداردهی اولیه به مقادیر پیش‌فرض
+   signal.type = "";
+   signal.id = "";
+   signal.isStructureActive = false;
+   signal.goldenZoneTop = 0;
+   signal.goldenZoneBottom = 0;
+   signal.motherAnchorPrice = 0;
+
+   // اگر ساختار معتبر نیست، یک سیگنال خالی برگردان
+   if(m_state == FAILED || m_state == COMPLETED || m_mother == NULL)
+      return signal;
+
+   // اگر ساختار معتبر است، اطلاعات پایه را پر کن
+   signal.isStructureActive = true;
+   signal.motherAnchorPrice = m_mother.GetPrice0();
+
+   // اگر هنوز به ناحیه طلایی نرسیده‌ایم، فقط اطلاعات پایه را برگردان
+   if(m_state != CHILD2_ACTIVE || m_child2 == NULL)
+      return signal;
    
+   // --- اینجا یعنی به ناحیه طلایی رسیده‌ایم، پس مرزها را محاسبه کن ---
+   string temp_levels[];
+   if(StringSplit(InpGoldenZone, ',', temp_levels) < 2)
+      return signal; // اگر تنظیمات ناحیه طلایی اشتباه بود، ادامه نده
+      
+   double level_1_percent = StringToDouble(temp_levels[0]) / 100.0;
+   double level_2_percent = StringToDouble(temp_levels[1]) / 100.0;
+      
+   double price0 = m_child2.GetPrice0();
+   double price100 = m_child2.GetPrice100();
+
+   double price_level_1 = price100 + (price0 - price100) * level_1_percent;
+   double price_level_2 = price100 + (price0 - price100) * level_2_percent;
+      
+   signal.goldenZoneTop = MathMax(price_level_1, price_level_2);
+   signal.goldenZoneBottom = MathMin(price_level_1, price_level_2);
+      
+   // --- حالا بررسی کن آیا قیمت فعلی داخل ناحیه هست تا سیگنال صادر شود ---
+   double current_price = (m_direction == LONG) ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   
+   if(current_price <= signal.goldenZoneTop && current_price >= signal.goldenZoneBottom)
+   {
+      signal.type = (m_direction == LONG) ? "Buy" : "Sell";
+      signal.id = m_id + "_" + TimeToString(TimeCurrent());
+   }
+   
+   return signal;
+}
+
+## قدم دوم: ارتقاء کتابخانه HipoFino.mqh
+حالا باید موتور اصلی رو آپدیت کنیم تا بتونه با گزارش‌های جدید و کامل HipoFibonacci کار کنه.
+الف) افزودن تابع کمکی CheckConfirmationCross
+این تابع رو برای بررسی کراس مووینگ‌ها به کلاس CHipoFino اضافه می‌کنیم.
+ * فایل: HipoFino.mqh
+ * مکان: داخل کلاس CHipoFino، در بخش private (مثلاً حدوداً خط ۳۵۰).
+این کد کامل رو در اونجا قرار بده:
+private:
+   // ... (سایر متغیرهای خصوصی)
+
    // --- تابع جدید برای تایید کراس ---
    bool CheckConfirmationCross(ENUM_DIRECTION direction, int fast_period, int slow_period)
    {
@@ -197,116 +130,74 @@ private:
       return false;
    }
 
-public:
-   // ... (سازنده و سایر توابع عمومی مثل قبل)
-
-   // --- بازنویسی کامل تابع OnTick ---
-   void OnTick()
+ب) بازنویسی منطق تصمیم‌گیری در OnTick
+این آخرین و مهم‌ترین مرحله است. باید بخش HIPO_WAITING_FOR_HIPO رو با منطق جدید جایگزین کنیم.
+ * فایل: HipoFino.mqh
+ * مکان: داخل تابع OnTick، case HIPO_WAITING_FOR_HIPO: (حدوداً خط ۶۰۰).
+کل case HIPO_WAITING_FOR_HIPO: فعلی رو پاک کن و کد کامل زیر رو به جاش قرار بده:
+case HIPO_WAITING_FOR_HIPO:
+{
+   // شرایط اضطراری مثل قبل باقی می‌مانند
+   if((m_active_direction == LONG && htf_bias == MACD_BEARISH) ||
+      (m_active_direction == SHORT && htf_bias == MACD_BULLISH))
    {
-      if(TimeCurrent() - m_last_flush_time >= 5) FlushLog();
-      
-      bool new_ltf_candle = IsNewCandle(m_ltf, m_candle_times.ltf_last_candle);
-      if(IsNewCandle(m_htf, m_candle_times.htf_last_candle) || new_ltf_candle)
+      HFiboStopCurrentStructure();
+      m_state = HIPO_IDLE;
+      Log("روند HTF معکوس شد، ساختار متوقف شد");
+      break;
+   }
+
+   // --- منطق جدید و هوشمند ---
+   SSignal signal = HFiboGetSignal();
+
+   // ۱. آیا اصلاً ساختار فعالی وجود دارد؟
+   if(!signal.isStructureActive)
+   {
+      // اگر ساختار به هر دلیلی (مثل فیل شدن) از بین رفته بود
+      if(HFiboIsStructureBroken())
       {
-         HFiboOnNewBar();
-         if(m_fractals != NULL) m_fractals.Calculate();
+         HFiboStopCurrentStructure();
+         m_state = HIPO_IDLE;
+         Log("ساختار فیبوناچی تخریب شد، بازگشت به حالت بیکار");
       }
-      
-      ENUM_MACD_BIAS htf_bias = GetMacdBias(m_htf_macd_handle, m_htf);
-      ENUM_MACD_BIAS ltf_bias = GetMacdBias(m_ltf_macd_handle, m_ltf);
-      if(g_dashboard != NULL) g_dashboard.UpdateMacdBias(htf_bias, ltf_bias, m_state);
-      
-      switch(m_state)
+      break;
+   }
+
+   // ۲. فیلتر ایمنی: آیا قیمت از نقطه ابطال عبور کرده؟
+   double current_price_ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double current_price_bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   if((m_active_direction == LONG && current_price_bid < signal.motherAnchorPrice) ||
+      (m_active_direction == SHORT && current_price_ask > signal.motherAnchorPrice))
+   {
+      Log("نقطه ابطال ساختار (لنگرگاه مادر) زده شد. ساختار فیل شد.");
+      HFiboStopCurrentStructure();
+      m_state = HIPO_IDLE;
+      break;
+   }
+   
+   // ۳. آیا سیگنال ورود (قرار گرفتن در ناحیه طلایی) صادر شده؟
+   if(signal.id != "")
+   {
+      // ۴. اگر بله، حالا فیلتر کراس مووینگ را بررسی کن
+      if(CheckConfirmationCross(m_active_direction, 5, 8))
       {
-         case HIPO_IDLE:
+         double entry_price = (signal.type == "Buy") ? current_price_ask : current_price_bid;
+         double sl_price = (signal.type == "Buy") ? signal.motherAnchorPrice - m_sl_buffer_pips * _Point :
+                                                     signal.motherAnchorPrice + m_sl_buffer_pips * _Point;
+
+         if(SendTrade(signal, entry_price, sl_price))
          {
-            if(!IsSessionActive()) return;
-            if((htf_bias == MACD_BULLISH && ltf_bias == MACD_BULLISH) ||
-               (htf_bias == MACD_BEARISH && ltf_bias == MACD_BEARISH))
-            {
-               HFiboStopCurrentStructure(); 
-               ENUM_DIRECTION direction = (htf_bias == MACD_BULLISH) ? LONG : SHORT;
-               if(HFiboCreateNewStructure(direction))
-               {
-                  m_active_direction = direction;
-                  m_state = HIPO_WAITING_FOR_HIPO;
-                  Log("دستور ایجاد ساختار جدید ارسال شد: " + (direction == LONG ? "خرید" : "فروش"));
-               }
-            }
-            break;
+            m_state = HIPO_MANAGING_POSITION;
+            Log("وارد حالت مدیریت معامله شد (با تایید کراس)");
          }
-         
-         case HIPO_WAITING_FOR_HIPO:
+         else
          {
-            if((m_active_direction == LONG && htf_bias == MACD_BEARISH) ||
-               (m_active_direction == SHORT && htf_bias == MACD_BULLISH))
-            {
-               HFiboStopCurrentStructure();
-               m_state = HIPO_IDLE;
-               Log("روند HTF معکوس شد، ساختار متوقف شد");
-               break;
-            }
-            
-            HipoFiboData fiboData;
-            if(HFiboGetActiveStructureData(fiboData))
-            {
-               double current_price_ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-               double current_price_bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-               double entry_price = (m_active_direction == LONG) ? current_price_ask : current_price_bid;
-
-               // فیلتر ایمنی: آیا قیمت از نقطه ابطال عبور کرده؟
-               if((m_active_direction == LONG && current_price_bid < fiboData.motherAnchorPrice) ||
-                  (m_active_direction == SHORT && current_price_ask > fiboData.motherAnchorPrice))
-               {
-                  Log("نقطه ابطال ساختار زده شد. ساختار فیل شد.");
-                  HFiboStopCurrentStructure();
-                  m_state = HIPO_IDLE;
-                  break;
-               }
-
-               // آیا قیمت داخل ناحیه طلایی است؟
-               if(entry_price <= fiboData.goldenZoneTop && entry_price >= fiboData.goldenZoneBottom)
-               {
-                  // اگر بله، آیا کراس تایید رخ داده؟
-                  if(CheckConfirmationCross(m_active_direction, 5, 8))
-                  {
-                     double sl_price = (m_active_direction == LONG) ? fiboData.motherAnchorPrice - m_sl_buffer_pips * _Point :
-                                                                    fiboData.motherAnchorPrice + m_sl_buffer_pips * _Point;
-                     
-                     SSignal final_signal = {(m_active_direction == LONG ? "Buy" : "Sell"), "ConfirmedCross"};
-
-                     if(SendTrade(final_signal, entry_price, sl_price))
-                     {
-                        m_state = HIPO_MANAGING_POSITION;
-                        Log("وارد حالت مدیریت معامله شد (با تایید کراس)");
-                     }
-                     else
-                     {
-                        HFiboStopCurrentStructure();
-                        m_state = HIPO_IDLE;
-                     }
-                  }
-               }
-            }
-            else if(HFiboIsStructureBroken())
-            {
-               HFiboStopCurrentStructure();
-               m_state = HIPO_IDLE;
-               Log("ساختار فیبوناچی تخریب شد، بازگشت به حالت بیکار");
-            }
-            break;
-         }
-         
-         case HIPO_MANAGING_POSITION:
-         {
-            // این بخش بدون تغییر باقی می‌ماند
-            // ...
-            break;
+            HFiboStopCurrentStructure();
+            m_state = HIPO_IDLE;
          }
       }
    }
-};
+   break;
+}
 
-#endif
-
-با این سه قدم، کل سیستم بر اساس معماری نهایی و هوشمندی که بهش رسیدیم آپدیت میشه. حالا سیستمت هم چارت تمیزی داره و هم یک منطق ورود بسیار دقیق و کنترل شده.
+با انجام این تغییرات، سیستمت دقیقاً همونطور که می‌خواستی کار می‌کنه. HipoFibonacci اطلاعات کامل رو میده و HipoFino با اون اطلاعات و فیلتر خودش، تصمیم نهایی رو می‌گیره.
