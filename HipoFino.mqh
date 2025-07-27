@@ -347,6 +347,33 @@ private:
       for(int i=1; i<=3; i++) 
          ObjectDelete(0, "TP_Level_" + (string)m_magic_number + "_" + IntegerToString(i));
    }
+ bool CheckConfirmationCross(ENUM_DIRECTION direction, int fast_period, int slow_period)
+   {
+      double fast_ma[2];
+      double slow_ma[2];
+
+      int fast_ma_handle = iMA(_Symbol, PERIOD_CURRENT, fast_period, 0, MODE_EMA, PRICE_CLOSE);
+      int slow_ma_handle = iMA(_Symbol, PERIOD_CURRENT, slow_period, 0, MODE_EMA, PRICE_CLOSE);
+
+      if(CopyBuffer(fast_ma_handle, 0, 1, 2, fast_ma) < 2) return false;
+      if(CopyBuffer(slow_ma_handle, 0, 1, 2, slow_ma) < 2) return false;
+      
+      // ایندکس 0 => کندل شیفت 1 (کندل قبلی)
+      // ایندکس 1 => کندل شیفت 2 (دو کندل قبل)
+      
+      if(direction == LONG)
+      {
+         if(fast_ma[1] < slow_ma[1] && fast_ma[0] > slow_ma[0])
+            return true;
+      }
+      else // SHORT
+      {
+         if(fast_ma[1] > slow_ma[1] && fast_ma[0] < slow_ma[0])
+            return true;
+      }
+      
+      return false;
+   }
 
 public:
    //+------------------------------------------------------------------+
@@ -571,45 +598,70 @@ public:
             break;
          }
          
-         case HIPO_WAITING_FOR_HIPO:
+   case HIPO_WAITING_FOR_HIPO:
+{
+   // شرایط اضطراری مثل قبل باقی می‌مانند
+   if((m_active_direction == LONG && htf_bias == MACD_BEARISH) ||
+      (m_active_direction == SHORT && htf_bias == MACD_BULLISH))
+   {
+      HFiboStopCurrentStructure();
+      m_state = HIPO_IDLE;
+      Log("روند HTF معکوس شد، ساختار متوقف شد");
+      break;
+   }
+
+   // --- منطق جدید و هوشمند ---
+   SSignal signal = HFiboGetSignal();
+
+   // ۱. آیا اصلاً ساختار فعالی وجود دارد؟
+   if(!signal.isStructureActive)
+   {
+      // اگر ساختار به هر دلیلی (مثل فیل شدن) از بین رفته بود
+      if(HFiboIsStructureBroken())
+      {
+         HFiboStopCurrentStructure();
+         m_state = HIPO_IDLE;
+         Log("ساختار فیبوناچی تخریب شد، بازگشت به حالت بیکار");
+      }
+      break;
+   }
+
+   // ۲. فیلتر ایمنی: آیا قیمت از نقطه ابطال عبور کرده؟
+   double current_price_ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double current_price_bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   if((m_active_direction == LONG && current_price_bid < signal.motherAnchorPrice) ||
+      (m_active_direction == SHORT && current_price_ask > signal.motherAnchorPrice))
+   {
+      Log("نقطه ابطال ساختار (لنگرگاه مادر) زده شد. ساختار فیل شد.");
+      HFiboStopCurrentStructure();
+      m_state = HIPO_IDLE;
+      break;
+   }
+   
+   // ۳. آیا سیگنال ورود (قرار گرفتن در ناحیه طلایی) صادر شده؟
+   if(signal.id != "")
+   {
+      // ۴. اگر بله، حالا فیلتر کراس مووینگ را بررسی کن
+      if(CheckConfirmationCross(m_active_direction, 5, 8))
+      {
+         double entry_price = (signal.type == "Buy") ? current_price_ask : current_price_bid;
+         double sl_price = (signal.type == "Buy") ? signal.motherAnchorPrice - m_sl_buffer_pips * _Point :
+                                                     signal.motherAnchorPrice + m_sl_buffer_pips * _Point;
+
+         if(SendTrade(signal, entry_price, sl_price))
          {
-            if((m_active_direction == LONG && htf_bias == MACD_BEARISH) ||
-               (m_active_direction == SHORT && htf_bias == MACD_BULLISH))
-            {
-               HFiboStopCurrentStructure();
-               m_state = HIPO_IDLE;
-               Log("روند HTF معکوس شد، ساختار متوقف شد");
-            }
-            else if(HFiboIsStructureBroken())
-            {
-               HFiboStopCurrentStructure();
-               m_state = HIPO_IDLE;
-               Log("ساختار فیبوناچی تخریب شد، بازگشت به حالت بیکار");
-            }
-            else
-            {
-               SSignal signal = HFiboGetSignal();
-               if(signal.id != "")
-               {
-                  double mother_zero = HFiboGetMotherZeroPoint();
-                  double entry_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
-                  double sl_price = (signal.type == "Buy") ? mother_zero - m_sl_buffer_pips * _Point :
-                                                           mother_zero + m_sl_buffer_pips * _Point;
-                  if(SendTrade(signal, entry_price, sl_price))
-                  {
-                     m_state = HIPO_MANAGING_POSITION;
-                     Log("وارد حالت مدیریت معامله شد");
-                  }
-                  else
-                  {
-                     HFiboStopCurrentStructure();
-                     m_state = HIPO_IDLE;
-                     Log("خطا در ارسال معامله، بازگشت به حالت بیکار");
-                  }
-               }
-            }
-            break;
+            m_state = HIPO_MANAGING_POSITION;
+            Log("وارد حالت مدیریت معامله شد (با تایید کراس)");
          }
+         else
+         {
+            HFiboStopCurrentStructure();
+            m_state = HIPO_IDLE;
+         }
+      }
+   }
+   break;
+}
          
          case HIPO_MANAGING_POSITION:
          {
