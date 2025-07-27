@@ -347,33 +347,6 @@ private:
       for(int i=1; i<=3; i++) 
          ObjectDelete(0, "TP_Level_" + (string)m_magic_number + "_" + IntegerToString(i));
    }
- bool CheckConfirmationCross(ENUM_DIRECTION direction, int fast_period, int slow_period)
-   {
-      double fast_ma[2];
-      double slow_ma[2];
-
-      int fast_ma_handle = iMA(_Symbol, PERIOD_CURRENT, fast_period, 0, MODE_EMA, PRICE_CLOSE);
-      int slow_ma_handle = iMA(_Symbol, PERIOD_CURRENT, slow_period, 0, MODE_EMA, PRICE_CLOSE);
-
-      if(CopyBuffer(fast_ma_handle, 0, 1, 2, fast_ma) < 2) return false;
-      if(CopyBuffer(slow_ma_handle, 0, 1, 2, slow_ma) < 2) return false;
-      
-      // ایندکس 0 => کندل شیفت 1 (کندل قبلی)
-      // ایندکس 1 => کندل شیفت 2 (دو کندل قبل)
-      
-      if(direction == LONG)
-      {
-         if(fast_ma[1] < slow_ma[1] && fast_ma[0] > slow_ma[0])
-            return true;
-      }
-      else // SHORT
-      {
-         if(fast_ma[1] > slow_ma[1] && fast_ma[0] < slow_ma[0])
-            return true;
-      }
-      
-      return false;
-   }
 
 public:
    //+------------------------------------------------------------------+
