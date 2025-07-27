@@ -168,29 +168,53 @@ int OnInit()
    
    // ایجاد نمونه موتور اصلی
    // در فایل HipoFinoExpert.mq5 - تابع OnInit
-
-// <<<< این خط را جایگزین کنید >>>>
+//==================================================================
+// >> نسخه اصلاح شده و مرتب برای ساخت موتور اصلی <<
+// این بلوک را به طور کامل در تابع OnInit جایگزین کنید
+//==================================================================
 g_engine = new CHipoFino(
-    // تنظیمات عمومی و مکدی
+    // --- گروه ۱: تنظیمات تایم‌فریم و مکدی
     InpHTF, InpLTF,
     InpHTFFastEMA, InpHTFSlowEMA, InpHTFSignal,
     InpLTFFastEMA, InpLTFSlowEMA, InpLTFSignal,
-    InpRiskPercent, InpSLBufferPips, InpMagicNumber,
-    // تنظیمات خروج پله‌ای
-    InpUsePartialTP, InpPartialTP_Percentages, InpFixedTP_RR,
-    // تنظیمات تریلینگ استاپ
-    InpUseTrailingStop, InpTrailingActivationRR, InpStopMethod,
-    // تنظیمات فیلتر سشن
-    InpUseSessionFilter, InpTokyoSession, InpLondonSession, InpNewYorkSession,
-    InpCustomSessionStart, InpCustomSessionEnd,
-    // تنظیمات اندیکاتورهای تریلینگ
-    InpSarStep, InpSarMaximum,
-    InpMinLookback, InpMaxLookback,
-    InpFractalBars, InpFractalBufferPips,
-    // تنظیمات نمایش
-    InpShowStopLine, InpShowFractals
+
+    // --- گروه ۲: تنظیمات عمومی معامله
+    InpRiskPercent,
+    InpSLBufferPips,
+    InpMagicNumber,
+
+    // --- گروه ۳: فیلتر سشن معاملاتی
+    InpUseSessionFilter,
+    InpTokyoSession,
+    InpLondonSession,
+    InpNewYorkSession,
+    InpCustomSessionStart,
+    InpCustomSessionEnd,
+
+    // --- گروه ۴: مدیریت خروج (پله‌ای یا ثابت)
+    InpUsePartialTP,
+    InpPartialTP_Percentages,
+    InpFixedTP_RR,
+
+    // --- گروه ۵: مدیریت حد ضرر متحرک (فعال‌سازی)
+    InpUseTrailingStop,
+    InpTrailingActivationRR,
+
+    // --- گروه ۶: پارامترهای روش‌های تریلینگ استاپ
+    InpStopMethod,
+    InpSarStep,
+    InpSarMaximum,
+    InpMinLookback,
+    InpMaxLookback,
+    InpFractalBars,
+    InpFractalBufferPips,
+
+    // --- گروه ۷: تنظیمات بصری
+    InpShowStopLine,
+    InpShowFractals
 );
-// <<<<ا  >>>>
+//==================================================================
+
 
    if(g_engine == NULL || !g_engine.Initialize())
    {
