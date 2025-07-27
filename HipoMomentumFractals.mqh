@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //|                                       HipoMomentumFractals_v2.1.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۲.۱.۰                          |
+//|                              نسخه: ۲.۲.۰ (بهینه شده)              |
 //|                              تاریخ: ۲۰۲۵/۰۷/۲۷                   |
 //|          کتابخانه شناسایی فراکتال‌های مومنتوم با تشخیص واگرایی    |
 //+------------------------------------------------------------------+
@@ -118,7 +118,7 @@ private:
       ObjectSetInteger(0, obj_name, OBJPROP_ARROWCODE, symbol_code);
       ObjectSetInteger(0, obj_name, OBJPROP_COLOR, signal_color);
       ObjectSetInteger(0, obj_name, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(0, obj_name, OBJPROP_ZORDER, 0); // ZORDER 0 برای قرار گرفتن زیر چارت
+      ObjectSetInteger(0, obj_name, OBJPROP_ZORDER, 0);
       ObjectSetDouble(0, obj_name, OBJPROP_PRICE, price);
    }
    
@@ -148,7 +148,7 @@ private:
       //--- اگر تعداد بیشتر از ۱۰ بود، قدیمی‌ها را با مرتب‌سازی حبابی پاک کن
       if(count > 10)
       {
-         //--- مرتب‌سازی حبابی (Bubble Sort) - ساده و کافی برای تعداد کم
+         //--- مرتب‌سازی حبابی (Bubble Sort)
          for(int i = 0; i < count - 1; i++)
          {
             for(int j = 0; j < count - i - 1; j++)
@@ -226,34 +226,42 @@ public:
    }
 
    //+------------------------------------------------------------------+
-   //| تابع اصلی محاسبه فراکتال‌ها و واگرایی‌ها
+   //| تابع اصلی محاسبه فراکتال‌ها (نسخه بهینه شده)
    //+------------------------------------------------------------------+
    void Calculate()
    {
       if(TimeCurrent() - m_last_flush_time >= 300)
          FlushLog();
 
-      int bars = Bars(_Symbol, m_timeframe);
-      if(bars <= m_fractal_bars * 2) return;
+      // --- بخش جدید: محدود کردن تعداد کندل‌های پردازشی ---
+      const int lookback_period = 200; // فقط 200 کندل اخیر را بررسی کن
+      int total_bars = Bars(_Symbol, m_timeframe);
+      if(total_bars <= m_fractal_bars * 2) return;
+      
+      // تعداد واقعی کندل برای پردازش، حداکثر 200 تاست
+      int bars_to_process = MathMin(total_bars, lookback_period);
 
-      ArrayResize(MajorHighs, bars);
-      ArrayResize(MajorLows, bars);
-      ArrayResize(DivergenceSignal, bars);
-      ArrayFill(MajorHighs, 0, bars, EMPTY_VALUE);
-      ArrayFill(MajorLows, 0, bars, EMPTY_VALUE);
-      ArrayFill(DivergenceSignal, 0, bars, 0);
+      // --- تغییر در اندازه آرایه‌ها و کپی داده‌ها ---
+      ArrayResize(MajorHighs, bars_to_process);
+      ArrayResize(MajorLows, bars_to_process);
+      ArrayResize(DivergenceSignal, bars_to_process);
+      ArrayFill(MajorHighs, 0, bars_to_process, EMPTY_VALUE);
+      ArrayFill(MajorLows, 0, bars_to_process, EMPTY_VALUE);
+      ArrayFill(DivergenceSignal, 0, bars_to_process, 0);
 
       double macd[], signal[], histogram[];
-      if(CopyBuffer(m_macd_handle, 0, 0, bars, macd) <= 0 || CopyBuffer(m_macd_handle, 1, 0, bars, signal) <= 0)
+      // فقط دیتای مورد نیاز را کپی کن
+      if(CopyBuffer(m_macd_handle, 0, 0, bars_to_process, macd) <= 0 || CopyBuffer(m_macd_handle, 1, 0, bars_to_process, signal) <= 0)
       {
          Log("خطا در دریافت داده‌های مکدی");
          return;
       }
-      ArrayResize(histogram, bars);
-      for(int i = 0; i < bars; i++) histogram[i] = macd[i] - signal[i];
+      ArrayResize(histogram, bars_to_process);
+      for(int i = 0; i < bars_to_process; i++) histogram[i] = macd[i] - signal[i];
       
       double high[], low[];
-      if(CopyHigh(_Symbol, m_timeframe, 0, bars, high) <= 0 || CopyLow(_Symbol, m_timeframe, 0, bars, low) <= 0)
+      // فقط دیتای مورد نیاز را کپی کن
+      if(CopyHigh(_Symbol, m_timeframe, 0, bars_to_process, high) <= 0 || CopyLow(_Symbol, m_timeframe, 0, bars_to_process, low) <= 0)
       {
          Log("خطا در دریافت داده‌های قیمت");
          return;
@@ -262,7 +270,9 @@ public:
       ArraySetAsSeries(high, true);
       ArraySetAsSeries(low, true);
 
-      for(int i = m_fractal_bars; i < bars - m_fractal_bars; i++)
+      // --- تغییر در حلقه اصلی ---
+      // حلقه فقط روی کندل‌های اخیر اجرا می‌شود
+      for(int i = m_fractal_bars; i < bars_to_process - m_fractal_bars; i++)
       {
          bool is_high = true, is_low = true;
          for(int j = 1; j <= m_fractal_bars; j++)
