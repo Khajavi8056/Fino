@@ -36,6 +36,8 @@ private:
    CHipoMomentumFractals* m_fractals; // نمونه فراکتال‌یاب
    int m_sar_handle;                  // هندل SAR
    int m_atr_handle;                  // هندل ATR
+   int  m_HANDELmA;
+   int  m_HANDELmAD;
    string m_log_buffer;               // بافر لاگ
    datetime m_last_flush_time;        // زمان آخرین فلاش لاگ
 
@@ -109,6 +111,8 @@ public:
       m_fractals = fractals;
       m_sar_handle = INVALID_HANDLE;
       m_atr_handle = INVALID_HANDLE;
+       m_HANDELmA = INVALID_HANDLE;
+        m_HANDELmAD=INVALID_HANDLE;
       m_log_buffer = "";
       m_last_flush_time = 0;
    }
@@ -131,6 +135,21 @@ public:
       {
          m_atr_handle = iATR(_Symbol, PERIOD_CURRENT, 14);
          if(m_atr_handle == INVALID_HANDLE)
+         {
+            Log("خطا: ایجاد هندل ATR ناموفق بود");
+            return false;
+         }
+         
+         
+          m_HANDELmA = iMA(_Symbol, PERIOD_CURRENT,9,0,MODE_EMA,0);
+         if(m_HANDELmA == INVALID_HANDLE)
+         {
+            Log("خطا: ایجاد هندل ATR ناموفق بود");
+            return false;
+         }
+         
+            m_HANDELmAD = iMA(_Symbol, PERIOD_CURRENT,21,0,MODE_EMA,0);
+         if(m_HANDELmAD == INVALID_HANDLE)
          {
             Log("خطا: ایجاد هندل ATR ناموفق بود");
             return false;
