@@ -83,9 +83,9 @@ input color InpChild2Color = clrGreen;    // رنگ فیبوناچی فرزند 
 
 /*input*/// group "تنظیمات پنل اصلی"
 /*input*/ bool InpShowPanelEa = true;           // نمایش پنل اصلی اطلاعاتی
-/*input*/ ENUM_BASE_CORNER InpPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل اصلی
-/*input*/ int InpPanelOffsetX = 160;           // فاصله افقی پنل اصلی (حداقل 0)
-/*input*/ int InpPanelOffsetY = 6;           // فاصله عمودی پنل اصلی (حداقل 0)
+ ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل اصلی
+ int InpPanelOffsetX = 10;           // فاصله افقی پنل اصلی (حداقل 0)
+ int InpPanelOffsetY = 136;           // فاصله عمودی پنل اصلی (حداقل 0)
 
 //input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
 /*input*/ bool InpTestMode = false;            // فعال‌سازی حالت تست داخلی
@@ -97,11 +97,11 @@ input color InpChild2Color = clrGreen;    // رنگ فیبوناچی فرزند 
 /*input*/ color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
 /*input*/ color InpTestPanelBgColor = clrDarkGray;      // رنگ پس‌زمینه پنل تست
 
-input group "تنظیمات دیباگ"
-input bool InpVisualDebug = false;        // فعال‌سازی حالت تست بصری
+/*input*/ // group "تنظیمات دیباگ"
+/*input*/  bool InpVisualDebug = false;        // فعال‌سازی حالت تست بصری
 
 input group "تنظیمات لاگ"
-input bool InpEnableLog = true;           // فعال‌سازی لاگ‌گیری
+input bool InpEnableLog = false;           // فعال‌سازی لاگ‌گیری
 input string InpLogFilePath = "HipoFibonacci_Log.txt"; // مسیر فایل لاگ (MQL5/Files)
 input int InpMaxFamilies = 1;             // حداکثر تعداد ساختارهای فعال (فقط 1)
 //+------------------------------------------------------------------+
@@ -252,8 +252,8 @@ private:
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetInteger(0, name, OBJPROP_XSIZE, 300);
-      ObjectSetInteger(0, name, OBJPROP_YSIZE, 20);
-      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrMidnightBlue);
+      ObjectSetInteger(0, name, OBJPROP_YSIZE, 25);
+      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrGoldenrod);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
       return CheckObjectExists(name);
    }
@@ -272,7 +272,7 @@ public:
    {
       return CreateBackground(m_name + "_Bg", m_offset_x, m_offset_y) &&
              CreateHeader(m_name + "_Header", m_offset_x, m_offset_y) &&
-             CreateLabel(m_name + "_Title", "Hipo Fibonacci v1.6.6 - 2025/07/25", m_offset_x + 10, m_offset_y + 5, clrWhite, 11, "Calibri Bold") &&
+             CreateLabel(m_name + "_Title", "Hipo Fibonacci", m_offset_x + 90, m_offset_y + 5, clrWhite, 13, "Calibri Bold") &&
              CreateLabel(m_name + "_Status", "وضعیت: در حال انتظار", m_offset_x + 10, m_offset_y + 35, clrLightGray, 9, "Calibri") &&
              CreateLabel(m_name + "_Command", "دستور: هیچ", m_offset_x + 10, m_offset_y + 65, clrLightGray, 9, "Calibri");
    }
@@ -1495,15 +1495,19 @@ bool CFamily::UpdateOnTick(double current_price, datetime current_time)
          return false;
       }
       
-      if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
-      {
-         if(m_child2.CheckSuccessChild2(current_price))
+     if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
          {
-            m_state = COMPLETED;
-            Log("ساختار با ورود به ناحیه طلایی کامل شد.");
-            return true;
-        }
-      }
+            if(m_child2.CheckSuccessChild2(current_price))
+            {
+               // m_state = COMPLETED; // 👈 این خط رو حذف کن
+               // Log("ساختار با ورود به ناحیه طلایی کامل شد."); // 👈 این لاگ رو هم حذف کن
+               // return true; // 👈 این return رو هم حذف کن
+               
+               // نیازی به تغییر وضعیت در اینجا نیست، چون سیگنال باید یک مرحله جلوتر دریافت شود.
+               // فقط اطمینان حاصل میکنیم که متد CheckSuccessChild2 سیگنال را آماده کرده است.
+               Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time) + " (سیگنال آماده)"); // 👈 این لاگ رو اینجا بزار
+            }
+         }
    }
    
    return true;
@@ -1608,50 +1612,56 @@ bool CFamily::TryUpdateMotherFractal()
    //+------------------------------------------------------------------+
 //| CFamily::GetSignal (نسخه کامل و نهایی)                           |
 //+------------------------------------------------------------------+
-SSignal GetSignal()
+SSignal CFamily::GetSignal() //
 {
    SSignal signal = {"", ""};
    
-   // شرط IsSuccessChild2 حذف شد تا برای هر دو نوع فرزند دوم سیگنال بررسی شود
-   if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
+   // سیگنال فقط وقتی صادر میشه که در حالت CHILD2_ACTIVE باشیم
+   // و تازه وارد ناحیه طلایی شده باشیم.
+   // و هنوز سیگنالی از این فاز صادر نکرده باشیم.
+   if(m_state == CHILD2_ACTIVE && m_child2 != NULL) //
    {
-      string temp_levels[];
-      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
-      if(count < 2)
+      string temp_levels[]; //
+      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels); //
+      if(count < 2) //
       {
-         Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone);
-         return signal;
+         Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone); //
+         return signal; //
       }
       
-      double level_1 = StringToDouble(temp_levels[0]) / 100.0;
-      double level_2 = StringToDouble(temp_levels[1]) / 100.0;
+      double level_1 = StringToDouble(temp_levels[0]) / 100.0; //
+      double level_2 = StringToDouble(temp_levels[1]) / 100.0; //
       
-      if(level_1 >= level_2)
+      if(level_1 >= level_2) //
       {
-         Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone);
-         return signal;
+         Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone); //
+         return signal; //
       }
       
-      // منطق محاسبه ناحیه طلایی در اینجا هم اصلاح شد
-      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
-      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
+      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1; //
+      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2; //
       
-      double zone_lower_bound = MathMin(price_level_1, price_level_2);
-      double zone_upper_bound = MathMax(price_level_1, price_level_2);
+      double zone_lower_bound = MathMin(price_level_1, price_level_2); //
+      double zone_upper_bound = MathMax(price_level_1, price_level_2); //
       
-      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID); //
       
-      bool in_golden_zone = (current_price >= zone_lower_bound && current_price <= zone_upper_bound);
+      bool in_golden_zone = (current_price >= zone_lower_bound && current_price <= zone_upper_bound); //
                                
-      if(in_golden_zone)
+      if(in_golden_zone) //
       {
-         signal.type = m_direction == LONG ? "Buy" : "Sell";
-         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure");
-         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits));
+         signal.type = m_direction == LONG ? "Buy" : "Sell"; //
+         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure"); //
+         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits)); //
+         
+         // حالا که سیگنال رو صادر کردیم، وضعیت رو به COMPLETED تغییر میدیم.
+         // این باعث میشه دفعه بعد دیگه این سیگنال صادر نشه.
+         m_state = COMPLETED; // 👈 این خط الان اینجاست!
+              Log("ساختار با ورود به ناحیه طلایی کامل شد و سیگنال صادر گردید."); // 👈 لاگ جدید
       }
    }
    
-   return signal;
+   return signal; //
 }
 
    bool IsActive()
