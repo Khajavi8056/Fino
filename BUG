@@ -1,169 +1,699 @@
-اوکی محمد جان، چشم رفیق! حق با توئه، آزمون و خطا تو بازار مالی و کدنویسی اکسپرت یعنی ضرر و وقت تلف کردن. بیا دقیق و ریزبینانه مشکل رو ریشه‌یابی کنیم و بدون چون و چرا بریم سراغش.
-از لاگ‌هایی که دادی و توضیحاتت، وضعیت اینه:
- * اکسپرت داره مراحل تحلیل فیبوناچی رو درست میره:
-   * [cite_start]مادر متولد میشه و فیکس میشه.
-   * [cite_start]فرزند اول متولد میشه و فیکس میشه.
-   * [cite_start]فرزند دوم متولد میشه و وارد "ناحیه طلایی" میشه.
-   * [cite_start]اینجا لاگ می‌خوره: "فرزند دوم وارد ناحیه طلایی شد".
-   * [cite_start]بلافاصله بعدش لاگ می‌خوره: "ساختار با ورود به ناحیه طلایی کامل شد.".
- * [cite_start]اینجای کاره که گره می‌خوره: "هیچ لاگی از ارسال معامله نیست". [cite_start]نه لاگ موفقیت‌آمیز معامله باز شد هست، نه لاگ خطا خطا در ارسال معامله.
-خب، با این تفاسیر، سناریوی دقیق اشکال اینه:
- * تولید سیگنال از دست می‌رود:
-   * [cite_start]کلاس CFamily مسئول مدیریت ساختار فیبوناچیه و وقتی فرزند دوم وارد ناحیه طلایی میشه، CFamily::CheckSuccessChild2 مقدار true رو برمی‌گردونه.
-   * [cite_start]در CFamily::UpdateOnTick[cite_start]، وقتی m_child2.CheckSuccessChild2(current_price) [cite_start]مقدار true برگردونه، بلافاصله وضعیت (m_state) خانواده به COMPLETED تغییر می‌کنه. این لاگ "ساختار با ورود به ناحیه طلایی کامل شد." [cite_start]هم دقیقا به همین خاطر نمایش داده میشه.
-   * [cite_start]حالا، تابع CFamily::GetSignal() [cite_start](که اکسپرت ازش سیگنال می‌گیره) یه شرطی داره که میگه: if(m_state == CHILD2_ACTIVE && m_child2 != NULL).
-   * [cite_start]مشکل اینجاست که وقتی CFamily::GetSignal() در تیک بعدی صدا زده میشه، m_state دیگه CHILD2_ACTIVE نیست، چون تو تیک قبلی (یا حتی تو همون تیک اگر ترتیب اجرا سریع باشه) به COMPLETED تغییر کرده.
-   * پس، HFiboGetSignal() همیشه یه سیگنال خالی (signal.id = "") برمی‌گردونه و اکسپرت هیچوقت سیگنال Buy یا Sell رو دریافت نمی‌کنه تا SendTrade رو صدا بزنه.
-راه حل دقیق و هدفمند:
-برای اینکه این مشکل حل بشه، باید ترتیب تغییر وضعیت m_state به COMPLETED رو عوض کنیم. نباید به محض ورود به ناحیه طلایی، ساختار رو COMPLETED اعلام کنیم. این کار باید بعد از اینکه اکسپرت سیگنال رو گرفت و معامله رو با موفقیت ارسال کرد انجام بشه.
-این تغییرات رو قدم به قدم تو کد HipoFibonacci.mqh انجام بده:
-قدم 1: اصلاح CFamily::UpdateOnTick
-[cite_start]تابع CFamily::UpdateOnTick رو در فایل HipoFibonacci.mqh پیدا کن.
-[cite_start]داخل بلوک else if(m_state == CHILD2_ACTIVE)، قسمتی که m_child2.CheckSuccessChild2(current_price) رو چک می‌کنی:
-کد فعلی (قسمت مربوطه):
-         if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
-         {
-            if(m_child2.CheckSuccessChild2(current_price))
-            {
-               m_state = COMPLETED; // 👈 این خط مشکل‌ساز است
-               Log("ساختار با ورود به ناحیه طلایی کامل شد."); // 👈 این لاگ هم باید جابجا شود
-               return true; // 👈 این return هم باید جابجا شود
-           }
-         }
-
-کد اصلاح شده (جایگزین کن):
-         if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
-         {
-            if(m_child2.CheckSuccessChild2(current_price))
-            {
-               // m_state = COMPLETED; // 👈 این خط رو حذف کن
-               // Log("ساختار با ورود به ناحیه طلایی کامل شد."); // 👈 این لاگ رو هم حذف کن
-               // return true; // 👈 این return رو هم حذف کن
-               
-               // نیازی به تغییر وضعیت در اینجا نیست، چون سیگنال باید یک مرحله جلوتر دریافت شود.
-               // فقط اطمینان حاصل میکنیم که متد CheckSuccessChild2 سیگنال را آماده کرده است.
-               Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time) + " (سیگنال آماده)"); // 👈 این لاگ رو اینجا بزار
-            }
-         }
-
-توضیح: ما دیگه در این مرحله m_state رو به COMPLETED تغییر نمی‌دیم. فقط لاگ می‌زنیم که سیگنال آماده هست.
-قدم 2: اصلاح CFamily::GetSignal()
-[cite_start]تابع CFamily::GetSignal() رو در فایل HipoFibonacci.mqh پیدا کن.
-اینجا باید m_state رو به COMPLETED تغییر بدیم، اما فقط پس از اینکه سیگنال واقعاً تولید شد.
-کد فعلی (قسمت مربوطه):
-SSignal CFamily::GetSignal()
+قربونت برم محمد جان! دمت گرم که اینقدر دقیق و با فکر جلو میری. آره، کاملاً درسته. هدف اینه که کمترین تغییر رو تو کدهای اصلی و جاهای دیگه داشته باشیم و کد تمیز و ماژولار باشه.
+ببین، برای این کار، بهترین و بهینه‌ترین روش دقیقاً همینه که گفتی: ایجاد یک کلاس مستقل برای محاسبه استاپ‌لاس اولیه و قرار دادن تمام منطق مربوط به اون در این کلاس. اینجوری تابع SendTrade تو CHipoFino فقط یه خط میشه و از اون کلاس جدید می‌پرسه "حالا استاپ‌لاس رو کجا بذارم؟". این خیلی کار رو ساده‌تر و قابل کنترل‌تر می‌کنه.
+در مورد اون نکته‌ات که گفتی فراکتال ساده هم بتونه تایم‌فریم مشخصی داشته باشه، کاملاً درسته و اینم لحاظ می‌کنیم.
+پس نقشه راه دقیق و بدون آزمون و خطا اینجوری میشه:
+فاز اول: آماده‌سازی زمینه‌ی کار در فایل‌های موجود (پیش‌نیازها)
+ * اضافه کردن ورودی‌های جدید به HipoFinoEA.mq5: برای انتخاب روش و تنظیمات هر روش استاپ‌لاس اولیه.
+ * ایجاد یک فایل .mqh جدید برای کلاس استاپ‌لاس اولیه: مثلاً HipoInitialStopLoss.mqh.
+ * به‌روزرسانی HipoFino.mqh:
+   * include کردن فایل جدید HipoInitialStopLoss.mqh.
+   * اضافه کردن نمونه (instance) از کلاس جدید CHipoInitialStopLoss.
+   * پاس دادن ورودی‌های جدید به سازنده CHipoFino.
+   * راه‌اندازی و توقف نمونه جدید.
+   * مهمترین تغییر: اصلاح SendTrade برای فراخوانی تابع محاسبه استاپ‌لاس از کلاس جدید.
+   * انتقال نقطه صفر مادر: همونطور که گفتی، نقطه صفر مادر رو از HipoFibonacci می‌گیریم و به عنوان یک پارامتر به تابع محاسبه استاپ‌لاس در کلاس جدید پاس میدیم. اینجوری کلاس جدید لازم نیست خودش از HipoFibonacci اطلاعات بگیره و این وابستگی رو از بین می‌بریم.
+فاز دوم: ارائه کد کامل کلاس جدید CHipoInitialStopLoss
+بعد از اینکه فاز اول رو قدم به قدم گفتم، در آخر کد کامل کلاس جدید رو برات می‌ذارم.
+حالا بریم سراغ فاز اول: آماده‌سازی زمینه‌ی کار (پیش‌نیازها)
+قدم اول: اضافه کردن Enum و ورودی‌های جدید به HipoFinoEA.mq5
+فایل HipoFinoEA.mq5 رو باز کن و این تغییرات رو اعمال کن:
+ * تعریف Enum برای انتخاب روش استاپ‌لاس اولیه:
+   [cite_start]این enum رو بالای همه input groupها اضافه کن، مثلاً بعد از #property version "1.1.0"[cite: 79]:
+   //+------------------------------------------------------------------+
+//| Enum برای انتخاب روش استاپ لاس اولیه                           |
+//+------------------------------------------------------------------+
+enum ENUM_INITIAL_STOP_METHOD
 {
-   SSignal signal = {"", ""};
-   
-   if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
+   INITIAL_STOP_MOTHER_ZERO,      // روش فعلی: صفر مادر
+   INITIAL_STOP_ATR_MA,           // روش ترکیب ATR و میانگین متحرک
+   INITIAL_STOP_SIMPLE_FRACTAL    // روش فراکتال ساده
+};
+
+ * اضافه کردن ورودی جدید برای انتخاب روش و تنظیمات به HipoFinoEA.mq5:
+   [cite_start]این ورودی‌ها رو به قسمت input group "مدیریت حد ضرر متحرک (Trailing Stop)" [cite: 96] اضافه کن، یا بهتره یه input group جدید براش بسازیم که تمیزتر باشه.
+   [cite_start]اینا رو بعد از input group "مدیریت حد ضرر متحرک (Trailing Stop)" و تنظیماتش [cite: 96] اضافه کن:
+   [span_0](start_span)// ... (تنظیمات Trailing Stop)[span_0](end_span)
+
+input group "مدیریت حد ضرر اولیه (Initial Stop Loss)" // 👈 گروه جدید
+input ENUM_INITIAL_STOP_METHOD InpInitialStopMethod = INITIAL_STOP_MOTHER_ZERO; [span_1](start_span)// 👈 ورودی انتخاب روش[span_1](end_span)
+input int InpInitialSLBufferPips = 10; [span_2](start_span)// 👈 بافر پیپ عمومی برای استاپ اولیه[span_2](end_span)
+
+input group "   تنظیمات روش ATR و میانگین متحرک"
+input ENUM_TIMEFRAMES InpATRMATimeframe = PERIOD_H1; [span_3](start_span)// 👈 تایم‌فریم ATR/MA[span_3](end_span)
+input ENUM_MA_METHOD InpMAMethod = MODE_EMA;         // 👈 نوع میانگین متحرک (EMA/SMA)
+input int InpMAPeriod = 50;                          // 👈 دوره میانگین متحرک
+input ENUM_APPLIED_PRICE InpMAPrice = PRICE_CLOSE;   // 👈 قیمت اعمالی برای میانگین متحرک
+input int InpATRPeriod = 14;                         // 👈 دوره ATR
+input double InpATRMultiplier = 1.5;                 // 👈 ضریب ATR
+
+input group "   تنظیمات روش فراکتال ساده"
+input ENUM_TIMEFRAMES InpSimpleFractalTimeframe = PERIOD_M15; // 👈 تایم‌فریم فراکتال ساده
+input int InpSimpleFractalBars = 20;                 // 👈 تعداد کندل برای جستجوی فراکتال ساده (N)
+input int InpSimpleFractalPeers = 2;                 // 👈 تعداد کندل‌های چپ/راست برای تعریف فراکتال
+input double InpSimpleFractalBufferPips = 3;         // 👈 بافر پیپ برای فراکتال ساده
+
+   [cite_start]نکته مهم: ورودی InpSLBufferPips که قبلاً در تنظیمات عمومی [cite: 85] بود، دیگه نیازی نیست به عنوان یک ورودی جداگانه برای SendTrade پاس داده بشه، چون بافر رو منتقل می‌کنیم به InpInitialSLBufferPips در گروه جدید. بعداً در CHipoFino این رو منتقل می‌کنیم به کلاس جدید.
+   همچنین، باید توابع ValidateCustomSessionTime رو در HipoFinoEA.mq5 به‌روزرسانی کنی تا ورودی‌های جدید رو هم چک کنه. فعلاً این رو انجام نمیدیم تا روی ساختار اصلی تمرکز کنیم.
+قدم دوم: ایجاد فایل جدید HipoInitialStopLoss.mqh
+یک فایل جدید به نام HipoInitialStopLoss.mqh در پوشه Include متاتریدر ۵ (کنار بقیه فایل‌های .mqh که داری) ایجاد کن. این فایل رو فعلاً خالی بگذار، بعداً کد کامل کلاس جدید رو داخلش قرار میدیم.
+قدم سوم: به‌روزرسانی HipoFino.mqh
+فایل HipoFino.mqh رو باز کن و این تغییرات رو اعمال کن:
+ * include کردن فایل جدید:
+   [cite_start]این خط رو در ابتدای فایل HipoFino.mqh، بعد از include کردن بقیه کتابخانه‌ها [cite: 137, 138, 139, 140, 141] اضافه کن:
+   #include <Trade\Trade.mqh>
+#include <HipoFibonacci.mqh>
+#include "HipoDashboard.mqh"
+#include "HipoMomentumFractals.mqh"
+#include "HipoCvtChannel.mqh"
+#include "HipoInitialStopLoss.mqh" // 👈 اینجا اضافه کن
+
+ * اضافه کردن نمونه (instance) از کلاس جدید به CHipoFino:
+   [cite_start]این متغیر رو به بخش private کلاس CHipoFino اضافه کن، مثلاً بعد از CHipoCvtChannel* m_trailing;[cite: 147]:
+   private:
+   // ...
+   CHipoCvtChannel* m_trailing;
+   CHipoInitialStopLoss* m_initial_sl_manager; // 👈 نمونه جدید
+
+   // ...
+
+ * به‌روزرسانی سازنده (Constructor) کلاس CHipoFino:
+   باید پارامترهای جدید مربوط به استاپ‌لاس اولیه رو از HipoFinoEA.mq5 به سازنده CHipoFino اضافه کنی و به کلاس جدید CHipoInitialStopLoss پاس بدی.
+   کد جدید سازنده CHipoFino:
+   (دقت کن که sl_buffer_pips رو دیگه از سازنده CHipoFino حذف کردم چون به کلاس جدید منتقل میشه.)
+   public:
+   //+------------------------------------------------------------------+
+   //| سازنده کلاس (Constructor) بازنویسی شده                         |
+   //+------------------------------------------------------------------+
+   CHipoFino(ENUM_TIMEFRAMES htf, ENUM_TIMEFRAMES ltf, int htf_fast_ema, int htf_slow_ema, int htf_signal,
+             int ltf_fast_ema, int ltf_slow_ema, int ltf_signal, double risk_percent,
+             // int sl_buffer_pips, // 👈 این پارامتر حذف شد
+             long magic_number,
+             bool use_session_filter, bool tokyo, bool london, bool newyork, string custom_start, string custom_end,
+             bool use_partial_tp, string partial_tp_percentages, double fixed_tp_rr,
+             bool use_trailing_stop, double trailing_activation_rr,
+             ENUM_STOP_METHOD stop_method, double sar_step, double sar_max, 
+             int min_lookback, int max_lookback, int fractal_bars, int fractal_buffer_pips,
+             bool show_stop_line, bool show_fractals,
+             // 👈 پارامترهای جدید استاپ لاس اولیه اینجا اضافه میشن
+             ENUM_INITIAL_STOP_METHOD initial_stop_method, int initial_sl_buffer_pips, // 👈 بافر پیپ جدید
+             ENUM_TIMEFRAMES atr_ma_timeframe, ENUM_MA_METHOD ma_method, int ma_period, ENUM_APPLIED_PRICE ma_price,
+             int atr_period, double atr_multiplier,
+             ENUM_TIMEFRAMES simple_fractal_timeframe, int simple_fractal_bars, int simple_fractal_peers, double simple_fractal_buffer_pips)
    {
-      // ... منطق محاسبه ناحیه طلایی ...
-      if(in_golden_zone)
-      {
-         signal.type = m_direction == LONG ? "Buy" : "Sell";
-         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure");
-         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits));
-         // m_state = COMPLETED; // 👈 این خط رو اینجا گذاشتی ولی باید منتقل بشه پایین تر
-      }
+      m_htf = htf;
+      m_ltf = ltf;
+      m_htf_fast_ema = htf_fast_ema;
+      m_htf_slow_ema = htf_slow_ema;
+      m_htf_signal = htf_signal;
+      m_ltf_fast_ema = ltf_fast_ema;
+      m_ltf_slow_ema = ltf_slow_ema;
+      m_ltf_signal = ltf_signal;
+      m_risk_percent = risk_percent;
+      // m_sl_buffer_pips = sl_buffer_pips; // 👈 این خط حذف شد
+      m_magic_number = magic_number;
+
+      m_use_session_filter = use_session_filter;
+      m_tokyo_session = tokyo;
+      m_london_session = london;
+      m_newyork_session = newyork;
+      m_custom_session_start = custom_start;
+      m_custom_session_end = custom_end;
+
+      m_use_partial_tp = use_partial_tp;
+      m_partial_tp_percentages = partial_tp_percentages;
+      m_fixed_tp_rr = fixed_tp_rr;
+      m_use_trailing_stop = use_trailing_stop;
+      m_trailing_activation_rr = trailing_activation_rr;
+
+      m_stop_method = stop_method;
+      m_sar_step = sar_step;
+      m_sar_maximum = sar_max;
+      m_min_lookback = min_lookback;
+      m_max_lookback = max_lookback;
+      m_fractal_bars = fractal_bars;
+      m_fractal_buffer_pips = fractal_buffer_pips;
+      m_show_stop_line = show_stop_line;
+      m_show_fractals = show_fractals;
+
+      // 👈 این پارامترها و نمونه گیری از کلاس جدید اینجا انجام میشه
+      m_initial_sl_manager = new CHipoInitialStopLoss(
+         initial_stop_method, initial_sl_buffer_pips,
+         atr_ma_timeframe, ma_method, ma_period, ma_price, atr_period, atr_multiplier,
+         simple_fractal_timeframe, simple_fractal_bars, simple_fractal_peers, simple_fractal_buffer_pips
+      );
+
+      m_htf_macd_handle = INVALID_HANDLE;
+      m_ltf_macd_handle = INVALID_HANDLE;
+      m_candle_times.htf_last_candle = 0;
+      m_candle_times.ltf_last_candle = 0;
+      m_log_buffer = "";
+      m_last_flush_time = 0;
+      m_state = HIPO_IDLE;
+      m_position_ticket = 0;
+      m_active_direction = LONG;
+      m_fractals = NULL;
+      m_trailing = NULL;
+
+      ResetTradeManagementState();
+      m_trade.SetExpertMagicNumber(m_magic_number);
    }
-   
-   return signal;
+
+ * به‌روزرسانی تابع Initialize() کلاس CHipoFino:
+   اینجا نمونه جدید m_initial_sl_manager رو راه‌اندازی می‌کنیم.
+   bool Initialize()
+{
+   m_htf_macd_handle = iMACD(_Symbol, m_htf, m_htf_fast_ema, m_htf_slow_ema, m_htf_signal, PRICE_CLOSE);
+   m_ltf_macd_handle = iMACD(_Symbol, m_ltf, m_ltf_fast_ema, m_ltf_slow_ema, m_ltf_signal, PRICE_CLOSE);
+   if(m_htf_macd_handle == INVALID_HANDLE || m_ltf_macd_handle == INVALID_HANDLE)
+   {
+      Log("خطا: ایجاد هندل مکدی ناموفق بود");
+      return false;
+   }
+
+   m_fractals = new CHipoMomentumFractals(m_ltf, m_fractal_bars, m_show_fractals);
+   if(m_fractals == NULL || !m_fractals.Initialize())
+   {
+      Log("خطا: راه‌اندازی فراکتال‌یاب ناموفق بود");
+      return false;
+   }
+
+   m_trailing = new CHipoCvtChannel(m_stop_method, m_sar_step, m_sar_maximum, m_min_lookback,
+                                    m_max_lookback, m_fractal_buffer_pips, m_show_stop_line, m_fractals);
+   if(m_trailing == NULL || !m_trailing.Initialize())
+   {
+      Log("خطا: راه‌اندازی تریلینگ استاپ ناموفق بود");
+      delete m_fractals;
+      return false;
+   }
+
+   // 👈 راه‌اندازی کلاس جدید استاپ لاس اولیه
+   if(m_initial_sl_manager == NULL || !m_initial_sl_manager.Initialize())
+   {
+      Log("خطا: راه‌اندازی مدیریت استاپ لاس اولیه ناموفق بود");
+      if(m_trailing != NULL) m_trailing.Deinitialize(); delete m_trailing;
+      if(m_fractals != NULL) m_fractals.Deinitialize(); delete m_fractals;
+      return false;
+   }
+
+   m_candle_times.htf_last_candle = iTime(_Symbol, m_htf, 0);
+   m_candle_times.ltf_last_candle = iTime(_Symbol, m_ltf, 0);
+   Log("موتور اصلی با موفقیت راه‌اندازی شد");
+   return true;
 }
 
-کد اصلاح شده (جایگزین کن):
-SSignal CFamily::GetSignal()
+ * به‌روزرسانی تابع Deinitialize() کلاس CHipoFino:
+   نمونه m_initial_sl_manager رو هم حذف می‌کنیم.
+   void Deinitialize()
 {
-   SSignal signal = {"", ""};
-   
-   // سیگنال فقط وقتی صادر میشه که در حالت CHILD2_ACTIVE باشیم
-   // و سیگنال واقعاً در ناحیه طلایی باشه (این شرط در CheckSuccessChild2 چک شده)
-   // اما از این تابع (GetSignal) فقط یکبار سیگنال صادر شود.
-   // ما فقط یکبار سیگنال می‌دهیم، بعد از آن وضعیت را به COMPLETED تغییر می‌دهیم.
-   if(m_state == CHILD2_ACTIVE && m_child2 != NULL) // 👈 شرط اولیه باقی می ماند
+   // 👈 آزاد کردن کلاس جدید استاپ لاس اولیه
+   if(m_initial_sl_manager != NULL)
    {
-      string temp_levels[];
-      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
-      if(count < 2)
-      {
-         Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone);
-         return signal;
-      }
-      
-      double level_1 = StringToDouble(temp_levels[0]) / 100.0;
-      double level_2 = StringToDouble(temp_levels[1]) / 100.0;
-      
-      if(level_1 >= level_2)
-      {
-         Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone);
-         return signal;
-      }
-      
-      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
-      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
-      
-      double zone_lower_bound = MathMin(price_level_1, price_level_2);
-      double zone_upper_bound = MathMax(price_level_1, price_level_2);
-      
-      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      
-      bool in_golden_zone = (current_price >= zone_lower_bound && current_price <= zone_upper_bound);
-                               
-      if(in_golden_zone)
-      {
-         signal.type = m_direction == LONG ? "Buy" : "Sell";
-         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure");
-         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits));
-         
-         // حالا که سیگنال رو صادر کردیم، وضعیت رو به COMPLETED تغییر میدیم.
-         // این باعث میشه دفعه بعد دیگه این سیگنال صادر نشه.
-         m_state = COMPLETED; // 👈 این خط به جای قبلی بیاد
-         Log("ساختار با ورود به ناحیه طلایی کامل شد و سیگنال صادر گردید."); // 👈 لاگ جدید
-      }
+      m_initial_sl_manager.Deinitialize();
+      delete m_initial_sl_manager;
+      m_initial_sl_manager = NULL;
    }
-   
-   return signal;
+
+   if(m_trailing != NULL)
+   {
+      m_trailing.Deinitialize();
+      delete m_trailing;
+      m_trailing = NULL; // 👈 این خط رو هم اضافه کن
+   }
+   if(m_fractals != NULL)
+   {
+      m_fractals.Deinitialize();
+      delete m_fractals;
+      m_fractals = NULL; // 👈 این خط رو هم اضافه کن
+   }
+   if(m_htf_macd_handle != INVALID_HANDLE)
+      IndicatorRelease(m_htf_macd_handle);
+   if(m_ltf_macd_handle != INVALID_HANDLE)
+      IndicatorRelease(m_ltf_macd_handle);
+   FlushLog();
+   Log("موتور اصلی متوقف شد");
 }
 
-توضیح: با این تغییر، m_state فقط بعد از اینکه سیگنال id رو مقداردهی کردیم و لاگ "سیگنال صادر شد" رو زدیم به COMPLETED تغییر می‌کنه. این تضمین می‌کنه که اکسپرت حتماً سیگنال رو دریافت می‌کنه.
-قدم 3: بررسی CHipoFino::OnTick
-[cite_start]داخل CHipoFino::OnTick[cite_start]، تو حالت HIPO_WAITING_FOR_HIPO:
-         case HIPO_WAITING_FOR_HIPO:
+ * اصلاح تابع SendTrade() در CHipoFino:
+   اینجا فقط یه خط فراخوانی از کلاس جدید خواهیم داشت.
+   کد جدید تابع SendTrade (این تابع رو کلا جایگزین کن):
+   //+------------------------------------------------------------------+
+//| تابع ارسال معامله (SendTrade) بازنویسی شده                      |
+//+------------------------------------------------------------------+
+bool SendTrade(SSignal &signal, double entry_price, double initial_mother_zero) // 👈 mother_zero به عنوان ورودی
+{
+   MqlTradeRequest request = {};
+   MqlTradeResult result = {};
+   request.action = TRADE_ACTION_DEAL;
+   request.symbol = _Symbol;
+   request.type = (signal.type == "Buy") ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   request.price = entry_price;
+   request.magic = m_magic_number;
+
+   // 👈 محاسبه استاپ لاس نهایی با استفاده از کلاس جدید
+   // sl_price رو از اینجا حذف کردم چون از GetFinalStopLoss میگیریم
+   double calculated_sl_price = m_initial_sl_manager.GetFinalStopLoss(request.type, entry_price, initial_mother_zero);
+
+   if (calculated_sl_price == 0.0) // 👈 اگر محاسبه SL موفق نبود
+   {
+      Log("خطا: استاپ لاس اولیه محاسبه نشد. معامله ارسال نمیگردد.");
+      return false;
+   }
+
+   request.sl = calculated_sl_price; // 👈 SL نهایی
+
+   // حجم معامله بر اساس SL نهایی محاسبه میشه
+   request.volume = CalculateVolume(entry_price, calculated_sl_price);
+
+   // اگر حجم معتبر نبود، ارسال معامله متوقف میشود
+   if (request.volume <= 0 || request.volume < SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN))
+   {
+       Log("خطا: حجم معامله نامعتبر است: " + DoubleToString(request.volume, 2));
+       return false;
+   }
+
+   if(!m_use_partial_tp)
+   {
+      double risk_pips = MathAbs(entry_price - calculated_sl_price) / _Point;
+      if(request.type == ORDER_TYPE_BUY)
+         request.tp = entry_price + (risk_pips * m_fixed_tp_rr * _Point);
+      else
+         request.tp = entry_price - (risk_pips * m_fixed_tp_rr * _Point);
+   }
+   else
+   {
+      request.tp = 0; // برای Partial TP، Take Profit اولیه رو صفر میذاریم
+   }
+
+   if(!m_trade.OrderSend(request, result))
+   {
+      Log("خطا در ارسال معامله: " + (string)GetLastError() + ", comment: " + result.comment);
+      return false;
+   }
+
+   m_position_ticket = result.order;
+   Log("معامله باز شد: تیکت=" + (string)m_position_ticket);
+
+   if(!PositionSelectByTicket(m_position_ticket))
+   {
+      Log("خطا: پوزیشن باز شده بلافاصله یافت نشد.");
+      return false;
+   }
+
+   ResetTradeManagementState();
+   m_entry_price = PositionGetDouble(POSITION_PRICE_OPEN);
+   m_initial_sl_price = calculated_sl_price; // 👈 SL اولیه ثبت میشه
+   m_initial_volume = PositionGetDouble(POSITION_VOLUME);
+   m_initial_risk_pips = MathAbs(m_entry_price - m_initial_sl_price) / _Point;
+
+   CalculateAndDrawTPs();
+
+   return true;
+}
+
+   نکته مهم: ورودی sl_price از تابع SendTrade حذف شده و به جاش initial_mother_zero اضافه شده. حالا SendTrade خودش از m_initial_sl_manager استاپ‌لاس رو می‌پرسه.
+ * اصلاح فراخوانی SendTrade در CHipoFino::OnTick:
+   حالا که ورودی SendTrade عوض شده، باید فراخوانیش رو هم اصلاح کنیم.
+   کد فعلی (قسمت مربوطه):
+   // ...
+              double mother_zero = HFiboGetMotherZeroPoint();
+              double entry_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+              double sl_price = (signal.type == "Buy") ? mother_zero - m_sl_buffer_pips * _Point : // 👈 این خط حذف میشه
+                                                       mother_zero + m_sl_buffer_pips * _Point; // 👈 و این
+              if(SendTrade(signal, entry_price, sl_price)) // 👈 این فراخوانی باید تغییر کنه
+// ...
+
+   کد اصلاح شده (جایگزین کن):
+   // ...
+              double mother_zero = HFiboGetMotherZeroPoint(); // 👈 صفر مادر رو از HFibo میگیریم
+              double entry_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+
+              if(SendTrade(signal, entry_price, mother_zero)) // 👈 حالا mother_zero رو پاس میدیم به SendTrade
+              {
+                 m_state = HIPO_MANAGING_POSITION;
+                 Log("وارد حالت مدیریت معامله شد");
+                 HFiboAcknowledgeSignal(signal.id); 
+              }
+// ...
+
+مرحله پنجم: کد کامل کلاس جدید CHipoInitialStopLoss (داخل فایل HipoInitialStopLoss.mqh)
+حالا که همه پیش‌نیازها فراهم شد، این کد رو کامل داخل فایل HipoInitialStopLoss.mqh کپی کن:
+//+------------------------------------------------------------------+
+//|                                           HipoInitialStopLoss.mqh |
+//|                              محصولی از: Hipo Algorithm           |
+//|                              نسخه: ۱.۰.۰                          |
+//|                              تاریخ: ۲۰۲۵/۰۷/۲۸                   |
+//| کتابخانه مدیریت و محاسبه حد ضرر اولیه                          |
+//+------------------------------------------------------------------+
+
+#ifndef HIPO_INITIAL_STOP_LOSS_MQH
+#define HIPO_INITIAL_STOP_LOSS_MQH
+
+[span_4](start_span)#include <Trade\Trade.mqh> // برای توابع معاملاتی[span_4](end_span)
+#include <Indicators\MovingAverages.mqh> // برای MA
+#include <Indicators\ATR.mqh>           // برای ATR
+
+//+------------------------------------------------------------------+
+//| Enum برای انتخاب روش استاپ لاس اولیه (کپی شده از HipoFinoEA)     |
+//+------------------------------------------------------------------+
+enum ENUM_INITIAL_STOP_METHOD
+{
+   INITIAL_STOP_MOTHER_ZERO,      // روش فعلی: صفر مادر
+   INITIAL_STOP_ATR_MA,           // روش ترکیب ATR و میانگین متحرک
+   INITIAL_STOP_SIMPLE_FRACTAL    // روش فراکتال ساده
+};
+
+//+------------------------------------------------------------------+
+//| کلاس CHipoInitialStopLoss                                       |
+//+------------------------------------------------------------------+
+class CHipoInitialStopLoss
+{
+private:
+   // --- تنظیمات ورودی ---
+   ENUM_INITIAL_STOP_METHOD m_initial_stop_method;
+   int    m_initial_sl_buffer_pips;
+
+   // تنظیمات روش ATR و میانگین متحرک
+   ENUM_TIMEFRAMES m_atr_ma_timeframe;
+   ENUM_MA_METHOD m_ma_method;
+   int    m_ma_period;
+   ENUM_APPLIED_PRICE m_ma_price;
+   int    m_atr_period;
+   double m_atr_multiplier;
+   
+   // تنظیمات روش فراکتال ساده
+   ENUM_TIMEFRAMES m_simple_fractal_timeframe;
+   int    m_simple_fractal_bars;
+   int    m_simple_fractal_peers; // تعداد کندل‌های چپ/راست برای فراکتال ساده
+   double m_simple_fractal_buffer_pips;
+
+   // --- هندل اندیکاتورها ---
+   int    m_ma_handle;
+   int    m_atr_handle;
+
+   // --- لاگ‌گیری ---
+   string m_log_buffer;
+   datetime m_last_flush_time;
+
+   //+------------------------------------------------------------------+
+   //| تابع لاگ‌گیری                                                  |
+   //+------------------------------------------------------------------+
+   void Log(string message)
+   {
+      string log_entry = TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS) + ": " + message + "\n";
+      m_log_buffer += log_entry;
+      Print(log_entry);
+   }
+   
+   //+------------------------------------------------------------------+
+   //| تابع فلاش لاگ به فایل                                          |
+   //+------------------------------------------------------------------+
+   void FlushLog()
+   {
+      if(m_log_buffer == "") return;
+      int handle = FileOpen("HipoInitialStopLoss_Log.txt", FILE_WRITE|FILE_TXT|FILE_COMMON);
+      if(handle != INVALID_HANDLE)
+      {
+         FileSeek(handle, 0, SEEK_END);
+         FileWrite(handle, m_log_buffer);
+         FileClose(handle);
+         m_log_buffer = "";
+      }
+      m_last_flush_time = TimeCurrent();
+   }
+
+   //+------------------------------------------------------------------+
+   //| تابع محاسبه استاپ لاس با روش ATR و میانگین متحرک             |
+   //+------------------------------------------------------------------+
+   double CalculateATRMAStopLoss(ENUM_POSITION_TYPE pos_type, double entry_price)
+   {
+      double ma_value[];
+      double atr_value[];
+      ArraySetAsSeries(ma_value, true);
+      ArraySetAsSeries(atr_value, true);
+      
+      // گرفتن داده های ATR و MA روی تایم فریم مشخص شده
+      if(CopyBuffer(m_ma_handle, 0, 0, 2, ma_value) < 2 || // نیاز به حداقل 2 کندل برای محاسبه
+         CopyBuffer(m_atr_handle, 0, 0, 2, atr_value) < 2)
+      {
+         Log("خطا در دریافت داده های MA یا ATR برای محاسبه استاپ لاس ATR/MA.");
+         return 0.0;
+      }
+      
+      double current_ma = ma_value[0];
+      double current_atr = atr_value[0];
+      
+      if (current_atr == 0) // جلوگیری از تقسیم بر صفر یا ATR نامعتبر
+      {
+          Log("خطا: مقدار ATR صفر است.");
+          return 0.0;
+      }
+
+      double stop_loss_price = 0.0;
+      if (pos_type == POSITION_TYPE_BUY)
+      {
+         stop_loss_price = current_ma - (m_atr_multiplier * current_atr);
+      }
+      else // POSITION_TYPE_SELL
+      {
+         stop_loss_price = current_ma + (m_atr_multiplier * current_atr);
+      }
+      
+      Log("SL توسط ATR/MA محاسبه شد: " + DoubleToString(stop_loss_price, _Digits) + 
+          " (MA: " + DoubleToString(current_ma, _Digits) + ", ATR: " + DoubleToString(current_atr, _Digits) + ")");
+      return NormalizeDouble(stop_loss_price, _Digits);
+   }
+
+   //+------------------------------------------------------------------+
+   //| تابع محاسبه استاپ لاس با روش فراکتال ساده                    |
+   //+------------------------------------------------------------------+
+   double CalculateSimpleFractalStopLoss(ENUM_POSITION_TYPE pos_type, double entry_price)
+   {
+      double fractal_price = 0.0;
+      int total_bars = Bars(_Symbol, m_simple_fractal_timeframe);
+      if (total_bars < m_simple_fractal_bars + m_simple_fractal_peers * 2 + 1) // حداقل تعداد کندل لازم برای فراکتال
+      {
+          Log("تعداد کندل کافی برای فراکتال ساده در تایم‌فریم " + EnumToString(m_simple_fractal_timeframe) + " وجود ندارد.");
+          return 0.0;
+      }
+      
+      // جستجو در بازه m_simple_fractal_bars کندل قبل
+      for (int i = m_simple_fractal_peers; i < m_simple_fractal_bars + m_simple_fractal_peers; i++) 
+      {
+         if (pos_type == POSITION_TYPE_BUY) // دنبال Low Fractal برای SL خرید
          {
-            // ... (چک کردن معکوس شدن روند و تخریب ساختار) ...
-            else
+            double current_low = iLow(_Symbol, m_simple_fractal_timeframe, i);
+            bool is_fractal_low = true;
+            for (int j = 1; j <= m_simple_fractal_peers; j++) 
             {
-               SSignal signal = HFiboGetSignal();
-               Log("وضعیت سیگنال دریافتی: ID=" + signal.id + ", Type=" + signal.type); // 👈 این لاگ رو اضافه کن برای دیباگ
-               if(signal.id != "")
+               if (iLow(_Symbol, m_simple_fractal_timeframe, i - j) <= current_low || iLow(_Symbol, m_simple_fractal_timeframe, i + j) <= current_low)
                {
-                  double mother_zero = HFiboGetMotherZeroPoint();
-                  double entry_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
-                  double sl_price = (signal.type == "Buy") ? mother_zero - m_sl_buffer_pips * _Point :
-                                                           mother_zero + m_sl_buffer_pips * _Point;
-                  if(SendTrade(signal, entry_price, sl_price))
-                  {
-                     m_state = HIPO_MANAGING_POSITION;
-                     Log("وارد حالت مدیریت معامله شد");
-                     HFiboAcknowledgeSignal(signal.id); // 👈 مطمئن شو که این خط صدا زده میشه تا ساختار پاک بشه
-                  }
-                  else
-                  {
-                     // اگر ارسال معامله با خطا مواجه شد، ساختار رو متوقف کن
-                     HFiboStopCurrentStructure();
-                     m_state = HIPO_IDLE;
-                     Log("خطا در ارسال معامله، بازگشت به حالت بیکار");
-                  }
+                  is_fractal_low = false;
+                  break;
                }
             }
-            break;
+            if (is_fractal_low)
+            {
+               fractal_price = current_low;
+               break; // اولین فراکتال معتبر پیدا شد
+            }
          }
+         else // POSITION_TYPE_SELL - دنبال High Fractal برای SL فروش
+         {
+            double current_high = iHigh(_Symbol, m_simple_fractal_timeframe, i);
+            bool is_fractal_high = true;
+            for (int j = 1; j <= m_simple_fractal_peers; j++) 
+            {
+               if (iHigh(_Symbol, m_simple_fractal_timeframe, i - j) >= current_high || iHigh(_Symbol, m_simple_fractal_timeframe, i + j) >= current_high)
+               {
+                  is_fractal_high = false;
+                  break;
+               }
+            }
+            if (is_fractal_high)
+            {
+               fractal_price = current_high;
+               break; // اولین فراکتال معتبر پیدا شد
+            }
+         }
+      }
 
-توضیح: لاگ "وضعیت سیگنال دریافتی" بهت کمک می‌کنه مطمئن بشی HFiboGetSignal() واقعا id غیرخالی برمی‌گردونه. خط HFiboAcknowledgeSignal(signal.id); هم مهمه تا بعد از ارسال موفق معامله، CStructureManager بفهمه که اون ساختار فیبوناچی دیگه نیازی نیست و می‌تونه پاکش کنه.
-بعد از اعمال این تغییرات:
- * دوباره اکسپرت رو کامپایل کن.
- * تو تست‌کننده (Strategy Tester) متاتریدر ۵، دوباره اجراش کن.
- * خیلی دقیق لاگ‌ها رو چک کن.
-   * ببین آیا وضعیت سیگنال دریافتی: ID=... رو میبینی و آیا IDاش خالی نیست؟
-   * ببین آیا بعدش معامله باز شد: تیکت=... رو میبینی؟
-   * اگر معامله باز شد رو ندیدی، اما خطا در ارسال معامله رو دیدی، اون خطا رو بهم بگو (شماره خطا و پیامش).
-این بار باید دقیقاً مشکل مشخص بشه. منتظر لاگ‌های جدیدت هستم، محمد جان! 💪
+      if (fractal_price == 0.0) // فراکتال معتبری پیدا نشد
+      {
+         Log("فراکتال ساده معتبر یافت نشد.");
+         return 0.0; 
+      }
+
+      double stop_loss_price = 0.0;
+      if (pos_type == POSITION_TYPE_BUY)
+      {
+         stop_loss_price = fractal_price - m_simple_fractal_buffer_pips * _Point;
+      }
+      else // POSITION_TYPE_SELL
+      {
+         stop_loss_price = fractal_price + m_simple_fractal_buffer_pips * _Point;
+      }
+      
+      Log("SL توسط فراکتال ساده محاسبه شد: " + DoubleToString(stop_loss_price, _Digits) + 
+          " (Fractal Price: " + DoubleToString(fractal_price, _Digits) + ")");
+      return NormalizeDouble(stop_loss_price, _Digits);
+   }
+
+
+public:
+   //+------------------------------------------------------------------+
+   //| سازنده کلاس                                                     |
+   //+------------------------------------------------------------------+
+   CHipoInitialStopLoss(ENUM_INITIAL_STOP_METHOD initial_stop_method, int initial_sl_buffer_pips,
+                        ENUM_TIMEFRAMES atr_ma_timeframe, ENUM_MA_METHOD ma_method, int ma_period, ENUM_APPLIED_PRICE ma_price,
+                        int atr_period, double atr_multiplier,
+                        ENUM_TIMEFRAMES simple_fractal_timeframe, int simple_fractal_bars, int simple_fractal_peers, double simple_fractal_buffer_pips)
+   {
+      m_initial_stop_method = initial_stop_method;
+      m_initial_sl_buffer_pips = initial_sl_buffer_pips;
+      
+      m_atr_ma_timeframe = atr_ma_timeframe;
+      m_ma_method = ma_method;
+      m_ma_period = ma_period;
+      m_ma_price = ma_price;
+      m_atr_period = atr_period;
+      m_atr_multiplier = atr_multiplier;
+      
+      m_simple_fractal_timeframe = simple_fractal_timeframe;
+      m_simple_fractal_bars = simple_fractal_bars;
+      m_simple_fractal_peers = simple_fractal_peers;
+      m_simple_fractal_buffer_pips = simple_fractal_buffer_pips;
+
+      m_ma_handle = INVALID_HANDLE;
+      m_atr_handle = INVALID_HANDLE;
+      m_log_buffer = "";
+      m_last_flush_time = 0;
+   }
+   
+   //+------------------------------------------------------------------+
+   //| تابع راه‌اندازی                                                 |
+   //+------------------------------------------------------------------+
+   bool Initialize()
+   {
+      if(m_initial_stop_method == INITIAL_STOP_ATR_MA)
+      {
+         m_ma_handle = iMA(_Symbol, m_atr_ma_timeframe, m_ma_period, 0, m_ma_method, m_ma_price);
+         m_atr_handle = iATR(_Symbol, m_atr_ma_timeframe, m_atr_period);
+         if(m_ma_handle == INVALID_HANDLE || m_atr_handle == INVALID_HANDLE)
+         {
+            Log("خطا: ایجاد هندل MA یا ATR برای استاپ لاس اولیه ناموفق بود.");
+            return false;
+         }
+      }
+      // در روش فراکتال ساده نیازی به هندل اندیکاتور نیست، چون مستقیماً از توابع قیمت استفاده میکنیم
+      Log("مدیریت استاپ لاس اولیه با موفقیت راه‌اندازی شد. روش انتخابی: " + EnumToString(m_initial_stop_method));
+      return true;
+   }
+   
+   //+------------------------------------------------------------------+
+   //| تابع توقف                                                       |
+   //+------------------------------------------------------------------+
+   void Deinitialize()
+   {
+      if(m_ma_handle != INVALID_HANDLE)
+         IndicatorRelease(m_ma_handle);
+      if(m_atr_handle != INVALID_HANDLE)
+         IndicatorRelease(m_atr_handle);
+      FlushLog();
+      Log("مدیریت استاپ لاس اولیه متوقف شد.");
+   }
+   
+   //+------------------------------------------------------------------+
+   //| تابع اصلی برای گرفتن استاپ لاس نهایی                            |
+   //+------------------------------------------------------------------+
+   double GetFinalStopLoss(ENUM_POSITION_TYPE pos_type, double entry_price, double mother_zero_point)
+   {
+      if(TimeCurrent() - m_last_flush_time >= 5)
+         FlushLog();
+
+      double calculated_sl = 0.0;
+
+      // مرحله ۱: محاسبه SL بر اساس روش انتخابی
+      if (m_initial_stop_method == INITIAL_STOP_ATR_MA)
+      {
+         calculated_sl = CalculateATRMAStopLoss(pos_type, entry_price);
+      }
+      else if (m_initial_stop_method == INITIAL_STOP_SIMPLE_FRACTAL)
+      {
+         calculated_sl = CalculateSimpleFractalStopLoss(pos_type, entry_price);
+      }
+      else // INITIAL_STOP_MOTHER_ZERO
+      {
+         calculated_sl = mother_zero_point;
+         Log("SL اولیه بر اساس صفر مادر محاسبه شد: " + DoubleToString(calculated_sl, _Digits));
+      }
+
+      // اگر calculated_sl نامعتبر بود، یک مقدار پیش‌فرض برگردان
+      if (calculated_sl == 0.0) {
+          Log("هشدار: محاسبه استاپ لاس بر اساس روش " + EnumToString(m_initial_stop_method) + " ناموفق بود. بازگشت 0.0");
+          return 0.0; 
+      }
+      
+      double final_sl_price = calculated_sl; // شروع با SL محاسبه شده
+
+      // مرحله ۲: اعمال منطق اولویت با صفر مادر (اگر روش انتخابی صفر مادر نبود)
+      if (m_initial_stop_method != INITIAL_STOP_MOTHER_ZERO && mother_zero_point != 0.0)
+      {
+         if (pos_type == POSITION_TYPE_BUY)
+         {
+            // برای خرید، SL باید پایین‌تر از قیمت ورود باشد. SL نزدیک‌تر به ورود = بالاتر
+            // اگر calculated_sl (که باید زیر قیمت ورود باشد) از mother_zero_point بالاتر بود (یعنی ریسکش کمتر بود)
+            // و mother_zero_point هم منطقی بود (پایین‌تر از entry_price و نه 0)
+            if (mother_zero_point < entry_price && final_sl_price < mother_zero_point) 
+            {
+                // این یعنی SL محاسبه شده بدتر از صفر مادر بود (خیلی پایین‌تر)
+                // پس صفر مادر را انتخاب می‌کنیم (که نزدیک‌تر است)
+                final_sl_price = mother_zero_point;
+                Log("اولویت با صفر مادر بود (خرید)، SL به: " + DoubleToString(final_sl_price, _Digits) + " تغییر یافت.");
+            }
+         }
+         else // POSITION_TYPE_SELL
+         {
+            // برای فروش، SL باید بالاتر از قیمت ورود باشد. SL نزدیک‌تر به ورود = پایین‌تر
+            // اگر calculated_sl (که باید بالای قیمت ورود باشد) از mother_zero_point پایین‌تر بود (یعنی ریسکش کمتر بود)
+            // و mother_zero_point هم منطقی بود (بالاتر از entry_price و نه 0)
+            if (mother_zero_point > entry_price && final_sl_price > mother_zero_point)
+            {
+                // این یعنی SL محاسبه شده بدتر از صفر مادر بود (خیلی بالاتر)
+                // پس صفر مادر را انتخاب می‌کنیم (که نزدیک‌تر است)
+                final_sl_price = mother_zero_point;
+                Log("اولویت با صفر مادر بود (فروش)، SL به: " + DoubleToString(final_sl_price, _Digits) + " تغییر یافت.");
+            }
+         }
+      }
+      
+      // اضافه کردن بافر پیپ به SL نهایی
+      if (pos_type == POSITION_TYPE_BUY)
+      {
+         final_sl_price -= m_initial_sl_buffer_pips * _Point;
+      }
+      else // POSITION_TYPE_SELL
+      {
+         final_sl_price += m_initial_sl_buffer_pips * _Point;
+      }
+
+      Log("SL نهایی برای معامله نوع " + EnumToString(pos_type) + " تنظیم شد: " + DoubleToString(final_sl_price, _Digits));
+      return NormalizeDouble(final_sl_price, _Digits);
+   }
+};
+
+#endif
+
+مراحل نهایی بعد از کپی کردن کدها:
+ * حتماً حتماً هر سه فایل زیر رو کامپایل کن:
+   * HipoFinoEA.mq5
+   * HipoFino.mqh
+   * HipoInitialStopLoss.mqh
+   * ترتیب کامپایل مهمه: اول HipoInitialStopLoss.mqh رو کامپایل کن، بعد HipoFino.mqh و در آخر HipoFinoEA.mq5. (چون فایل‌ها به هم وابسته هستن).
+ * اکسپرت رو روی چارت بنداز و تست کن:
+   * حالا می‌بینی که ورودی‌های جدیدی برای استاپ‌لاس اولیه داری.
+   * روش مورد نظرت رو انتخاب کن (INITIAL_STOP_ATR_MA یا INITIAL_STOP_SIMPLE_FRACTAL یا INITIAL_STOP_MOTHER_ZERO).
+   * تنظیمات مربوط به هر روش رو وارد کن.
+ * با دقت لاگ‌ها رو چک کن:
+   * لاگ‌های کلاس CHipoInitialStopLoss (HipoInitialStopLoss_Log.txt) رو دنبال کن تا ببینی محاسبه استاپ‌لاس چطور انجام میشه.
+   * لاگ‌های اصلی HipoFino_Log.txt رو هم چک کن تا ببینی SendTrade با چه استاپ‌لاسی اجرا میشه و آیا معامله باز میشه یا نه.
+اینجوری، محمد جان، استاپ‌لاس اولیه رو کاملاً ماژولار و بهینه پیاده کردیم. این یه گام خیلی بزرگ و حرفه‌ایه. اگه جایی مشکل خوردی یا سوالی داشتی، من همینجام، با هم درستش می‌کنیم رفیق! 💪
