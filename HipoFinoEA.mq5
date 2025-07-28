@@ -18,6 +18,14 @@
 #include "HipoDashboard.mqh"
 #include "HipoMomentumFractals.mqh"
 #include "HipoCvtChannel.mqh"
+#include "HipoInitialStopLoss.mqh" 
+//+------------------------------------------------------------------+
+//|ENUMs            |
+//+------------------------------------------------------------------+
+
+  
+
+
 
 //+------------------------------------------------------------------+
 //| ورودی‌های اکسپرت (نسخه بازنویسی شده با گروه‌بندی جدید)            |
@@ -72,6 +80,24 @@ input bool InpShowFractals = true;             // نمایش فراکتال‌ه
 input int InpFractalBars = 3;                  // تعداد کندل‌های فراکتال
 input int InpFractalBufferPips = 5;            // بافر فراکتال (پیپ)
 
+input group "مدیریت حد ضرر اولیه (Initial Stop Loss)" // 👈 گروه جدید
+input ENUM_INITIAL_STOP_METHOD InpInitialStopMethod = INITIAL_STOP_MOTHER_ZERO; // 👈 ورودی انتخاب روش[span_1](end_span)
+input int InpInitialSLBufferPips = 10; // 👈 بافر پیپ عمومی برای استاپ اولیه[span_2](end_span)
+
+input group "   تنظیمات روش ATR و میانگین متحرک"
+input ENUM_TIMEFRAMES InpATRMATimeframe = PERIOD_H1; // 👈 تایم‌فریم ATR/MA[span_3](end_span)
+input ENUM_MA_METHOD InpMAMethod = MODE_EMA;         // 👈 نوع میانگین متحرک (EMA/SMA)
+input int InpMAPeriod = 50;                          // 👈 دوره میانگین متحرک
+input ENUM_APPLIED_PRICE InpMAPrice = PRICE_CLOSE;   // 👈 قیمت اعمالی برای میانگین متحرک
+input int InpATRPeriod = 14;                         // 👈 دوره ATR
+input double InpATRMultiplier = 1.5;                 // 👈 ضریب ATR
+
+input group "   تنظیمات روش فراکتال ساده"
+input ENUM_TIMEFRAMES InpSimpleFractalTimeframe = PERIOD_M15; // 👈 تایم‌فریم فراکتال ساده
+input int InpSimpleFractalBars = 20;                 // 👈 تعداد کندل برای جستجوی فراکتال ساده (N)
+input int InpSimpleFractalPeers = 2;                 // 👈 تعداد کندل‌های چپ/راست برای تعریف فراکتال
+input double InpSimpleFractalBufferPips = 3;         // 👈 بافر پیپ برای فراکتال ساده
+
 
 //+------------------------------------------------------------------+
 //| متغیرهای سراسری                                                |
@@ -92,6 +118,9 @@ bool ValidateCustomSessionTime(string time_str)
    return (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59);
 }
 
+//+------------------------------------------------------------------+
+//| تابع راه‌اندازی اکسپرت                                         |
+//+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| تابع راه‌اندازی اکسپرت                                         |
 //+------------------------------------------------------------------+
@@ -117,9 +146,10 @@ int OnInit()
       Print("خطا: نسبت ریسک به ریوارد باید بین 1.0 تا 5.0 باشد");
       return(INIT_PARAMETERS_INCORRECT);
    }
-   if(InpSLBufferPips < 0)
+   // InpSLBufferPips دیگر در CHipoFino استفاده نمیشود، ولی برای اعتبار سنجی کلی بهتر است بماند
+   if(InpInitialSLBufferPips < 0) // 👈 اعتبار سنجی جدید
    {
-      Print("خطا: بافر حد ضرر نمی‌تواند منفی باشد");
+      Print("خطا: بافر حد ضرر اولیه نمی‌تواند منفی باشد");
       return(INIT_PARAMETERS_INCORRECT);
    }
    if(InpHTFFastEMA <= 0 || InpHTFSlowEMA <= InpHTFFastEMA || InpHTFSignal <= 0)
@@ -158,7 +188,16 @@ int OnInit()
       Print("خطا: تنظیمات فراکتال نامعتبر است");
       return(INIT_PARAMETERS_INCORRECT);
    }
-   
+   // 👈 اعتبار سنجی برای ATR/MA و فراکتال ساده
+   if (InpMAPeriod <= 0 || InpATRPeriod <= 0 || InpATRMultiplier <= 0) {
+       Print("خطا: تنظیمات ATR/MA نامعتبر است.");
+       return(INIT_PARAMETERS_INCORRECT);
+   }
+   if (InpSimpleFractalBars <= 0 || InpSimpleFractalPeers <= 0 || InpSimpleFractalBufferPips < 0) {
+       Print("خطا: تنظیمات فراکتال ساده نامعتبر است.");
+       return(INIT_PARAMETERS_INCORRECT);
+   }
+
    // راه‌اندازی کتابخانه فیبوناچی
    if(!HFiboOnInit())
    {
@@ -167,11 +206,6 @@ int OnInit()
    }
    
    // ایجاد نمونه موتور اصلی
-   // در فایل HipoFinoExpert.mq5 - تابع OnInit
-//==================================================================
-// >> نسخه اصلاح شده و مرتب برای ساخت موتور اصلی <<
-// این بلوک را به طور کامل در تابع OnInit جایگزین کنید
-//==================================================================
 g_engine = new CHipoFino(
     // --- گروه ۱: تنظیمات تایم‌فریم و مکدی
     InpHTF, InpLTF,
@@ -180,7 +214,6 @@ g_engine = new CHipoFino(
 
     // --- گروه ۲: تنظیمات عمومی معامله
     InpRiskPercent,
-    InpSLBufferPips,
     InpMagicNumber,
 
     // --- گروه ۳: فیلتر سشن معاملاتی
@@ -211,9 +244,22 @@ g_engine = new CHipoFino(
 
     // --- گروه ۷: تنظیمات بصری
     InpShowStopLine,
-    InpShowFractals
+    InpShowFractals,
+    
+    // 👈 پارامترهای جدید استاپ لاس اولیه
+    InpInitialStopMethod,
+    InpInitialSLBufferPips, // 👈 بافر پیپ جدید
+    InpATRMATimeframe,
+    InpMAMethod,
+    InpMAPeriod,
+    InpMAPrice,
+    InpATRPeriod,
+    InpATRMultiplier,
+    InpSimpleFractalTimeframe,
+    InpSimpleFractalBars,
+    InpSimpleFractalPeers,
+    InpSimpleFractalBufferPips
 );
-//==================================================================
 
 
    if(g_engine == NULL || !g_engine.Initialize())
