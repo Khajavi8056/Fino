@@ -6,7 +6,7 @@
 //| اکسپرت ساده برای اجرای حالت تست دستی کتابخانه HipoFibonacci                 |
 //+------------------------------------------------------------------+
 
-#property copyright "Hipo Algorithm"
+#property copyright "Hipo Algorithm" 
 #property link      "https://hipoalgorithm.com"
 #property version   "1.5"
 
