@@ -14,7 +14,7 @@
 #include "HipoDashboard.mqh"
 #include "HipoMomentumFractals.mqh"
 #include "HipoCvtChannel.mqh"
-
+#include "HipoInitialStopLoss.mqh" 
 //+------------------------------------------------------------------+
 //| ثابت‌ها و ساختارها                                             |
 //+------------------------------------------------------------------+
@@ -70,7 +70,7 @@ private:
    ENUM_DIRECTION m_active_direction;
    CHipoMomentumFractals* m_fractals;
    CHipoCvtChannel* m_trailing;
-   
+   CHipoInitialStopLoss* m_initial_sl_manager;
    // --- متغیرهای جدید برای مدیریت معامله ---
    bool   m_use_partial_tp;
    string m_partial_tp_percentages;
@@ -354,7 +354,7 @@ public:
    //+------------------------------------------------------------------+
    CHipoFino(ENUM_TIMEFRAMES htf, ENUM_TIMEFRAMES ltf, int htf_fast_ema, int htf_slow_ema, int htf_signal,
              int ltf_fast_ema, int ltf_slow_ema, int ltf_signal, double risk_percent,
-             int sl_buffer_pips, long magic_number,
+             long magic_number,
              bool use_session_filter, bool tokyo, bool london, bool newyork, string custom_start, string custom_end,
              // پارامترهای جدید
              bool use_partial_tp, string partial_tp_percentages, double fixed_tp_rr,
@@ -362,7 +362,11 @@ public:
              // پارامترهای تریلینگ
              ENUM_STOP_METHOD stop_method, double sar_step, double sar_max, 
              int min_lookback, int max_lookback, int fractal_bars, int fractal_buffer_pips,
-             bool show_stop_line, bool show_fractals)
+             bool show_stop_line, bool show_fractals,
+             ENUM_INITIAL_STOP_METHOD initial_stop_method, int initial_sl_buffer_pips, // 👈 بافر پیپ جدید
+             ENUM_TIMEFRAMES atr_ma_timeframe, ENUM_MA_METHOD ma_method, int ma_period, ENUM_APPLIED_PRICE ma_price,
+             int atr_period, double atr_multiplier,
+             ENUM_TIMEFRAMES simple_fractal_timeframe, int simple_fractal_bars, int simple_fractal_peers, double simple_fractal_buffer_pips)
    {
       m_htf = htf;
       m_ltf = ltf;
@@ -373,7 +377,7 @@ public:
       m_ltf_slow_ema = ltf_slow_ema;
       m_ltf_signal = ltf_signal;
       m_risk_percent = risk_percent;
-      m_sl_buffer_pips = sl_buffer_pips;
+     // m_sl_buffer_pips = sl_buffer_pips;
       m_magic_number = magic_number;
       
       m_use_session_filter = use_session_filter;
@@ -398,7 +402,11 @@ public:
       m_fractal_buffer_pips = fractal_buffer_pips;
       m_show_stop_line = show_stop_line;
       m_show_fractals = show_fractals;
-
+      m_initial_sl_manager = new CHipoInitialStopLoss(
+               initial_stop_method, initial_sl_buffer_pips,
+               atr_ma_timeframe, ma_method, ma_period, ma_price, atr_period, atr_multiplier,
+               simple_fractal_timeframe, simple_fractal_bars, simple_fractal_peers, simple_fractal_buffer_pips
+            );
       m_htf_macd_handle = INVALID_HANDLE;
       m_ltf_macd_handle = INVALID_HANDLE;
       m_candle_times.htf_last_candle = 0;
@@ -444,6 +452,14 @@ public:
          return false;
       }
       
+      if(m_initial_sl_manager == NULL || !m_initial_sl_manager.Initialize())
+      {
+         Log("خطا: راه‌اندازی مدیریت استاپ لاس اولیه ناموفق بود");
+         if(m_trailing != NULL) m_trailing.Deinitialize(); delete m_trailing;
+         if(m_fractals != NULL) m_fractals.Deinitialize(); delete m_fractals;
+         return false;
+      }
+      
       m_candle_times.htf_last_candle = iTime(_Symbol, m_htf, 0);
       m_candle_times.ltf_last_candle = iTime(_Symbol, m_ltf, 0);
       Log("موتور اصلی با موفقیت راه‌اندازی شد");
@@ -455,15 +471,24 @@ public:
    //+------------------------------------------------------------------+
    void Deinitialize()
    {
+     if(m_initial_sl_manager != NULL)
+      {
+         m_initial_sl_manager.Deinitialize();
+         delete m_initial_sl_manager;
+         m_initial_sl_manager = NULL;
+      }
+   
       if(m_trailing != NULL)
       {
          m_trailing.Deinitialize();
          delete m_trailing;
+         m_trailing = NULL; // 👈 این خط رو هم اضافه کن
       }
       if(m_fractals != NULL)
       {
          m_fractals.Deinitialize();
          delete m_fractals;
+         m_fractals = NULL; // 👈 این خط رو هم اضافه کن
       }
       if(m_htf_macd_handle != INVALID_HANDLE)
          IndicatorRelease(m_htf_macd_handle);
@@ -472,63 +497,80 @@ public:
       FlushLog();
       Log("موتور اصلی متوقف شد");
    }
-   
    //+------------------------------------------------------------------+
    //| تابع ارسال معامله (SendTrade) بازنویسی شده                    |
    //+------------------------------------------------------------------+
-   bool SendTrade(SSignal &signal, double entry_price, double sl_price)
+ bool SendTrade(SSignal &signal, double entry_price, double initial_mother_zero) // 👈 mother_zero به عنوان ورودی
+{
+   MqlTradeRequest request = {};
+   MqlTradeResult result = {};
+   request.action = TRADE_ACTION_DEAL;
+   request.symbol = _Symbol;
+   request.type = (signal.type == "Buy") ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   request.price = entry_price;
+   request.magic = m_magic_number;
+
+   // 👈 محاسبه استاپ لاس نهایی با استفاده از کلاس جدید
+   // sl_price رو از اینجا حذف کردم چون از GetFinalStopLoss میگیریم
+ ENUM_DIRECTION trade_direction_for_sl = (request.type == ORDER_TYPE_BUY) ? LONG : SHORT;
+   double calculated_sl_price = m_initial_sl_manager.GetFinalStopLoss(trade_direction_for_sl, entry_price, initial_mother_zero);
+   if (calculated_sl_price == 0.0) // 👈 اگر محاسبه SL موفق نبود
    {
-      MqlTradeRequest request = {};
-      MqlTradeResult result = {};
-      request.action = TRADE_ACTION_DEAL;
-      request.symbol = _Symbol;
-      request.volume = CalculateVolume(entry_price, sl_price);
-      request.type = (signal.type == "Buy") ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
-      request.price = entry_price;
-      request.sl = sl_price;
-      
-      if(!m_use_partial_tp)
-      {
-         double risk_pips = MathAbs(entry_price - sl_price) / _Point;
-         if(request.type == ORDER_TYPE_BUY)
-            request.tp = entry_price + (risk_pips * m_fixed_tp_rr * _Point);
-         else
-            request.tp = entry_price - (risk_pips * m_fixed_tp_rr * _Point);
-      }
-      else
-      {
-         request.tp = 0;
-      }
-      request.magic = m_magic_number;
-      
- 
-      if(!m_trade.OrderSend(request, result))
-
-      {
-         Log("خطا در ارسال معامله: " + (string)GetLastError() + ", comment: " + result.comment);
-         return false;
-      }
-      
-      m_position_ticket = result.order;
-      Log("معامله باز شد: تیکت=" + (string)m_position_ticket);
-      
-      if(!PositionSelectByTicket(m_position_ticket))
-      {
-         Log("خطا: پوزیشن باز شده بلافاصله یافت نشد.");
-         return false;
-      }
-
-      ResetTradeManagementState();
-      m_entry_price = PositionGetDouble(POSITION_PRICE_OPEN);
-      m_initial_sl_price = sl_price;
-      m_initial_volume = PositionGetDouble(POSITION_VOLUME);
-      m_initial_risk_pips = MathAbs(m_entry_price - m_initial_sl_price) / _Point;
-      
-      CalculateAndDrawTPs();
-      
-      return true;
+      Log("خطا: استاپ لاس اولیه محاسبه نشد. معامله ارسال نمیگردد.");
+      return false;
    }
-   
+
+   request.sl = calculated_sl_price; // 👈 SL نهایی
+
+   // حجم معامله بر اساس SL نهایی محاسبه میشه
+   request.volume = CalculateVolume(entry_price, calculated_sl_price);
+
+   // اگر حجم معتبر نبود، ارسال معامله متوقف میشود
+   if (request.volume <= 0 || request.volume < SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN))
+   {
+       Log("خطا: حجم معامله نامعتبر است: " + DoubleToString(request.volume, 2));
+       return false;
+   }
+
+   if(!m_use_partial_tp)
+   {
+      double risk_pips = MathAbs(entry_price - calculated_sl_price) / _Point;
+      if(request.type == ORDER_TYPE_BUY)
+         request.tp = entry_price + (risk_pips * m_fixed_tp_rr * _Point);
+      else
+         request.tp = entry_price - (risk_pips * m_fixed_tp_rr * _Point);
+   }
+   else
+   {
+      request.tp = 0; // برای Partial TP، Take Profit اولیه رو صفر میذاریم
+   }
+
+   if(!m_trade.OrderSend(request, result))
+   {
+      Log("خطا در ارسال معامله: " + (string)GetLastError() + ", comment: " + result.comment);
+      return false;
+   }
+
+   m_position_ticket = result.order;
+   Log("معامله باز شد: تیکت=" + (string)m_position_ticket);
+
+   if(!PositionSelectByTicket(m_position_ticket))
+   {
+      Log("خطا: پوزیشن باز شده بلافاصله یافت نشد.");
+      return false;
+   }
+
+   ResetTradeManagementState();
+   m_entry_price = PositionGetDouble(POSITION_PRICE_OPEN);
+   m_initial_sl_price = calculated_sl_price; // 👈 SL اولیه ثبت میشه
+   m_initial_volume = PositionGetDouble(POSITION_VOLUME);
+   m_initial_risk_pips = MathAbs(m_entry_price - m_initial_sl_price) / _Point;
+
+   CalculateAndDrawTPs();
+
+   return true;
+}
+
    //+------------------------------------------------------------------+
    //| تابع پردازش تیک (OnTick) بازنویسی شده                          |
    //+------------------------------------------------------------------+
@@ -589,17 +631,18 @@ public:
             else
             {
                SSignal signal = HFiboGetSignal();
+              // Log("وضعیت سیگنال دریافتی: ID=" + signal.id + ", Type=" + signal.type); // 👈 این لاگ رو اضافه کن برای دیباگ
                if(signal.id != "")
                {
-                  double mother_zero = HFiboGetMotherZeroPoint();
-                  double entry_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
-                  double sl_price = (signal.type == "Buy") ? mother_zero - m_sl_buffer_pips * _Point :
-                                                           mother_zero + m_sl_buffer_pips * _Point;
-                  if(SendTrade(signal, entry_price, sl_price))
-                  {
-                     m_state = HIPO_MANAGING_POSITION;
-                     Log("وارد حالت مدیریت معامله شد");
-                  }
+                   double mother_zero = HFiboGetMotherZeroPoint(); // 👈 صفر مادر رو از HFibo میگیریم
+                   double entry_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      
+                    if(SendTrade(signal, entry_price, mother_zero)) // 👈 حالا mother_zero رو پاس میدیم به SendTrade
+                    {
+                       m_state = HIPO_MANAGING_POSITION;
+                       Log("وارد حالت مدیریت معامله شد");
+                       HFiboAcknowledgeSignal(signal.id); 
+                    }
                   else
                   {
                      HFiboStopCurrentStructure();
