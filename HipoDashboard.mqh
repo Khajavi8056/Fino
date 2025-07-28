@@ -98,7 +98,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetInteger(0, name, OBJPROP_XSIZE, 300);
       ObjectSetInteger(0, name, OBJPROP_YSIZE, 120);
-      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrBlack);
+      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrDarkSlateGray);
       ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, -1);
       return true;
@@ -116,7 +116,7 @@ private:
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetInteger(0, name, OBJPROP_XSIZE, 300);
       ObjectSetInteger(0, name, OBJPROP_YSIZE, 20);
-      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrBlack);
+      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrGoldenrod);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
       return true;
    }
@@ -132,8 +132,8 @@ private:
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetInteger(0, name, OBJPROP_XSIZE, 300);
-      ObjectSetInteger(0, name, OBJPROP_YSIZE, 1);
-      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrGold);
+      ObjectSetInteger(0, name, OBJPROP_YSIZE,0.5);
+      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrGoldenrod);
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 0);
       return true;
    }
@@ -181,10 +181,10 @@ public:
          if(!CreateBackground(m_panel_name + "_Bg", 10, 20) ||
             !CreateHeader(m_panel_name + "_Header", 10, 20) ||
             !CreateHeaderLine(m_panel_name + "_HeaderLine", 10, 40) ||
-            !CreateLabel(m_panel_name + "_Title", "HipoFino v1.0", 20, 25, clrGold, 11, "Calibri Bold") ||
+            !CreateLabel(m_panel_name + "_Title", "HipoFino ", 120, 19, clrWhite, 13, "Calibri Bold") ||
             !CreateLabel(m_panel_name + "_HTF", "HTF Trend (" + EnumToString(m_htf) + ")", 30, 50, clrWhite, 9, "Calibri") ||
             !CreateLabel(m_panel_name + "_LTF", "LTF Trigger (" + EnumToString(m_ltf) + ")", 30, 70, clrWhite, 9, "Calibri") ||
-            !CreateLabel(m_panel_name + "_Status", "وضعیت: در انتظار سیگنال...", 20, 90, clrWhite, 9, "Calibri") ||
+            !CreateLabel(m_panel_name + "_Status", "وضعیت: در انتظار سیگنال...", 20, 90, clrWhite, 12, "Calibri") ||
             !CreateCircle(m_panel_name + "_HTF_Circle", 20, 50, clrLightGray) ||
             !CreateCircle(m_panel_name + "_LTF_Circle", 20, 70, clrLightGray))
          {
@@ -252,10 +252,10 @@ public:
          color status_color = (m_flash_counter < 20) ? clrLightYellow : clrWhite;
          
          ObjectSetInteger(0, m_panel_name + "_HTF_Circle", OBJPROP_COLOR,
-                          htf_bias == MACD_BULLISH ? clrGold :
+                          htf_bias == MACD_BULLISH ? clrGreen :
                           htf_bias == MACD_BEARISH ? clrRed : clrLightGray);
          ObjectSetInteger(0, m_panel_name + "_LTF_Circle", OBJPROP_COLOR,
-                          ltf_bias == MACD_BULLISH ? clrGold :
+                          ltf_bias == MACD_BULLISH ? clrGreen :
                           ltf_bias == MACD_BEARISH ? clrRed : clrLightGray);
          
          string status_text;
