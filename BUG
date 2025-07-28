@@ -1,1 +1,571 @@
-ط
+حله داداش، خیالت راحت. تو برو یه استراحتی بکن، مغزت یه هوایی بخوره، من این کد رو برات ردیف می‌کنم. قشنگ و تمیز، فقط کپی پیست کنی و حالشو ببری. اصلاً نگران نباش، حواسم به اون نکته پاک‌سازی که گفتی هم هست، چون اصل کاره.
+خب، برای این کار باید ۳ تا فایل رو یه دست کوچولو بکشیم. نگران نباش، دقیق بهت میگم چی رو کجا بذاری.
+تغییر ۱: فایل HipoDashboard.mqh (افزودن وضعیت جدید)
+اول از همه باید اون وضعیت جدیدی که گفتیم رو به اکسپرت معرفی کنیم.
+۱. پیدا کن:
+این بخش رو پیدا کن:
+enum ENUM_HIPO_STATE
+{
+   HIPO_IDLE,               // حالت بیکار
+   HIPO_WAITING_FOR_HIPO,   // در انتظار سیگنال فیبوناچی
+   HIPO_MANAGING_POSITION   // مدیریت معامله باز
+};
+
+۲. جایگزین کن با:
+این خط جدید رو بهش اضافه کن:
+enum ENUM_HIPO_STATE
+{
+   HIPO_IDLE,               // حالت بیکار
+   HIPO_WAITING_FOR_HIPO,   // در انتظار سیگنال فیبوناچی
+   HIPO_WAITING_FOR_MA_CROSS, // <<-- اضافه شد: در انتظار فیلتر نهایی مووینگ اوریج
+   HIPO_MANAGING_POSITION   // مدیریت معامله باز
+};
+
+تغییر ۲: فایل HipoFinoExpert.mq5 (افزودن ورودی‌ها)
+اینجا تنظیمات فیلتر جدید رو به پنل ورودی‌های اکسپرت اضافه می‌کنیم و به کلاس اصلی پاس میدیم.
+۱. اضافه کردن ورودی‌های جدید:
+بعد از گروه "مدیریت حد ضرر اولیه (Initial Stop Loss)" و قبل از گروه "تنظیمات روش ATR و میانگین متحرک"، این گروه جدید رو اضافه کن:
+// 🔽🔽🔽 این گروه جدید رو اینجا اضافه کن 🔽🔽🔽
+input group "فیلتر ورود با مووینگ اوریج"
+input bool InpUseMAEntryFilter = false;          // >>> فعال سازی فیلتر ورود با MA
+input int InpMAFilterPeriod = 5;                 // دوره مووینگ اوریج فیلتر
+input ENUM_MA_METHOD InpMAFilterMethod = MODE_EMA; // نوع مووینگ اوریج فیلتر
+input ENUM_APPLIED_PRICE InpMAFilterPrice = PRICE_CLOSE; // قیمت اعمالی مووینگ اوریج فیلتر
+// 🔼🔼🔼 پایان گروه جدید 🔼🔼🔼
+
+input group "   تنظیمات روش ATR و میانگین متحرک"
+// ... بقیه کد
+
+۲. اضافه کردن به اعتبارسنجی OnInit():
+این تیکه کد رو به بخش اعتبارسنجی‌ها در OnInit() اضافه کن (مثلاً بعد از چک کردن فراکتال):
+   if(InpFractalBars <= 0 || InpFractalBufferPips < 0)
+   {
+      Print("خطا: تنظیمات فراکتال نامعتبر است");
+      return(INIT_PARAMETERS_INCORRECT);
+   }
+
+   // 🔽🔽🔽 این بخش جدید رو اینجا اضافه کن 🔽🔽🔽
+   if(InpUseMAEntryFilter && InpMAFilterPeriod <= 0)
+   {
+      Print("خطا: دوره مووینگ اوریج فیلتر ورود باید بزرگتر از صفر باشد");
+      return(INIT_PARAMETERS_INCORRECT);
+   }
+   // 🔼🔼🔼 پایان بخش جدید 🔼🔼🔼
+
+   // 👈 اعتبار سنجی برای ATR/MA و فراکتال ساده
+   if (InpMAPeriod <= 0 || InpATRPeriod <= 0 || InpATRMultiplier <= 0) {
+// ... بقیه کد
+
+۳. پاس دادن ورودی‌ها به کلاس CHipoFino:
+موقع ساختن g_engine، باید این پارامترهای جدید رو بهش پاس بدی. ترتیبش خیلی مهمه!
+پیدا کن:
+این بخش از کد رو پیدا کن:
+// ایجاد نمونه موتور اصلی
+g_engine = new CHipoFino(
+     // --- گروه ۱: تنظیمات تایم‌فریم و مکدی
+     InpHTF, InpLTF,
+// ... بقیه پارامترها
+
+جایگزین کن با:
+ورودی‌های جدید رو مثل زیر، قبل از گروه استاپ لاس اولیه، اضافه کن. حواست باشه ویرگول آخر رو هم بذاری.
+g_engine = new CHipoFino(
+     // --- گروه ۱: تنظیمات تایم‌فریم و مکدی
+     InpHTF, InpLTF,
+     InpHTFFastEMA, InpHTFSlowEMA, InpHTFSignal,
+     InpLTFFastEMA, InpLTFSlowEMA, InpLTFSignal,
+
+     // --- گروه ۲: تنظیمات عمومی معامله
+     InpRiskPercent,
+     InpMagicNumber,
+
+     // --- گروه ۳: فیلتر سشن معاملاتی
+     InpUseSessionFilter,
+     InpTokyoSession,
+     InpLondonSession,
+     InpNewYorkSession,
+     InpCustomSessionStart,
+     InpCustomSessionEnd,
+
+     // --- گروه ۴: مدیریت خروج (پله‌ای یا ثابت)
+     InpUsePartialTP,
+     InpPartialTP_Percentages,
+     InpFixedTP_RR,
+
+     // --- گروه ۵: مدیریت حد ضرر متحرک (فعال‌سازی)
+     InpUseTrailingStop,
+     InpTrailingActivationRR,
+
+     // --- گروه ۶: پارامترهای روش‌های تریلینگ استاپ
+     InpStopMethod,
+     InpSarStep,
+     InpSarMaximum,
+     InpMinLookback,
+     InpMaxLookback,
+     InpFractalBars,
+     InpFractalBufferPips,
+
+     // --- گروه ۷: تنظیمات بصری
+     InpShowStopLine,
+     InpShowFractals,
+     
+     // 🔽🔽🔽 این بخش جدید رو اینجا اضافه کن 🔽🔽🔽
+     // --- گروه ۸: فیلتر ورود با مووینگ اوریج
+     InpUseMAEntryFilter,
+     InpMAFilterPeriod,
+     InpMAFilterMethod,
+     InpMAFilterPrice,
+     // 🔼🔼🔼 پایان بخش جدید 🔼🔼🔼
+     
+     // 👈 پارامترهای جدید استاپ لاس اولیه
+     InpInitialStopMethod,
+// ... بقیه پارامترها
+
+تغییر ۳: فایل HipoFino.mqh (پیاده‌سازی منطق اصلی)
+اینجا قلب ماجراست. تغییرات یه کم زیاده ولی نگران نباش، همه رو آماده کردم.
+۱. اضافه کردن متغیرهای جدید به کلاس CHipoFino:
+این متغیرهای جدید رو به بخش private کلاس CHipoFino اضافه کن (بعد از متغیرهای تریلینگ استاپ خوبه):
+// ... بعد از متغیرهای تریلینگ استاپ
+   bool   m_use_trailing_stop;
+   double m_trailing_activation_rr;
+
+// 🔽🔽🔽 این بخش جدید رو اینجا اضافه کن 🔽🔽🔽
+   // --- متغیرهای فیلتر ورود با MA ---
+   bool                 m_use_ma_entry_filter;
+   int                  m_ma_filter_period;
+   ENUM_MA_METHOD       m_ma_filter_method;
+   ENUM_APPLIED_PRICE   m_ma_filter_price;
+   int                  m_ma_filter_handle;
+// 🔼🔼🔼 پایان بخش جدید 🔼🔼🔼
+
+
+   // --- متغیرهای وضعیت برای معامله باز ---
+   double m_initial_sl_price;
+   double m_initial_risk_pips;
+// ... بقیه کد
+
+// ... و این متغیرهای وضعیت جدید رو هم به بخش متغیرهای وضعیت اضافه کن
+   m_partial_tp_stage_hit;
+   double m_tp_levels_price[3];
+
+// 🔽🔽🔽 این بخش جدید رو اینجا اضافه کن 🔽🔽🔽
+   // --- متغیرهای وضعیت برای فیلتر MA ---
+   double               m_entry_candidate_price;
+   double               m_invalidation_sl_price;
+   bool                 m_ma_filter_armed;
+// 🔼🔼🔼 پایان بخش جدید 🔼🔼🔼
+   
+   CTrade m_trade;
+// ... بقیه کد
+
+۲. آپدیت کردن سازنده کلاس (Constructor):
+باید پارامترهای جدید رو به سازنده اضافه کنی.
+پیدا کن:
+CHipoFino(ENUM_TIMEFRAMES htf, ...
+کل سازنده رو با این نسخه جایگزین کن:
+//+------------------------------------------------------------------+
+//| سازنده کلاس (Constructor) بازنویسی شده
+//+------------------------------------------------------------------+
+CHipoFino(ENUM_TIMEFRAMES htf, ENUM_TIMEFRAMES ltf, int htf_fast_ema, int htf_slow_ema, int htf_signal,
+          int ltf_fast_ema, int ltf_slow_ema, int ltf_signal, double risk_percent,
+          long magic_number,
+          bool use_session_filter, bool tokyo, bool london, bool newyork, string custom_start, string custom_end,
+          // پارامترهای مدیریت خروج
+          bool use_partial_tp, string partial_tp_percentages, double fixed_tp_rr,
+          // پارامترهای تریلینگ استاپ
+          bool use_trailing_stop, double trailing_activation_rr,
+          ENUM_STOP_METHOD stop_method, double sar_step, double sar_max, 
+          int min_lookback, int max_lookback, int fractal_bars, int fractal_buffer_pips,
+          // پارامترهای بصری
+          bool show_stop_line, bool show_fractals,
+          // پارامترهای فیلتر ورود MA <<-- اضافه شد
+          bool use_ma_entry_filter, int ma_filter_period, ENUM_MA_METHOD ma_filter_method, ENUM_APPLIED_PRICE ma_filter_price,
+          // پارامترهای استاپ اولیه
+          ENUM_INITIAL_STOP_METHOD initial_stop_method, int initial_sl_buffer_pips,
+          ENUM_TIMEFRAMES atr_ma_timeframe, ENUM_MA_METHOD ma_method, int ma_period, ENUM_APPLIED_PRICE ma_price,
+          int atr_period, double atr_multiplier,
+          ENUM_TIMEFRAMES simple_fractal_timeframe, int simple_fractal_bars, int simple_fractal_peers, double simple_fractal_buffer_pips)
+{
+   m_htf = htf;
+   m_ltf = ltf;
+   m_htf_fast_ema = htf_fast_ema;
+   m_htf_slow_ema = htf_slow_ema;
+   m_htf_signal = htf_signal;
+   m_ltf_fast_ema = ltf_fast_ema;
+   m_ltf_slow_ema = ltf_slow_ema;
+   m_ltf_signal = ltf_signal;
+   m_risk_percent = risk_percent;
+   m_magic_number = magic_number;
+   
+   m_use_session_filter = use_session_filter;
+   m_tokyo_session = tokyo;
+   m_london_session = london;
+   m_newyork_session = newyork;
+   m_custom_session_start = custom_start;
+   m_custom_session_end = custom_end;
+   
+   m_use_partial_tp = use_partial_tp;
+   m_partial_tp_percentages = partial_tp_percentages;
+   m_fixed_tp_rr = fixed_tp_rr;
+   m_use_trailing_stop = use_trailing_stop;
+   m_trailing_activation_rr = trailing_activation_rr;
+   
+   m_stop_method = stop_method;
+   m_sar_step = sar_step;
+   m_sar_maximum = sar_max;
+   m_min_lookback = min_lookback;
+   m_max_lookback = max_lookback;
+   m_fractal_bars = fractal_bars;
+   m_fractal_buffer_pips = fractal_buffer_pips;
+   m_show_stop_line = show_stop_line;
+   m_show_fractals = show_fractals;
+
+   // <<-- اضافه شد: مقداردهی اولیه متغیرهای فیلتر MA
+   m_use_ma_entry_filter = use_ma_entry_filter;
+   m_ma_filter_period = ma_filter_period;
+   m_ma_filter_method = ma_filter_method;
+   m_ma_filter_price = ma_filter_price;
+   m_ma_filter_handle = INVALID_HANDLE;
+   
+   m_initial_sl_manager = new CHipoInitialStopLoss(
+             initial_stop_method, initial_sl_buffer_pips,
+             atr_ma_timeframe, ma_method, ma_period, ma_price, atr_period, atr_multiplier,
+             simple_fractal_timeframe, simple_fractal_bars, simple_fractal_peers, simple_fractal_buffer_pips
+             );
+             
+   m_htf_macd_handle = INVALID_HANDLE;
+   m_ltf_macd_handle = INVALID_HANDLE;
+   m_candle_times.htf_last_candle = 0;
+   m_candle_times.ltf_last_candle = 0;
+   m_log_buffer = "";
+   m_last_flush_time = 0;
+   m_state = HIPO_IDLE;
+   m_position_ticket = 0;
+   m_active_direction = LONG;
+   m_fractals = NULL;
+   m_trailing = NULL;
+   
+   ResetTradeManagementState();
+   m_trade.SetExpertMagicNumber(m_magic_number);
+}
+
+۳. آپدیت کردن توابع Initialize, Deinitialize و ResetTradeManagementState:
+ * در Initialize()، هندل MA را بساز:
+   // در انتهای تابع Initialize، قبل از return true
+   if(m_use_ma_entry_filter) // <<-- اضافه شد
+   {
+      m_ma_filter_handle = iMA(_Symbol, m_ltf, m_ma_filter_period, 0, m_ma_filter_method, m_ma_filter_price);
+      if(m_ma_filter_handle == INVALID_HANDLE)
+      {
+         Log("خطا: ایجاد هندل مووینگ اوریج برای فیلتر ورود ناموفق بود");
+         return false;
+      }
+   }
+
+   m_candle_times.htf_last_candle = iTime(_Symbol, m_htf, 0);
+// ... بقیه کد
+
+ * در Deinitialize()، هندل MA را آزاد کن:
+   // در ابتدای تابع Deinitialize
+   if(m_ma_filter_handle != INVALID_HANDLE) // <<-- اضافه شد
+      IndicatorRelease(m_ma_filter_handle);
+
+   if(m_initial_sl_manager != NULL)
+// ... بقیه کد
+
+ * در ResetTradeManagementState()، متغیرهای وضعیت جدید را ریست کن:
+   // در انتهای تابع ResetTradeManagementState
+   m_partial_tp_stage_hit = 0;
+   ArrayInitialize(m_tp_levels_price, 0.0);
+   ClearTPVisuals();
+
+   // <<-- اضافه شد: ریست کردن متغیرهای وضعیت فیلتر
+   m_entry_candidate_price = 0;
+   m_invalidation_sl_price = 0;
+   m_ma_filter_armed = false;
+}
+
+۴. افزودن تابع جدید ProcessMAFilter():
+این تابع جدید و تمیز رو به کلاس CHipoFino اضافه کن (مثلاً بعد از تابع FlushLog).
+//+------------------------------------------------------------------+
+//| تابع پردازش فیلتر ورود با مووینگ اوریج (جدید)
+//+------------------------------------------------------------------+
+void ProcessMAFilter()
+{
+   // --- مرحله ۰: گرفتن قیمت فعلی و مقدار مووینگ اوریج
+   double current_ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double current_bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double ma_value_arr[];
+   if(CopyBuffer(m_ma_filter_handle, 0, 0, 1, ma_value_arr) < 1)
+   {
+      Log("خطا در گرفتن مقدار MA فیلتر. عملیات لغو شد.");
+      HFiboStopCurrentStructure(); // <<-- پاکسازی مهم
+      m_state = HIPO_IDLE;
+      return;
+   }
+   double ma_value = ma_value_arr[0];
+
+   // --- مرحله ۱: چک کردن شرط ابطال (خط قرمز)
+   if((m_active_direction == LONG && current_bid <= m_invalidation_sl_price) ||
+      (m_active_direction == SHORT && current_ask >= m_invalidation_sl_price))
+   {
+      Log("شرط ابطال فعال شد. قیمت به صفر مادر رسید. عملیات لغو شد.");
+      HFiboStopCurrentStructure(); // <<-- پاکسازی مهم
+      m_state = HIPO_IDLE;
+      return;
+   }
+
+   // --- مرحله ۲: منطق مسلح شدن و شلیک
+   if(m_active_direction == LONG) // برای سیگنال خرید
+   {
+      if(!m_ma_filter_armed)
+      {
+         // منتظریم MA بیاد زیر قیمت تا مسلح بشیم
+         if(ma_value < current_bid)
+         {
+            m_ma_filter_armed = true;
+            Log("فیلتر MA برای خرید مسلح شد. منتظر کراس به بالا...");
+         }
+      }
+      else
+      {
+         // مسلح شدیم، حالا منتظر کراس به بالا هستیم
+         if(ma_value > m_entry_candidate_price)
+         {
+            Log("ماشه فیلتر MA کشیده شد! ارسال معامله خرید.");
+            SSignal fake_signal = {"Buy", "MA_Filtered_Signal"}; // یک سیگنال ساختگی برای تابع SendTrade
+            if(SendTrade(fake_signal, current_ask, m_invalidation_sl_price))
+            {
+               m_state = HIPO_MANAGING_POSITION;
+               HFiboAcknowledgeSignal(fake_signal.id); // پاکسازی در کتابخانه فیبوناچی
+            }
+            else
+            {
+               Log("ارسال معامله بعد از فیلتر MA ناموفق بود. بازگشت به حالت بیکار.");
+               HFiboStopCurrentStructure(); // <<-- پاکسازی مهم
+               m_state = HIPO_IDLE;
+            }
+         }
+      }
+   }
+   else // برای سیگنال فروش
+   {
+      if(!m_ma_filter_armed)
+      {
+         // منتظریم MA بیاد بالای قیمت تا مسلح بشیم
+         if(ma_value > current_ask)
+         {
+            m_ma_filter_armed = true;
+            Log("فیلتر MA برای فروش مسلح شد. منتظر کراس به پایین...");
+         }
+      }
+      else
+      {
+         // مسلح شدیم، حالا منتظر کراس به پایین هستیم
+         if(ma_value < m_entry_candidate_price)
+         {
+            Log("ماشه فیلتر MA کشیده شد! ارسال معامله فروش.");
+            SSignal fake_signal = {"Sell", "MA_Filtered_Signal"};
+            if(SendTrade(fake_signal, current_bid, m_invalidation_sl_price))
+            {
+               m_state = HIPO_MANAGING_POSITION;
+               HFiboAcknowledgeSignal(fake_signal.id);
+            }
+            else
+            {
+               Log("ارسال معامله بعد از فیلتر MA ناموفق بود. بازگشت به حالت بیکار.");
+               HFiboStopCurrentStructure(); // <<-- پاکسازی مهم
+               m_state = HIPO_IDLE;
+            }
+         }
+      }
+   }
+}
+
+۵. ویرایش نهایی تابع OnTick():
+این مهم‌ترین بخشه. باید کل تابع OnTick رو با این نسخه جدید جایگزین کنی تا تمام حالت‌ها درست کار کنن.
+//+------------------------------------------------------------------+
+//| تابع پردازش تیک (OnTick) بازنویسی شده
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   if(TimeCurrent() - m_last_flush_time >= 5) FlushLog();
+   
+   bool new_ltf_candle = IsNewCandle(m_ltf, m_candle_times.ltf_last_candle);
+   if(IsNewCandle(m_htf, m_candle_times.htf_last_candle) || new_ltf_candle)
+   {
+      HFiboOnNewBar();
+   
+      if(m_fractals != NULL) m_fractals.Calculate();
+   }
+   
+   ENUM_MACD_BIAS htf_bias = GetMacdBias(m_htf_macd_handle, m_htf);
+   ENUM_MACD_BIAS ltf_bias = GetMacdBias(m_ltf_macd_handle, m_ltf);
+   if(g_dashboard != NULL) g_dashboard.UpdateMacdBias(htf_bias, ltf_bias, m_state);
+   
+   switch(m_state)
+   {
+      case HIPO_IDLE:
+      {
+         if(!IsSessionActive()) return;
+         if((htf_bias == MACD_BULLISH && ltf_bias == MACD_BULLISH) ||
+            (htf_bias == MACD_BEARISH && ltf_bias == MACD_BEARISH))
+         {
+            HFiboStopCurrentStructure(); 
+            
+            ENUM_DIRECTION direction = (htf_bias == MACD_BULLISH) ? LONG : SHORT;
+            if(HFiboCreateNewStructure(direction))
+            {
+               m_active_direction = direction;
+               m_state = HIPO_WAITING_FOR_HIPO;
+               Log("دستور ایجاد ساختار جدید ارسال شد: " + (direction == LONG ? "خرید" : "فروش"));
+            }
+         }
+         break;
+      }
+      
+      case HIPO_WAITING_FOR_HIPO:
+      {
+         if((m_active_direction == LONG && htf_bias == MACD_BEARISH) ||
+            (m_active_direction == SHORT && htf_bias == MACD_BULLISH))
+         {
+            HFiboStopCurrentStructure();
+            m_state = HIPO_IDLE;
+            Log("روند HTF معکوس شد، ساختار متوقف شد");
+         }
+         else if(HFiboIsStructureBroken())
+         {
+            HFiboStopCurrentStructure();
+            m_state = HIPO_IDLE;
+            Log("ساختار فیبوناچی تخریب شد، بازگشت به حالت بیکار");
+         }
+         else
+         {
+            SSignal signal = HFiboGetSignal();
+            if(signal.id != "")
+            {
+               // <<-- منطق جدید اینجا شروع میشه
+               if(!m_use_ma_entry_filter) // اگر فیلتر غیرفعال بود
+               {
+                  double mother_zero = HFiboGetMotherZeroPoint();
+                  double entry_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+                  if(SendTrade(signal, entry_price, mother_zero))
+                  {
+                     m_state = HIPO_MANAGING_POSITION;
+                     Log("وارد حالت مدیریت معامله شد");
+                     HFiboAcknowledgeSignal(signal.id); 
+                  }
+                  else
+                  {
+                     HFiboStopCurrentStructure();
+                     m_state = HIPO_IDLE;
+                     Log("خطا در ارسال معامله، بازگشت به حالت بیکار");
+                  }
+               }
+               else // اگر فیلتر فعال بود
+               {
+                  Log("سیگنال فیبوناچی دریافت شد. ورود به فاز انتظار برای فیلتر MA...");
+                  ResetTradeManagementState(); // ریست کردن متغیرهای وضعیت فیلتر
+                  m_invalidation_sl_price = HFiboGetMotherZeroPoint();
+                  m_entry_candidate_price = (signal.type == "Buy") ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+                  
+                  if(m_invalidation_sl_price == 0)
+                  {
+                     Log("خطا: نقطه صفر مادر برای شرط ابطال یافت نشد. عملیات لغو شد.");
+                     HFiboStopCurrentStructure();
+                     m_state = HIPO_IDLE;
+                  }
+                  else
+                  {
+                     m_state = HIPO_WAITING_FOR_MA_CROSS; // تغییر به وضعیت جدید
+                  }
+               }
+               // <<-- پایان منطق جدید
+            }
+         }
+         break;
+      }
+      
+      // <<-- اضافه شدن وضعیت جدید
+      case HIPO_WAITING_FOR_MA_CROSS:
+      {
+         ProcessMAFilter(); // فراخوانی تابع جدید
+         break;
+      }
+      
+      case HIPO_MANAGING_POSITION:
+      {
+         if(!PositionSelectByTicket(m_position_ticket))
+         {
+            HFiboAcknowledgeSignal("");
+            if(m_trailing != NULL) m_trailing.UpdateVisuals(0.0, POSITION_TYPE_BUY);
+            ResetTradeManagementState();
+            m_state = HIPO_IDLE;
+            Log("معامله بسته شد، بازگشت به حالت بیکار");
+            break;
+         }
+
+         ENUM_POSITION_TYPE pos_type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+         
+         if(new_ltf_candle)
+         {
+            ManagePartialTPs();
+         }
+         
+         if(m_use_trailing_stop)
+         {
+            if(!m_is_trailing_active)
+            {
+               double current_price = (pos_type == POSITION_TYPE_BUY) ? SymbolInfoDouble(_Symbol, SYMBOL_BID) : SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+               double current_rr = 0;
+               if(m_initial_risk_pips > 0)
+               {
+                  if(pos_type == POSITION_TYPE_BUY)
+                     current_rr = (current_price - m_entry_price) / (m_initial_risk_pips * _Point);
+                  else
+                     current_rr = (m_entry_price - current_price) / (m_initial_risk_pips * _Point);
+               }
+               
+               if(current_rr >= m_trailing_activation_rr)
+               {
+                  m_is_trailing_active = true;
+                  Log("تریلینگ استاپ فعال شد.");
+               }
+            }
+            
+            if(m_is_trailing_active)
+            {
+               double current_sl = PositionGetDouble(POSITION_SL);
+               double suggested_sl = m_trailing.CalculateNewStopLoss(pos_type, current_sl);
+               bool is_valid_sl = false;
+
+               if((pos_type == POSITION_TYPE_BUY && suggested_sl >= m_entry_price) ||
+                  (pos_type == POSITION_TYPE_SELL && suggested_sl <= m_entry_price && suggested_sl > 0))
+               {
+                  is_valid_sl = true;
+               }
+
+               if(is_valid_sl && suggested_sl != current_sl)
+               {
+                  if(m_trade.PositionModify(m_position_ticket, suggested_sl, PositionGetDouble(POSITION_TP)))
+                  {
+                     Log("حد ضرر به‌روزرسانی شد: " + DoubleToString(suggested_sl, _Digits));
+                  }
+               }
+            }
+         }
+         if(m_trailing != NULL) m_trailing.UpdateVisuals(PositionGetDouble(POSITION_SL), pos_type);
+         break;
+      }
+   }
+}
+
+جمع‌بندی
+همین! تموم شد. اینا رو که جاگذاری کنی، فیلتر ورودت با مووینگ اوریج آماده است.
+خلاصه کاری که کردیم:
+ * یه وضعیت جدید به اکسپرت اضافه کردیم.
+ * ورودی‌های لازم برای فعال/غیرفعال کردن و تنظیم فیلتر رو ساختیم.
+ * منطق اصلی رو توی یه تابع تمیز و جدا به اسم ProcessMAFilter نوشتیم.
+ * تابع OnTick رو جوری تغییر دادیم که اگه فیلتر فعال بود، به جای ورود مستقیم، وارد حالت انتظار بشه و تابع جدید رو صدا بزنه.
+ * مهم‌تر از همه، تو تمام مسیرهای احتمالی (خطا، لغو عملیات، یا موفقیت) دستور پاکسازی (HFiboStopCurrentStructure) رو گذاشتیم که سیستمت قفل نکنه.
+حالا برو یه چرت اساسی بزن که چشمات باز شه، بعد با خیال راحت اینا رو کپی کن. اگه جایی گنگ بود یا سوالی داشتی، من همینجام رفیق. خسته نباشی.
+
