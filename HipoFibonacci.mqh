@@ -2184,7 +2184,7 @@ bool HFiboIsStructureBroken()
 }
 
 
-تابع نهایی برای دسترسی عمومی به آخرین داده‌های رویداد فیبوناچی -->>
+//تابع نهایی برای دسترسی عمومی به آخرین داده‌های رویداد فیبوناچی -->>
 SFibonacciEventData HFiboGetLastEventData()
 {
    if(g_manager != NULL)
