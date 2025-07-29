@@ -134,6 +134,17 @@ struct SFractal
    double price;
    datetime time;
 };
+// ... بعد از تعریف struct SFractal
+
+// <<-- اضافه شد: ساختار جدید برای نگهداری داده‌های خروجی و رویدادهای کلیدی فیبوناچی -->>
+struct SFibonacciEventData
+{
+   datetime child1_fix_time;          // زمان دقیق فیکس شدن فرزند اول
+   double   child1_fix_price;         // قیمت در لحظه فیکس شدن فرزند اول
+   datetime child1_breakout_time;     // زمان دقیق شکست سقف/کف فرزند اول
+   double   child1_breakout_price;    // قیمت در لحظه شکست سقف/کف فرزند اول
+   string   child2_levels_string;     // تمام سطوح فرزند دوم به صورت یک رشته
+};
 
 //+------------------------------------------------------------------+
 //| کلاس CFractalFinder: پیدا کردن فراکتال‌ها                      |
@@ -841,6 +852,11 @@ private:
    double m_breakout_candle_high;
    double m_breakout_candle_low;
    int m_breakout_candle_count;
+   datetime m_fixation_time;
+   double   m_fixation_price;
+   datetime m_breakout_time;
+   double   m_breakout_price;
+   
    void Log(string message)
    {
       if(InpEnableLog)
@@ -1015,6 +1031,11 @@ virtual bool Draw() override
       if(fix_condition)
       {
          m_is_fixed = true;
+         
+          // <<-- اضافه شد: ثبت زمان و قیمت فیکس شدن -->>
+          m_fixation_time = TimeCurrent();
+         m_fixation_price = current_price;
+   
          Log("فرزند اول فیکس شد: صد=" + DoubleToString(m_price100, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
          if(InpVisualDebug)
          {
@@ -1044,6 +1065,8 @@ virtual bool Draw() override
                                  (m_parent_mother.GetDirection() == SHORT && current_price < m_price100);
          if(trigger_condition)
          {
+         m_breakout_time = TimeCurrent();
+        m_breakout_price = current_price;
             Log("فرزند دوم (موفق) فعال شد: عبور از صد فرزند اول: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
             return true;
          }
@@ -1140,6 +1163,31 @@ virtual bool Draw() override
    }
    return false;
 }
+
+
+   // <<-- اضافه شد: تابع اصلی برای خروجی گرفتن از تمام داده‌های کلیدی این فرزند -->>
+   SFibonacciEventData GetEventData()
+   {
+      SFibonacciEventData data;
+      
+      // پر کردن اطلاعاتی که ثبت کردیم
+      data.child1_fix_time = m_fixation_time;
+      data.child1_fix_price = m_fixation_price;
+      data.child1_breakout_time = m_breakout_time;
+      data.child1_breakout_price = m_breakout_price;
+
+      // پر کردن رشته سطوح فیبوناچی
+      string result = "";
+      for(int i = 0; i < ArraySize(m_levels); i++)
+      {
+         double level_price = m_price100 + (m_price0 - m_price100) * (m_levels[i] / 100.0);
+         result += "L" + (string)m_levels[i] + ":" + DoubleToString(level_price, _Digits) + ";";
+      }
+      data.child2_levels_string = result;
+      
+      return data;
+   }
+
 //+------------------------------------------------------------------+
 //| CChildFibo::CheckSuccessChild2 (نسخه کامل و نهایی)                |
 //+------------------------------------------------------------------+
@@ -1546,6 +1594,23 @@ bool CFamily::UpdateOnTick(double current_price, datetime current_time)
    }
 
 
+   SFibonacciEventData GetLastEventData()
+   {
+      // اگر فرزند دوم فعال است، اطلاعات آن را برمیگردانیم
+      if(m_child2 != NULL)
+      {
+         return m_child2.GetEventData();
+      }
+      // اگر فرزند اول فعال است، اطلاعات آن را برمیگردانیم
+      if(m_child1 != NULL)
+      {
+         return m_child1.GetEventData();
+      }
+      
+      // اگر هیچ فرزندی فعال نیست، یک ساختار خالی برمیگردانیم
+      SFibonacciEventData empty_data;
+      return empty_data;
+   }
 //==================================================================
 // >> نسخه اصلاح شده و نهایی تابع نگهبان مادر <<
 //==================================================================
@@ -1784,6 +1849,20 @@ public:
       }
       Log("کتابخانه HipoFibonacci راه‌اندازی شد");
       return true;
+   }
+
+   // <<-- اضافه شد: تابعی برای گرفتن داده‌های رویداد از تنها خانواده فعال -->>
+   SFibonacciEventData GetActiveFamilyEventData()
+   {
+      // ما فقط یک ساختار فعال داریم، پس همیشه سراغ اولین عضو آرایه (اندیس صفر) میریم
+      if(ArraySize(m_families) > 0 && m_families[0] != NULL)
+      {
+         return m_families[0].GetLastEventData();
+      }
+      
+      // اگر ساختاری فعال نبود، ساختار خالی برمیگردانیم
+      SFibonacciEventData empty_data;
+      return empty_data;
    }
 
    void HFiboOnDeinit(const int reason)
@@ -2102,4 +2181,18 @@ bool HFiboIsStructureBroken()
       return true; // هیچ ساختاری فعال نیست، یعنی ساختار تخریب شده
    }
    return false; // ساختار همچنان فعال است
+}
+
+
+تابع نهایی برای دسترسی عمومی به آخرین داده‌های رویداد فیبوناچی -->>
+SFibonacciEventData HFiboGetLastEventData()
+{
+   if(g_manager != NULL)
+   {
+      return g_manager.GetActiveFamilyEventData();
+   }
+   
+   // اگر مدیر اصلی وجود نداشت، ساختار خالی برمیگردانیم
+   SFibonacciEventData empty_data;
+   return empty_data;
 }
