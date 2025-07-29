@@ -83,7 +83,11 @@ input int InpFractalBufferPips = 5;            // بافر فراکتال (پی�
 input group "مدیریت حد ضرر اولیه (Initial Stop Loss)" // 👈 گروه جدید
 input ENUM_INITIAL_STOP_METHOD InpInitialStopMethod = INITIAL_STOP_MOTHER_ZERO; // 👈 ورودی انتخاب روش[span_1](end_span)
 input int InpInitialSLBufferPips = 10; // 👈 بافر پیپ عمومی برای استاپ اولیه[span_2](end_span)
-
+input group "فیلتر ورود با مووینگ اوریج"
+input bool InpUseMAEntryFilter = false;          // >>> فعال سازی فیلتر ورود با MA
+input int InpMAFilterPeriod = 5;                 // دوره مووینگ اوریج فیلتر
+input ENUM_MA_METHOD InpMAFilterMethod = MODE_EMA; // نوع مووینگ اوریج فیلتر
+input ENUM_APPLIED_PRICE InpMAFilterPrice = PRICE_CLOSE; // قیمت اعمالی مووینگ اوریج فیلتر
 input group "   تنظیمات روش ATR و میانگین متحرک"
 input ENUM_TIMEFRAMES InpATRMATimeframe = PERIOD_H1; // 👈 تایم‌فریم ATR/MA[span_3](end_span)
 input ENUM_MA_METHOD InpMAMethod = MODE_EMA;         // 👈 نوع میانگین متحرک (EMA/SMA)
@@ -245,7 +249,12 @@ g_engine = new CHipoFino(
     // --- گروه ۷: تنظیمات بصری
     InpShowStopLine,
     InpShowFractals,
-    
+     // --- گروه ۸: فیلتر ورود با مووینگ اوریج
+     InpUseMAEntryFilter,
+     InpMAFilterPeriod,
+     InpMAFilterMethod,
+     InpMAFilterPrice,
+     
     // 👈 پارامترهای جدید استاپ لاس اولیه
     InpInitialStopMethod,
     InpInitialSLBufferPips, // 👈 بافر پیپ جدید
