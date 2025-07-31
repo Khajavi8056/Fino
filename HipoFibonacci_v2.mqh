@@ -1,6 +1,17 @@
+//+------------------------------------------------------------------+
+//|                                              HipoFibonacci.mqh   |
+//|                              محصولی از: Hipo Algorithm           |
+//|                              نسخه: 2.0.0                          |
+//|                              تاریخ: 2025/07/27                   |
+//| کتابخانه فیبوناچی برای پروژه HipoFino                          |
+//+------------------------------------------------------------------+
+
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
 #property version   "2.0.0"
+
+#ifndef HIPO_FIBONACCI_MQH
+#define HIPO_FIBONACCI_MQH
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -41,42 +52,41 @@ input ENUM_TIMEFRAMES InpFractalTimeframe = PERIOD_CURRENT; // تایم‌فری
 input group "شکست ساختار اولیه (برای مادر)"
 enum ENUM_FRACTAL_BREAK_MODE
 {
-   SIMPLE_PRICE_CROSS, // عبور لحظه‌ای قیمت
-   CANDLE_CLOSE,       // کلوز کندل
-   CONFIRMED_BREAK     // شکست تأییدشده
+   SIMPLE_PRICE_CROSS,       // عبور لحظه‌ای قیمت
+   FRACTAL_CANDLE_CLOSE,     // کلوز کندل
+   FRACTAL_CONFIRMED_BREAK   // شکست تأییدشده
 };
-input ENUM_FRACTAL_BREAK_MODE InpFractalBreakMode = CANDLE_CLOSE; // روش شکست فرکتال
-input bool InpUseFractalAge = false; // استفاده از زمان تشکیل فرکتال (true) یا زمان شکست (false)
+input ENUM_FRACTAL_BREAK_MODE InpFractalBreakMode = FRACTAL_CANDLE_CLOSE; // روش شکست فرکتال
 input int InpMaxBreakoutCandles = 3; // حداکثر کندل‌های فرصت برای تأیید شکست
+
+input group "فیکس شدن مادر"
+enum ENUM_FIX_MODE
+{
+   FIX_PRICE_CROSS,  // عبور لحظه‌ای قیمت
+   FIX_CANDLE_CLOSE  // کلوز کندل
+};
+input ENUM_FIX_MODE InpMotherFixMode = FIX_PRICE_CROSS; // حالت فیکس شدن مادر
+
+input group "تخریب ساختار"
+enum ENUM_STRUCTURE_BREAK_MODE
+{
+   STRUCTURE_PRICE_CROSS,  // عبور لحظه‌ای قیمت
+   STRUCTURE_CANDLE_CLOSE  // کلوز کندل
+};
+input ENUM_STRUCTURE_BREAK_MODE InpStructureBreakMode = STRUCTURE_PRICE_CROSS; // حالت تخریب ساختار
+
+input group "شکست فرزند اول"
+enum ENUM_CHILD_BREAK_MODE
+{
+   CHILD_PRICE_CROSS,      // عبور ساده قیمت
+   CHILD_CONFIRMED_BREAK   // شکست تأییدشده
+};
+input ENUM_CHILD_BREAK_MODE InpChildBreakMode = CHILD_CONFIRMED_BREAK; // حالت شکست سطح 100% فرزند
 
 input group "سطوح فیبوناچی"
 input string InpMotherLevels = "0,38,50,68,100,150,200,250"; // سطوح فیبو مادر
 input string InpChildLevels = "0,38,50,68,100,150,200,250";  // سطوح فیبو فرزندان
 input string InpGoldenZone = "38,50"; // ناحیه طلایی برای سیگنال
-
-input group "فیکس شدن مادر"
-enum ENUM_FIX_MODE
-{
-   PRICE_CROSS,   // عبور لحظه‌ای قیمت
-   CANDLE_CLOSE   // کلوز کندل
-};
-input ENUM_FIX_MODE InpMotherFixMode = PRICE_CROSS; // حالت فیکس شدن مادر
-
-input group "تخریب ساختار"
-enum ENUM_STRUCTURE_BREAK_MODE
-{
-   PRICE_CROSS1,   // عبور لحظه‌ای قیمت
-   CANDLE_CLOSE1   // کلوز کندل
-};
-input ENUM_STRUCTURE_BREAK_MODE InpStructureBreakMode = PRICE_CROSS1; // حالت تخریب ساختار
-
-input group "شکست فرزند اول"
-enum ENUM_CHILD_BREAK_MODE
-{
-   PRICE_CROSSS,     // عبور ساده قیمت
-   CONFIRMED_BREAK   // شکست تأییدشده
-};
-input ENUM_CHILD_BREAK_MODE InpChildBreakMode = CONFIRMED_BREAK; // حالت شکست سطح 100% فرزند
 
 input group "رنگ‌بندی اشیاء"
 input color InpMotherColor = clrWhite;    // رنگ فیبوناچی مادر
@@ -171,7 +181,7 @@ struct SFibonacciEventData
 //+------------------------------------------------------------------+
 class CFractalFinder
 {
-private:
+public:
    bool IsHighFractal(int index, ENUM_TIMEFRAMES timeframe, int peers)
    {
       if(index + peers >= iBars(_Symbol, timeframe)) return false;
@@ -200,7 +210,6 @@ private:
       return true;
    }
 
-public:
    void FindRecentHigh(datetime startTime, int lookback, int peers, ENUM_TIMEFRAMES timeframe, SFractal &fractal)
    {
       fractal.price = 0.0;
@@ -536,7 +545,7 @@ public:
    datetime GetTime100() { return m_time100; }
    double GetPrice100() { return m_price100; }
 
- double GetLevel(int index) { return index < ArraySize(m_levels) ? m_levels[index] : 0.0; }
+   double GetLevel(int index) { return index < ArraySize(m_levels) ? m_levels[index] : 0.0; }
    int GetLevelsCount() { return ArraySize(m_levels); }
 };
 
@@ -613,37 +622,34 @@ private:
          CStructureManager::AddLog(message);
    }
 
-   
-bool DrawGoldenZone()
-{
-   if(!m_is_success_child2) return true;
-   string rect_name = m_golden_zone_name + (m_is_test ? "_Test" : "");
-   ObjectDelete(0, rect_name);
-   string temp_levels[];
-   int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
-   if(count < 2)
+   bool DrawGoldenZone()
    {
-      Log("خطا: InpGoldenZone باید حداقل دو سطح داشته باشد");
-      return false;
+      if(!m_is_success_child2) return true;
+      string rect_name = m_golden_zone_name + (m_is_test ? "_Test" : "");
+      ObjectDelete(0, rect_name);
+      string temp_levels[];
+      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+      if(count < 2)
+      {
+         Log("خطا: InpGoldenZone باید حداقل دو سطح داشته باشد");
+         return false;
+      }
+      double level_1 = StringToDouble(temp_levels[0]) / 100.0;
+      double level_2 = StringToDouble(temp_levels[1]) / 100.0;
+      double price_level_1 = m_price100 + (m_price0 - m_price100) * level_1;
+      double price_level_2 = m_price100 + (m_price0 - m_price100) * level_2;
+      double zone_lower = MathMin(price_level_1, price_level_2);
+      double zone_upper = MathMax(price_level_1, price_level_2);
+      datetime right_edge = iTime(_Symbol, _Period, 0) + PeriodSeconds(_Period) * 100;
+      if(!ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, m_time100, zone_lower, right_edge, zone_upper)) return false;
+      ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrGoldenrod);
+      ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrGoldenrod);
+      ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
+      ObjectSetInteger(0, rect_name, OBJPROP_ZORDER, -1);
+      CheckObjectExists(rect_name);
+      Log("مستطیل زون طلایی رسم شد: از " + TimeToString(m_time100) + " تا لبه چارت");
+      return true;
    }
-   double level_1 = StringToDouble(temp_levels[0]) / 100.0;
-   double level_2 = StringToDouble(temp_levels[1]) / 100.0;
-   double price_level_1 = m_price100 + (m_price0 - m_price100) * level_1;
-   double price_level_2 = m_price100 + (m_price0 - m_price100) * level_2;
-   double zone_lower = MathMin(price_level_1, price_level_2);
-   double zone_upper = MathMax(price_level_1, price_level_2);
-   datetime right_edge = iTime(_Symbol, _Period, 0) + PeriodSeconds(_Period) * 100;
-   if(!ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, m_time100, zone_lower, right_edge, zone_upper)) return false;
-   ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrGoldenrod);
-   ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrGoldenrod);
-   ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
-   ObjectSetInteger(0, rect_name, OBJPROP_ZORDER, -1);
-   ObjectSetDouble(0, rect_name, OBJPROP_BGCOLOR, clrGoldenrod, 0.3);
-   CheckObjectExists(rect_name);
-   Log("مستطیل زون طلایی رسم شد: از " + TimeToString(m_time100) + " تا لبه چارت");
-   return true;
-}
-
 
 public:
    CChildFibo(string name, color clr, string levels, CMotherFibo* mother, bool is_success_child2, bool is_test)
@@ -796,7 +802,7 @@ public:
    bool CheckFailure(double current_price)
    {
       if(m_is_fixed || m_parent_mother == NULL) return false;
-      if(InpChildBreakMode == PRICE_CROSSS)
+      if(InpChildBreakMode == CHILD_PRICE_CROSS)
       {
          bool fail_condition = (m_direction == LONG && current_price > m_parent_mother.GetPrice100()) ||
                                (m_direction == SHORT && current_price < m_parent_mother.GetPrice100());
@@ -816,7 +822,7 @@ public:
             return true;
          }
       }
-      else if(InpChildBreakMode == CONFIRMED_BREAK)
+      else if(InpChildBreakMode == CHILD_CONFIRMED_BREAK)
       {
          if(!m_breakout_triggered)
          {
@@ -920,10 +926,10 @@ public:
             else
                break_level = m_parent_mother.GetPrice100() - (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * (target_level / 100.0);
             bool break_condition = false;
-            if(InpStructureBreakMode == PRICE_CROSS1)
+            if(InpStructureBreakMode == STRUCTURE_PRICE_CROSS)
                break_condition = (m_direction == LONG && iHigh(_Symbol, _Period, 1) >= break_level) ||
                                  (m_direction == SHORT && iLow(_Symbol, _Period, 1) <= break_level);
-            else if(InpStructureBreakMode == CANDLE_CLOSE1)
+            else if(InpStructureBreakMode == STRUCTURE_CANDLE_CLOSE)
                break_condition = (m_direction == LONG && iClose(_Symbol, _Period, 1) >= break_level && iOpen(_Symbol, _Period, 0) >= break_level) ||
                                  (m_direction == SHORT && iClose(_Symbol, _Period, 1) <= break_level && iOpen(_Symbol, _Period, 0) <= break_level);
             if(break_condition)
@@ -1080,7 +1086,7 @@ public:
       }
       if(m_state == MOTHER_ACTIVE)
       {
-         if(InpMotherFixMode == PRICE_CROSS)
+         if(InpMotherFixMode == FIX_PRICE_CROSS)
          {
             double level_50 = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * 0.5;
             bool fix_condition = (m_direction == LONG && current_price >= level_50) ||
@@ -1142,7 +1148,7 @@ public:
    {
       if(m_state == MOTHER_ACTIVE)
       {
-         if(InpMotherFixMode == CANDLE_CLOSE)
+         if(InpMotherFixMode == FIX_CANDLE_CLOSE)
          {
             double level_50 = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * 0.5;
             bool fix_condition = (m_direction == LONG && iClose(_Symbol, _Period, 1) >= level_50) ||
@@ -1168,37 +1174,35 @@ public:
       return true;
    }
 
-
-SSignal GetSignal()
-{
-   SSignal signal = {"", ""};
-   if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
+   SSignal GetSignal()
    {
-      string temp_levels[];
-      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
-      if(count < 2)
+      SSignal signal = {"", ""};
+      if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
       {
-         Log("خطا: InpGoldenZone باید حداقل دو سطح داشته باشد");
-         return signal;
+         string temp_levels[];
+         int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+         if(count < 2)
+         {
+            Log("خطا: InpGoldenZone باید حداقل دو سطح داشته باشد");
+            return signal;
+         }
+         double level_1 = StringToDouble(temp_levels[0]) / 100.0;
+         double level_2 = StringToDouble(temp_levels[1]) / 100.0;
+         double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
+         double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
+         double zone_lower = MathMin(price_level_1, price_level_2);
+         double zone_upper = MathMax(price_level_1, price_level_2);
+         double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+         if(current_price >= zone_lower && current_price <= zone_upper)
+         {
+            signal.type = m_direction == LONG ? "Buy" : "Sell";
+            signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Complex" : "Simple");
+            Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id);
+            m_state = COMPLETED;
+         }
       }
-      double level_1 = StringToDouble(temp_levels[0]) / 100.0;
-      double level_2 = StringToDouble(temp_levels[1]) / 100.0;
-      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
-      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
-      double zone_lower = MathMin(price_level_1, price_level_2);
-      double zone_upper = MathMax(price_level_1, price_level_2);
-      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      if(current_price >= zone_lower && current_price <= zone_upper)
-      {
-         signal.type = m_direction == LONG ? "Buy" : "Sell";
-         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Complex" : "Simple");
-         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id);
-         m_state = COMPLETED;
-      }
+      return signal;
    }
-   return signal;
-}
-
 
    SFibonacciEventData GetLastEventData()
    {
@@ -1311,23 +1315,16 @@ private:
       }
    }
 
-
-
-
-
    void FindAndStoreFractals(bool is_initial_scan)
    {
-      // بررسی وجود داده‌های کافی در چارت
       if(iBars(_Symbol, InpFractalTimeframe) < InpFractalPeers + 1)
       {
          Log("خطا: داده‌های چارت کافی نیست برای تایم‌فریم " + EnumToString(InpFractalTimeframe));
          return;
       }
 
-      // محاسبه زمان شروع بازه Lookback
       datetime lookback_time = iTime(_Symbol, InpFractalTimeframe, InpFractalLookback);
 
-      // حذف فرکتال‌های قدیمی‌تر از InpFractalLookback
       for(int i = m_unbrokenHighs_total - 1; i >= 0; i--)
       {
          if(m_unbrokenHighs[i].time < lookback_time)
@@ -1425,8 +1422,6 @@ private:
       DrawUnbrokenFractals();
    }
 
-   
-
    void CheckForBreakouts()
    {
       double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
@@ -1489,7 +1484,7 @@ private:
             }
          }
       }
-      else if(InpFractalBreakMode == CANDLE_CLOSE)
+      else if(InpFractalBreakMode == FRACTAL_CANDLE_CLOSE)
       {
          for(int i = m_unbrokenHighs_total - 1; i >= 0; i--)
          {
@@ -1546,7 +1541,7 @@ private:
             }
          }
       }
-      else if(InpFractalBreakMode == CONFIRMED_BREAK)
+      else if(InpFractalBreakMode == FRACTAL_CONFIRMED_BREAK)
       {
          if(m_pendingHighBreak.time != 0)
          {
@@ -1561,33 +1556,33 @@ private:
                m_pendingHighBreak.candles_left--;
                if(iHigh(_Symbol, InpFractalTimeframe, 1) >= m_pendingHighBreak.initial_break_price)
                {
+                  SBrokenFractal broken;
+                  broken.time = m_pendingHighBreak.time;
+                  broken.price = m_pendingHighBreak.price;
+                  broken.direction = LONG;
+                  broken.break_time = iTime(_Symbol, InpFractalTimeframe, 1);
+                  broken.is_bos = m_pendingDirection == LONG;
+                  m_lastBrokenHigh = broken;
                   for(int i = 0; i < m_unbrokenHighs_total; i++)
                   {
-                     if(m_unbrokenHighs[i].time == m_pendingHighBreak.time)
+                     if(m_unbrokenHighs[i].time == broken.time)
                      {
-                        SBrokenFractal broken;
-                        broken.time = m_unbrokenHighs[i].time;
-                        broken.price = m_unbrokenHighs[i].price;
-                        broken.direction = LONG;
-                        broken.break_time = iTime(_Symbol, InpFractalTimeframe, 1);
-                        broken.is_bos = m_pendingDirection == LONG;
-                        m_lastBrokenHigh = broken;
                         for(int j = i; j < m_unbrokenHighs_total - 1; j++)
                            m_unbrokenHighs[j] = m_unbrokenHighs[j+1];
                         m_unbrokenHighs_total--;
-                        m_pendingHighBreak.time = 0;
-                        Log("شکست سقف (تأییدشده): قیمت=" + DoubleToString(broken.price, _Digits) + ", BOS=" + (broken.is_bos ? "true" : "false"));
-                        if(InpVisualDebug)
-                        {
-                           string label_name = "Debug_Label_" + (broken.is_bos ? "BOS" : "CHOCH") + "_" + TimeToString(broken.break_time) + (m_is_test_mode ? "_Test" : "");
-                           if(ObjectCreate(0, label_name, OBJ_TEXT, 0, broken.break_time, broken.price))
-                           {
-                              ObjectSetString(0, label_name, OBJPROP_TEXT, broken.is_bos ? "BOS" : "CHOCH");
-                              ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrYellow);
-                              ObjectSetInteger(0, label_name, OBJPROP_FONTSIZE, 8);
-                           }
-                        }
                         break;
+                     }
+                  }
+                  m_pendingHighBreak.time = 0;
+                  Log("شکست سقف تأیید شد: قیمت=" + DoubleToString(broken.price, _Digits) + ", BOS=" + (broken.is_bos ? "true" : "false"));
+                  if(InpVisualDebug)
+                  {
+                     string label_name = "Debug_Label_" + (broken.is_bos ? "BOS" : "CHOCH") + "_" + TimeToString(broken.break_time) + (m_is_test_mode ? "_Test" : "");
+                     if(ObjectCreate(0, label_name, OBJ_TEXT, 0, broken.break_time, broken.price))
+                     {
+                        ObjectSetString(0, label_name, OBJPROP_TEXT, broken.is_bos ? "BOS" : "CHOCH");
+                        ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrYellow);
+                        ObjectSetInteger(0, label_name, OBJPROP_FONTSIZE, 8);
                      }
                   }
                }
@@ -1605,10 +1600,12 @@ private:
                   m_pendingHighBreak.initial_break_time = iTime(_Symbol, InpFractalTimeframe, 1);
                   m_pendingHighBreak.initial_break_price = iHigh(_Symbol, InpFractalTimeframe, 1);
                   m_pendingHighBreak.candles_left = InpMaxBreakoutCandles;
-                  Log("شکست اولیه سقف: قیمت=" + DoubleToString(m_unbrokenHighs[i].price, _Digits));
+                  Log("شکست اولیه سقف: قیمت=" + DoubleToString(m_pendingHighBreak.price, _Digits));
+                  break;
                }
             }
          }
+
          if(m_pendingLowBreak.time != 0)
          {
             int shift = iBarShift(_Symbol, InpFractalTimeframe, m_pendingLowBreak.initial_break_time);
@@ -1622,33 +1619,33 @@ private:
                m_pendingLowBreak.candles_left--;
                if(iLow(_Symbol, InpFractalTimeframe, 1) <= m_pendingLowBreak.initial_break_price)
                {
+                  SBrokenFractal broken;
+                  broken.time = m_pendingLowBreak.time;
+                  broken.price = m_pendingLowBreak.price;
+                  broken.direction = SHORT;
+                  broken.break_time = iTime(_Symbol, InpFractalTimeframe, 1);
+                  broken.is_bos = m_pendingDirection == SHORT;
+                  m_lastBrokenLow = broken;
                   for(int i = 0; i < m_unbrokenLows_total; i++)
                   {
-                     if(m_unbrokenLows[i].time == m_pendingLowBreak.time)
+                     if(m_unbrokenLows[i].time == broken.time)
                      {
-                        SBrokenFractal broken;
-                        broken.time = m_unbrokenLows[i].time;
-                        broken.price = m_unbrokenLows[i].price;
-                        broken.direction = SHORT;
-                        broken.break_time = iTime(_Symbol, InpFractalTimeframe, 1);
-                        broken.is_bos = m_pendingDirection == SHORT;
-                        m_lastBrokenLow = broken;
                         for(int j = i; j < m_unbrokenLows_total - 1; j++)
                            m_unbrokenLows[j] = m_unbrokenLows[j+1];
                         m_unbrokenLows_total--;
-                        m_pendingLowBreak.time = 0;
-                        Log("شکست کف (تأییدشده): قیمت=" + DoubleToString(broken.price, _Digits) + ", BOS=" + (broken.is_bos ? "true" : "false"));
-                        if(InpVisualDebug)
-                        {
-                           string label_name = "Debug_Label_" + (broken.is_bos ? "BOS" : "CHOCH") + "_" + TimeToString(broken.break_time) + (m_is_test_mode ? "_Test" : "");
-                           if(ObjectCreate(0, label_name, OBJ_TEXT, 0, broken.break_time, broken.price))
-                           {
-                              ObjectSetString(0, label_name, OBJPROP_TEXT, broken.is_bos ? "BOS" : "CHOCH");
-                              ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrYellow);
-                              ObjectSetInteger(0, label_name, OBJPROP_FONTSIZE, 8);
-                           }
-                        }
                         break;
+                     }
+                  }
+                  m_pendingLowBreak.time = 0;
+                  Log("شکست کف تأیید شد: قیمت=" + DoubleToString(broken.price, _Digits) + ", BOS=" + (broken.is_bos ? "true" : "false"));
+                  if(InpVisualDebug)
+                  {
+                     string label_name = "Debug_Label_" + (broken.is_bos ? "BOS" : "CHOCH") + "_" + TimeToString(broken.break_time) + (m_is_test_mode ? "_Test" : "");
+                     if(ObjectCreate(0, label_name, OBJ_TEXT, 0, broken.break_time, broken.price))
+                     {
+                        ObjectSetString(0, label_name, OBJPROP_TEXT, broken.is_bos ? "BOS" : "CHOCH");
+                        ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrYellow);
+                        ObjectSetInteger(0, label_name, OBJPROP_FONTSIZE, 8);
                      }
                   }
                }
@@ -1666,53 +1663,18 @@ private:
                   m_pendingLowBreak.initial_break_time = iTime(_Symbol, InpFractalTimeframe, 1);
                   m_pendingLowBreak.initial_break_price = iLow(_Symbol, InpFractalTimeframe, 1);
                   m_pendingLowBreak.candles_left = InpMaxBreakoutCandles;
-                  Log("شکست اولیه کف: قیمت=" + DoubleToString(m_unbrokenLows[i].price, _Digits));
+                  Log("شکست اولیه کف: قیمت=" + DoubleToString(m_pendingLowBreak.price, _Digits));
+                  break;
                }
             }
          }
       }
    }
 
-   bool CreateNewFamily(SBrokenFractal &fractal)
-   {
-      if(ArraySize(m_families) >= InpMaxFamilies)
-      {
-         Log("خطا: حداکثر تعداد ساختارها پر شده است");
-         return false;
-      }
-      CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()) + "_" + IntegerToString(ArraySize(m_families)), fractal.direction, m_is_test_mode);
-      if(new_family == NULL || !new_family.Initialize(fractal))
-      {
-         Log("خطا در ایجاد ساختار جدید");
-         if(new_family != NULL) delete new_family;
-         return false;
-      }
-      ArrayResize(m_families, ArraySize(m_families) + 1);
-      m_families[ArraySize(m_families) - 1] = new_family;
-      Log("ساختار جدید ایجاد شد: جهت=" + (fractal.direction == LONG ? "Long" : "Short"));
-      return true;
-   }
-
 public:
-   static void AddLog(string message)
-   {
-      if(InpEnableLog)
-      {
-         string log_entry = TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": " + message + "\n";
-         Print(log_entry);
-         int handle = FileOpen(InpLogFilePath, FILE_WRITE | FILE_TXT | FILE_COMMON);
-         if(handle != INVALID_HANDLE)
-         {
-            FileSeek(handle, 0, SEEK_END);
-            FileWrite(handle, log_entry);
-            FileClose(handle);
-         }
-      }
-   }
-
    CStructureManager()
    {
-      ArrayFree(m_families);
+      ArrayResize(m_families, 0);
       m_panel = NULL;
       m_test_panel = NULL;
       m_is_test_mode = InpTestMode;
@@ -1721,10 +1683,10 @@ public:
       m_unbrokenHighs_total = 0;
       m_unbrokenLows_total = 0;
       m_lastFractalScanTime = 0;
-      ZeroMemory(m_lastBrokenHigh);
-      ZeroMemory(m_lastBrokenLow);
-      ZeroMemory(m_pendingHighBreak);
-      ZeroMemory(m_pendingLowBreak);
+      m_lastBrokenHigh.time = 0;
+      m_lastBrokenLow.time = 0;
+      m_pendingHighBreak.time = 0;
+      m_pendingLowBreak.time = 0;
       m_pendingDirection = LONG;
    }
 
@@ -1732,246 +1694,309 @@ public:
    {
       if(InpShowPanelEa)
       {
-         m_panel = new CPanel("MainPanel", InpPanelCorner, InpPanelOffsetX, InpPanelOffsetY);
+         m_panel = new CPanel("HipoFiboPanel", InpPanelCorner, InpPanelOffsetX, InpPanelOffsetY);
          if(m_panel == NULL || !m_panel.Create())
          {
-            Log("خطا در ایجاد پنل اصلی");
+            Log("خطا: ایجاد پنل اصلی ناموفق بود");
             return false;
          }
       }
+
       if(m_is_test_mode)
       {
-         m_test_panel = new CTestPanel("TestPanel", InpTestPanelCorner, InpTestPanelOffsetX, InpTestPanelOffsetY,
+         m_test_panel = new CTestPanel("HipoFiboTestPanel", InpTestPanelCorner, InpTestPanelOffsetX, InpTestPanelOffsetY,
                                        InpTestPanelButtonColorLong, InpTestPanelButtonColorShort, InpTestPanelButtonColorStop, InpTestPanelBgColor);
          if(m_test_panel == NULL || !m_test_panel.Create())
          {
-            Log("خطا در ایجاد پنل تست");
+            Log("خطا: ایجاد پنل تست ناموفق بود");
             return false;
          }
       }
+
       FindAndStoreFractals(true);
-      Log("مدیریت ساختارها با موفقیت راه‌اندازی شد");
+      Log("کتابخانه فیبوناچی با موفقیت راه‌اندازی شد");
       return true;
    }
 
-   void UpdateOnTick()
-   {
-      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      datetime current_time = TimeCurrent();
-      FindAndStoreFractals(false);
-      CheckForBreakouts();
-      for(int i = ArraySize(m_families) - 1; i >= 0; i--)
-      {
-         if(!m_families[i].IsActive())
-         {
-            m_families[i].Destroy();
-            delete m_families[i];
-            for(int j = i; j < ArraySize(m_families) - 1; j++)
-               m_families[j] = m_families[j+1];
-            ArrayResize(m_families, ArraySize(m_families) - 1);
-         }
-         else
-         {
-            m_families[i].UpdateOnTick(current_price, current_time);
-         }
-      }
-      if(m_lastBrokenHigh.time != 0 && m_lastBrokenHigh.is_bos)
-      {
-         if(CreateNewFamily(m_lastBrokenHigh))
-            m_pendingDirection = LONG;
-         ZeroMemory(m_lastBrokenHigh);
-      }
-      if(m_lastBrokenLow.time != 0 && m_lastBrokenLow.is_bos)
-      {
-         if(CreateNewFamily(m_lastBrokenLow))
-            m_pendingDirection = SHORT;
-         ZeroMemory(m_lastBrokenLow);
-      }
-      if(m_panel != NULL)
-      {
-         string status = ArraySize(m_families) > 0 ? EnumToString(m_families[0].GetState()) : "در حال انتظار";
-         m_panel.UpdateStatus(status);
-         m_panel.UpdateCommand(m_current_command);
-      }
-      if(m_is_test_mode && m_test_panel != NULL)
-      {
-         for(int i = ObjectsTotal(0, -1, OBJ_BUTTON) - 1; i >= 0; i--)
-         {
-            string button_name = ObjectName(0, i);
-            if(StringFind(button_name, "TestPanel_") >= 0)
-            {
-               string command = "";
-               if(m_test_panel.OnButtonClick(button_name, command))
-               {
-                  m_current_command = command;
-                  m_test_panel.UpdateSignal("", "");
-               }
-            }
-         }
-         m_panel.UpdateTestStatus(m_current_command);
-      }
-      FlushLog();
-   }
-
-   void UpdateOnNewBar()
-   {
-      for(int i = ArraySize(m_families) - 1; i >= 0; i--)
-      {
-         if(!m_families[i].UpdateOnNewBar())
-         {
-            m_families[i].Destroy();
-            delete m_families[i];
-            for(int j = i; j < ArraySize(m_families) - 1; j++)
-               m_families[j] = m_families[j+1];
-            ArrayResize(m_families, ArraySize(m_families) - 1);
-         }
-      }
-      FlushLog();
-   }
-
-   SSignal GetSignal()
-   {
-      SSignal signal = {"", ""};
-      if(m_is_test_mode)
-      {
-         if(m_current_command == "StartLong")
-         {
-            signal.type = "Buy";
-            signal.id = "Test_" + TimeToString(TimeCurrent()) + "_Long";
-            m_test_panel.UpdateSignal(signal.type, signal.id);
-            Log("سیگنال تست خرید صادر شد: ID=" + signal.id);
-         }
-         else if(m_current_command == "StartShort")
-         {
-            signal.type = "Sell";
-            signal.id = "Test_" + TimeToString(TimeCurrent()) + "_Short";
-            m_test_panel.UpdateSignal(signal.type, signal.id);
-            Log("سیگنال تست فروش صادر شد: ID=" + signal.id);
-         }
-         else if(m_current_command == "Stop")
-         {
-            m_test_panel.UpdateSignal("", "");
-            m_current_command = "";
-            Log("سیگنال تست متوقف شد");
-         }
-      }
-      else
-      {
-         for(int i = 0; i < ArraySize(m_families); i++)
-         {
-            SSignal family_signal = m_families[i].GetSignal();
-            if(family_signal.id != "")
-            {
-               signal = family_signal;
-               if(m_test_panel != NULL)
-                  m_test_panel.UpdateSignal(signal.type, signal.id);
-               break;
-            }
-         }
-      }
-      return signal;
-   }
-
-   void Destroy()
+   void Deinitialize()
    {
       for(int i = 0; i < ArraySize(m_families); i++)
       {
-         m_families[i].Destroy();
-         delete m_families[i];
+         if(m_families[i] != NULL)
+         {
+            m_families[i].Destroy();
+            delete m_families[i];
+         }
       }
-      ArrayFree(m_families);
+      ArrayResize(m_families, 0);
+
       if(m_panel != NULL)
       {
          m_panel.Destroy();
          delete m_panel;
          m_panel = NULL;
       }
+
       if(m_test_panel != NULL)
       {
          m_test_panel.Destroy();
          delete m_test_panel;
          m_test_panel = NULL;
       }
-      ClearDebugObjects(m_is_test_mode);
+
       FlushLog();
-      Log("مدیریت ساختارها تخریب شد");
+      Log("کتابخانه فیبوناچی متوقف شد");
    }
 
-   SFibonacciEventData GetLastEventData()
+   void OnTick()
    {
-      if(ArraySize(m_families) > 0)
-         return m_families[0].GetLastEventData();
-      SFibonacciEventData empty_data;
-      return empty_data;
+      CheckForBreakouts();
+      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      datetime current_time = TimeCurrent();
+
+      for(int i = 0; i < ArraySize(m_families); i++)
+      {
+         if(m_families[i] != NULL && m_families[i].IsActive())
+         {
+            if(!m_families[i].UpdateOnTick(current_price, current_time))
+            {
+               m_families[i].Destroy();
+               delete m_families[i];
+               m_families[i] = NULL;
+            }
+         }
+      }
+
+      if(m_panel != NULL)
+      {
+         string status = "تعداد ساختارها: " + (string)ArraySize(m_families);
+         m_panel.UpdateStatus(status);
+         m_panel.UpdateCommand(m_current_command);
+      }
+
+      if(m_is_test_mode && m_test_panel != NULL)
+      {
+         m_test_panel.UpdateSignal("", "");
+      }
+
+      FlushLog();
    }
 
-   double GetMotherPrice0()
+   void OnNewBar()
    {
-      if(ArraySize(m_families) > 0)
-         return m_families[0].GetMotherPrice0();
+      FindAndStoreFractals(false);
+      CheckForBreakouts();
+
+      for(int i = 0; i < ArraySize(m_families); i++)
+      {
+         if(m_families[i] != NULL && m_families[i].IsActive())
+         {
+            if(!m_families[i].UpdateOnNewBar())
+            {
+               m_families[i].Destroy();
+               delete m_families[i];
+               m_families[i] = NULL;
+            }
+         }
+      }
+   }
+
+   void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+   {
+      if(!m_is_test_mode || m_test_panel == NULL) return;
+
+      string command = "";
+      if(m_test_panel.OnButtonClick(sparam, command))
+      {
+         if(command == "StartLong")
+         {
+            m_pendingDirection = LONG;
+            Log("تست دستی: شروع ساختار خرید");
+         }
+         else if(command == "StartShort")
+         {
+            m_pendingDirection = SHORT;
+            Log("تست دستی: شروع ساختار فروش");
+         }
+         else if(command == "Stop")
+         {
+            for(int i = 0; i < ArraySize(m_families); i++)
+            {
+               if(m_families[i] != NULL)
+               {
+                  m_families[i].Destroy();
+                  delete m_families[i];
+                  m_families[i] = NULL;
+               }
+            }
+            ArrayResize(m_families, 0);
+            Log("تست دستی: توقف تمام ساختارها");
+         }
+         m_current_command = command;
+      }
+   }
+
+   bool CreateNewStructure(ENUM_DIRECTION direction)
+   {
+      if(ArraySize(m_families) >= InpMaxFamilies) return false;
+
+      SBrokenFractal fractal = direction == LONG ? m_lastBrokenHigh : m_lastBrokenLow;
+      if(fractal.time == 0) return false;
+
+      CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()), direction, m_is_test_mode);
+      if(new_family == NULL || !new_family.Initialize(fractal))
+      {
+         delete new_family;
+         return false;
+      }
+
+      int size = ArraySize(m_families);
+      ArrayResize(m_families, size + 1);
+      m_families[size] = new_family;
+      m_pendingDirection = direction;
+      Log("ساختار جدید ایجاد شد: جهت=" + (direction == LONG ? "خرید" : "فروش"));
+      return true;
+   }
+
+   void StopCurrentStructure()
+   {
+      for(int i = 0; i < ArraySize(m_families); i++)
+      {
+         if(m_families[i] != NULL)
+         {
+            m_families[i].Destroy();
+            delete m_families[i];
+            m_families[i] = NULL;
+         }
+      }
+      ArrayResize(m_families, 0);
+      Log("ساختار فعلی متوقف شد");
+   }
+
+   bool IsStructureBroken()
+   {
+      for(int i = 0; i < ArraySize(m_families); i++)
+      {
+         if(m_families[i] != NULL && m_families[i].GetState() == FAILED)
+            return true;
+      }
+      return false;
+   }
+
+   SSignal GetSignal()
+   {
+      SSignal signal = {"", ""};
+      for(int i = 0; i < ArraySize(m_families); i++)
+      {
+         if(m_families[i] != NULL && m_families[i].IsActive())
+         {
+            signal = m_families[i].GetSignal();
+            if(signal.id != "") break;
+         }
+      }
+      return signal;
+   }
+
+   void AcknowledgeSignal(string signal_id)
+   {
+      for(int i = 0; i < ArraySize(m_families); i++)
+      {
+         if(m_families[i] != NULL && m_families[i].GetSignal().id == signal_id)
+         {
+            m_families[i].Destroy();
+            delete m_families[i];
+            m_families[i] = NULL;
+            Log("سیگنال تأیید شد و ساختار حذف شد: ID=" + signal_id);
+         }
+      }
+   }
+
+   double GetMotherZeroPoint()
+   {
+      for(int i = 0; i < ArraySize(m_families); i++)
+      {
+         if(m_families[i] != NULL && m_families[i].IsActive())
+            return m_families[i].GetMotherPrice0();
+      }
       return 0.0;
+   }
+
+   static void AddLog(string message)
+   {
+      if(InpEnableLog)
+      {
+         string log_entry = TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": " + message + "\n";
+         Print(log_entry);
+      }
    }
 };
 
 //+------------------------------------------------------------------+
-//| متغیرهای عمومی و توابع دسترسی                                   |
+//| متغیرهای سراسری و توابع اصلی                                  |
 //+------------------------------------------------------------------+
 CStructureManager* g_structure_manager = NULL;
 
-//+------------------------------------------------------------------+
-//| تابع راه‌اندازی کتابخانه                                       |
-//+------------------------------------------------------------------+
-
-bool HipoFibonacci_Init()
+bool HFiboOnInit()
 {
-   // بررسی حداقل مقادیر ورودی‌ها
-   if(InpFractalLookback < 10 || InpFractalPeers < 1)
-   {
-      Print("خطا: InpFractalLookback باید حداقل 10 و InpFractalPeers باید حداقل 1 باشد");
-      return false;
-   }
-
-   if(g_structure_manager != NULL)
-   {
-      Print("خطا: کتابخانه قبلاً راه‌اندازی شده است");
-      return false;
-   }
    g_structure_manager = new CStructureManager();
    if(g_structure_manager == NULL || !g_structure_manager.Initialize())
    {
-      Print("خطا در راه‌اندازی کتابخانه");
-      if(g_structure_manager != NULL)
-      {
-         g_structure_manager.Destroy();
-         delete g_structure_manager;
-         g_structure_manager = NULL;
-      }
+      delete g_structure_manager;
+      g_structure_manager = NULL;
       return false;
    }
    return true;
 }
-//+------------------------------------------------------------------+
-//| تابع به‌روزرسانی در هر تیک                                     |
-//+------------------------------------------------------------------+
-void HipoFibonacci_OnTick()
+
+void HFiboOnDeinit(const int reason)
 {
    if(g_structure_manager != NULL)
-      g_structure_manager.UpdateOnTick();
+   {
+      g_structure_manager.Deinitialize();
+      delete g_structure_manager;
+      g_structure_manager = NULL;
+   }
 }
 
-//+------------------------------------------------------------------+
-//| تابع به‌روزرسانی در هر کندل جدید                               |
-//+------------------------------------------------------------------+
-void HipoFibonacci_OnNewBar()
+void HFiboOnTick()
 {
    if(g_structure_manager != NULL)
-      g_structure_manager.UpdateOnNewBar();
+      g_structure_manager.OnTick();
 }
 
-//+------------------------------------------------------------------+
-//| تابع دریافت سیگنال                                             |
-//+------------------------------------------------------------------+
-SSignal HipoFibonacci_GetSignal()
+void HFiboOnNewBar()
+{
+   if(g_structure_manager != NULL)
+      g_structure_manager.OnNewBar();
+}
+
+void HFiboOnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+   if(g_structure_manager != NULL)
+      g_structure_manager.OnChartEvent(id, lparam, dparam, sparam);
+}
+
+bool HFiboCreateNewStructure(ENUM_DIRECTION direction)
+{
+   if(g_structure_manager != NULL)
+      return g_structure_manager.CreateNewStructure(direction);
+   return false;
+}
+
+void HFiboStopCurrentStructure()
+{
+   if(g_structure_manager != NULL)
+      g_structure_manager.StopCurrentStructure();
+}
+
+bool HFiboIsStructureBroken()
+{
+   if(g_structure_manager != NULL)
+      return g_structure_manager.IsStructureBroken();
+   return false;
+}
+
+SSignal HFiboGetSignal()
 {
    if(g_structure_manager != NULL)
       return g_structure_manager.GetSignal();
@@ -1979,120 +2004,18 @@ SSignal HipoFibonacci_GetSignal()
    return empty_signal;
 }
 
-//+------------------------------------------------------------------+
-//| تابع تخریب کتابخانه                                            |
-//+------------------------------------------------------------------+
-void HipoFibonacci_Deinit()
+void HFiboAcknowledgeSignal(string signal_id)
 {
    if(g_structure_manager != NULL)
-   {
-      g_structure_manager.Destroy();
-      delete g_structure_manager;
-      g_structure_manager = NULL;
-   }
+      g_structure_manager.AcknowledgeSignal(signal_id);
 }
 
-//+------------------------------------------------------------------+
-//| تابع دریافت داده‌های آخرین رویداد                              |
-//+------------------------------------------------------------------+
-SFibonacciEventData HipoFibonacci_GetLastEventData()
+double HFiboGetMotherZeroPoint()
 {
    if(g_structure_manager != NULL)
-      return g_structure_manager.GetLastEventData();
-   SFibonacciEventData empty_data;
-   return empty_data;
-}
-
-//+------------------------------------------------------------------+
-//| تابع دریافت قیمت صفر مادر                                       |
-//+------------------------------------------------------------------+
-double HipoFibonacci_GetMotherPrice0()
-{
-   if(g_structure_manager != NULL)
-      return g_structure_manager.GetMotherPrice0();
+      return g_structure_manager.GetMotherZeroPoint();
    return 0.0;
 }
 
-
-
-   void FindAndStoreFractals(bool is_initial_scan)
-   {
-      // بررسی وجود داده‌های کافی در چارت
-      if(iBars(_Symbol, InpFractalTimeframe) < InpFractalPeers + 1)
-      {
-         Log("خطا: داده‌های چارت کافی نیست برای تایم‌فریم " + EnumToString(InpFractalTimeframe));
-         return;
-      }
-
-      // محاسبه زمان شروع بازه Lookback
-      datetime lookback_time = iTime(_Symbol, InpFractalTimeframe, InpFractalLookback);
-
-      // حذف فرکتال‌های قدیمی‌تر از InpFractalLookback
-      for(int i = m_unbrokenHighs_total - 1; i >= 0; i--)
-      {
-         if(m_unbrokenHighs[i].time < lookback_time)
-         {
-            for(int j = i; j < m_unbrokenHighs_total - 1; j++)
-               m_unbrokenHighs[j] = m_unbrokenHighs[j+1];
-            m_unbrokenHighs_total--;
-         }
-      }
-      for(int i = m_unbrokenLows_total - 1; i >= 0; i--)
-      {
-         if(m_unbrokenLows[i].time < lookback_time)
-         {
-            for(int j = i; j < m_unbrokenLows_total - 1; j++)
-               m_unbrokenLows[j] = m_unbrokenLows[j+1];
-            m_unbrokenLows_total--;
-         }
-      }
-
-      datetime start_time = is_initial_scan ? iTime(_Symbol, InpFractalTimeframe, InpFractalLookback) : m_lastFractalScanTime;
-      int start_index = iBarShift(_Symbol, InpFractalTimeframe, start_time);
-      int end_index = is_initial_scan ? InpFractalPeers : 1;
-      for(int i = start_index; i >= end_index; i--)
-      {
-         if(m_fractal_finder.IsHighFractal(i, InpFractalTimeframe, InpFractalPeers))
-         {
-            SFractal fractal;
-            fractal.price = iHigh(_Symbol, InpFractalTimeframe, i);
-            fractal.time = iTime(_Symbol, InpFractalTimeframe, i);
-            if(m_unbrokenHighs_total < 100)
-            {
-               for(int j = m_unbrokenHighs_total; j > 0; j--)
-                  m_unbrokenHighs[j] = m_unbrokenHighs[j-1];
-               m_unbrokenHighs[0] = fractal;
-               m_unbrokenHighs_total++;
-            }
-            else
-            {
-               Log("هشدار: آرایه فرکتال‌های سقف پر است، فرکتال قدیمی‌تر حذف شد");
-               for(int j = 99; j > 0; j--)
-                  m_unbrokenHighs[j] = m_unbrokenHighs[j-1];
-               m_unbrokenHighs[0] = fractal;
-            }
-         }
-         if(m_fractal_finder.IsLowFractal(i, InpFractalTimeframe, InpFractalPeers))
-         {
-            SFractal fractal;
-            fractal.price = iLow(_Symbol, InpFractalTimeframe, i);
-            fractal.time = iTime(_Symbol, InpFractalTimeframe, i);
-            if(m_unbrokenLows_total < 100)
-            {
-               for(int j = m_unbrokenLows_total; j > 0; j--)
-                  m_unbrokenLows[j] = m_unbrokenLows[j-1];
-               m_unbrokenLows[0] = fractal;
-               m_unbrokenLows_total++;
-            }
-            else
-            {
-               Log("هشدار: آرایه فرکتال‌های کف پر است، فرکتال قدیمی‌تر حذف شد");
-               for(int j = 99; j > 0; j--)
-                  m_unbrokenLows[j] = m_unbrokenLows[j-1];
-               m_unbrokenLows[0] = fractal;
-            }
-         }
-      }
-      m_lastFractalScanTime = iTime(_Symbol, InpFractalTimeframe, 0);
-      DrawUnbrokenFractals();
-   }
+#endif
+//+------------------------------------------------------------------+
