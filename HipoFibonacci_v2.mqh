@@ -44,6 +44,17 @@ void ClearDebugObjects(bool is_test)
 //+------------------------------------------------------------------+
 //| ورودی‌های کتابخانه                                              |
 //+------------------------------------------------------------------+
+
+
+enum ENUM_STRUCTURE_START_MODE
+{
+   USE_LAST_BREAK,      // استفاده از آخرین شکست ثبت شده
+   WAIT_FOR_NEW_BREAK   // انتظار برای شکست جدید بعد از دستور
+};
+input ENUM_STRUCTURE_START_MODE InpStructureStartMode = USE_LAST_BREAK; // حالت شروع ساختار
+//^^^^^^^^^^ پایان بخش جدید ^^^^^^^^^^
+
+
 input group "تنظیمات فراکتال"
 input int InpFractalLookback = 288;       // حداکثر تعداد کندل برای جستجوی فراکتال (حداقل 10)
 input int InpFractalPeers = 3;            // تعداد کندل‌های چپ/راست برای فراکتال (حداقل 1)
@@ -132,9 +143,12 @@ enum ENUM_STRUCTURE_STATE
 
 enum ENUM_DIRECTION
 {
-   LONG,  // خرید
-   SHORT  // فروش
+   DIRECTION_NONE, // حالت خنثی یا نامشخص
+   LONG,           // خرید
+   SHORT           // فروش
 };
+//^^^^^^^^^^ پایان تغییر ^^^^^^^^^^
+
 
 struct SSignal
 {
@@ -552,6 +566,7 @@ public:
 //+------------------------------------------------------------------+
 //| کلاس CMotherFibo: فیبوناچی مادر                                |
 //+------------------------------------------------------------------+
+//vvvvvvvvvv این بلوک کد را به طور کامل جایگزین کلاس CMotherFibo فعلی کن vvvvvvvvvv
 class CMotherFibo : public CBaseFibo
 {
 private:
@@ -594,9 +609,39 @@ public:
       }
       return false;
    }
+   
+   // این تابع بازنویسی شده تا باگ رسم برعکس فیبوناچی مادر را اصلاح کند
+   virtual bool Draw() override
+   {
+      string obj_name = m_name + (m_is_test ? "_Test" : "");
+      ObjectDelete(0, obj_name);
+
+      // نکته کلیدی اینجاست: نقاط 100 و 0 رو جابجا به تابع پاس میدیم تا رسم درست انجام بشه
+      if(!ObjectCreate(0, obj_name, OBJ_FIBO, 0, m_time100, m_price100, m_time0, m_price0))
+      {
+         Print("خطا در ایجاد شیء فیبوناچی مادر: ", obj_name);
+         return false;
+      }
+
+      ObjectSetInteger(0, obj_name, OBJPROP_COLOR, m_color);
+      ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, obj_name, OBJPROP_LEVELS, ArraySize(m_levels));
+      for(int i = 0; i < ArraySize(m_levels); i++)
+      {
+         ObjectSetDouble(0, obj_name, OBJPROP_LEVELVALUE, i, m_levels[i] / 100.0);
+         ObjectSetString(0, obj_name, OBJPROP_LEVELTEXT, i, DoubleToString(m_levels[i], 1) + "%");
+         ObjectSetInteger(0, obj_name, OBJPROP_LEVELCOLOR, i, m_color);
+         ObjectSetInteger(0, obj_name, OBJPROP_LEVELSTYLE, i, STYLE_SOLID);
+      }
+      ChartRedraw(0);
+      Sleep(50);
+      return CheckObjectExists(obj_name);
+   }
 
    ENUM_DIRECTION GetDirection() { return m_direction; }
 };
+//^^^^^^^^^^ پایان بلوک جایگزینی ^^^^^^^^^^
+
 
 //+------------------------------------------------------------------+
 //| کلاس CChildFibo: فیبوناچی فرزند                                |
@@ -1042,24 +1087,50 @@ public:
       m_is_test = is_test;
    }
 
+   //vvvvvvvvvv کل تابع Initialize فعلی را با این کد جایگزین کن vvvvvvvvvv
    bool Initialize(SBrokenFractal &fractal)
    {
       m_mother = new CMotherFibo(m_id + "_Mother", InpMotherColor, InpMotherLevels, m_direction, m_is_test);
       if(m_mother == NULL) return false;
-      double price0;
-      datetime time0 = TimeCurrent();
+
+      double price0 = 0;
+      datetime time0 = 0;
+      int bar_index_0 = -1;
+
       if(m_direction == LONG)
       {
          price0 = iLow(_Symbol, _Period, iBarShift(_Symbol, _Period, fractal.time));
+         bar_index_0 = iBarShift(_Symbol, _Period, fractal.time);
+
          for(int i = iBarShift(_Symbol, _Period, fractal.time); i >= iBarShift(_Symbol, _Period, fractal.break_time); i--)
-            price0 = MathMin(price0, iLow(_Symbol, _Period, i));
+         {
+            double current_low = iLow(_Symbol, _Period, i);
+            if(current_low < price0)
+            {
+               price0 = current_low;
+               bar_index_0 = i;
+            }
+         }
       }
-      else
+      else // SHORT
       {
          price0 = iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, fractal.time));
+         bar_index_0 = iBarShift(_Symbol, _Period, fractal.time);
+
          for(int i = iBarShift(_Symbol, _Period, fractal.time); i >= iBarShift(_Symbol, _Period, fractal.break_time); i--)
-            price0 = MathMax(price0, iHigh(_Symbol, _Period, i));
+         {
+            double current_high = iHigh(_Symbol, _Period, i);
+            if(current_high > price0)
+            {
+               price0 = current_high;
+               bar_index_0 = i;
+            }
+         }
       }
+      
+      if(bar_index_0 != -1)
+         time0 = iTime(_Symbol, _Period, bar_index_0);
+
       if(m_mother.Initialize(time0, price0, fractal.time, fractal.price))
       {
          m_state = MOTHER_ACTIVE;
@@ -1070,6 +1141,8 @@ public:
       m_mother = NULL;
       return false;
    }
+//^^^^^^^^^^ پایان بخش جایگزینی ^^^^^^^^^^
+
 
    bool UpdateOnTick(double current_price, datetime current_time)
    {
@@ -1422,11 +1495,17 @@ private:
       DrawUnbrokenFractals();
    }
 
+   //vvvvvvvvvv کل تابع CheckForBreakouts فعلی را با این کد کامل جایگزین کن vvvvvvvvvv
    void CheckForBreakouts()
    {
+      // اگر در حالت انتظار برای شکست جدید نیستیم، این تابع نیازی به ساخت ساختار ندارد
+      bool can_create_family = (InpStructureStartMode == WAIT_FOR_NEW_BREAK);
+
+      // بخش اول: شناسایی شکست ها
       double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
       double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
       datetime current_time = TimeCurrent();
+
       if(InpFractalBreakMode == SIMPLE_PRICE_CROSS)
       {
          for(int i = m_unbrokenHighs_total - 1; i >= 0; i--)
@@ -1669,7 +1748,52 @@ private:
             }
          }
       }
+      
+      // بخش دوم: ساخت ساختار در صورتی که در حالت انتظار باشیم
+      if(can_create_family)
+      {
+         // آیا یک شکست سقف جدید داریم و نیت ما هم خرید بوده؟
+         if(m_lastBrokenHigh.time != 0 && m_pendingDirection == LONG)
+         {
+            CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()), LONG, m_is_test_mode);
+            if(new_family != NULL && new_family.Initialize(m_lastBrokenHigh))
+            {
+               int size = ArraySize(m_families);
+               ArrayResize(m_families, size + 1);
+               m_families[size] = new_family;
+               Log("ساختار خرید بر اساس شکست جدید " + TimeToString(m_lastBrokenHigh.time) + " ایجاد شد.");
+               m_pendingDirection = DIRECTION_NONE;
+               m_lastBrokenHigh.time = 0; // گزارش مصرف شد
+               m_current_command = "Long Active";
+            }
+            else
+            {
+               delete new_family;
+            }
+         }
+         // آیا یک شکست کف جدید داریم و نیت ما هم فروش بوده؟
+         else if(m_lastBrokenLow.time != 0 && m_pendingDirection == SHORT)
+         {
+            CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()), SHORT, m_is_test_mode);
+            if(new_family != NULL && new_family.Initialize(m_lastBrokenLow))
+            {
+               int size = ArraySize(m_families);
+               ArrayResize(m_families, size + 1);
+               m_families[size] = new_family;
+               Log("ساختار فروش بر اساس شکست جدید " + TimeToString(m_lastBrokenLow.time) + " ایجاد شد.");
+               m_pendingDirection = DIRECTION_NONE;
+               m_lastBrokenLow.time = 0; // گزارش مصرف شد
+               m_current_command = "Short Active";
+            }
+            else
+            {
+               delete new_family;
+            }
+         }
+      }
    }
+//^^^^^^^^^^ پایان بلوک جایگزینی ^^^^^^^^^^
+
 
 public:
    CStructureManager()
@@ -1687,7 +1811,7 @@ public:
       m_lastBrokenLow.time = 0;
       m_pendingHighBreak.time = 0;
       m_pendingLowBreak.time = 0;
-      m_pendingDirection = LONG;
+      m_pendingDirection = DIRECTION_NONE;
    }
 
    bool Initialize()
@@ -1810,12 +1934,12 @@ public:
       {
          if(command == "StartLong")
          {
-            m_pendingDirection = LONG;
+            CreateNewStructure(LONG);
             Log("تست دستی: شروع ساختار خرید");
          }
          else if(command == "StartShort")
          {
-            m_pendingDirection = SHORT;
+            CreateNewStructure(SHORT);
             Log("تست دستی: شروع ساختار فروش");
          }
          else if(command == "Stop")
@@ -1836,27 +1960,60 @@ public:
       }
    }
 
+   //vvvvvvvvvv کل تابع CreateNewStructure فعلی را با این کد جایگزین کن vvvvvvvvvv
    bool CreateNewStructure(ENUM_DIRECTION direction)
    {
-      if(ArraySize(m_families) >= InpMaxFamilies) return false;
-
-      SBrokenFractal fractal = direction == LONG ? m_lastBrokenHigh : m_lastBrokenLow;
-      if(fractal.time == 0) return false;
-
-      CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()), direction, m_is_test_mode);
-      if(new_family == NULL || !new_family.Initialize(fractal))
+      if(ArraySize(m_families) >= InpMaxFamilies)
       {
-         delete new_family;
+         Log("خطا: یک ساختار از قبل فعال است.");
          return false;
       }
-
-      int size = ArraySize(m_families);
-      ArrayResize(m_families, size + 1);
-      m_families[size] = new_family;
-      m_pendingDirection = direction;
-      Log("ساختار جدید ایجاد شد: جهت=" + (direction == LONG ? "خرید" : "فروش"));
-      return true;
+      
+      // حالت اول: استفاده از آخرین شکست موجود
+      if(InpStructureStartMode == USE_LAST_BREAK)
+      {
+         SBrokenFractal fractal_to_use = (direction == LONG) ? m_lastBrokenHigh : m_lastBrokenLow;
+         
+         if(fractal_to_use.time != 0)
+         {
+            CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()), direction, m_is_test_mode);
+            if(new_family != NULL && new_family.Initialize(fractal_to_use))
+            {
+               int size = ArraySize(m_families);
+               ArrayResize(m_families, size + 1);
+               m_families[size] = new_family;
+               Log("ساختار " + (direction == LONG ? "خرید" : "فروش") + " بر اساس آخرین شکست موجود ایجاد شد.");
+               m_current_command = (direction == LONG) ? "Long Active" : "Short Active";
+               // گزارش شکست رو مصرف میکنیم
+               if(direction == LONG) m_lastBrokenHigh.time = 0;
+               else m_lastBrokenLow.time = 0;
+               return true;
+            }
+            else
+            {
+               delete new_family;
+               return false;
+            }
+         }
+         else
+         {
+            Log("هیچ شکست اخیری برای استفاده یافت نشد. منتظر شکست جدید می‌مانیم...");
+            // اگر شکست اخیری نبود، خودکار به حالت انتظار برای شکست جدید میرویم
+            m_pendingDirection = direction;
+            m_current_command = (direction == LONG) ? "Arm Long" : "Arm Short";
+            return false; // ساختاری ایجاد نشد
+         }
+      }
+      // حالت دوم: انتظار برای یک شکست کاملا جدید
+      else // WAIT_FOR_NEW_BREAK
+      {
+         m_pendingDirection = direction;
+         Log("کتابخانه برای شکار شکست جدید " + (direction == LONG ? "خرید" : "فروش") + " مسلح شد.");
+         m_current_command = (direction == LONG) ? "Arm Long" : "Arm Short";
+         return false; // هنوز ساختاری ایجاد نشده است
+      }
    }
+//^^^^^^^^^^ پایان بخش جایگزینی ^^^^^^^^^^
 
    void StopCurrentStructure()
    {
