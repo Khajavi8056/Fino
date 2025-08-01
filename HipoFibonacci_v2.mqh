@@ -1054,7 +1054,7 @@ public:
    bool IsFixed() { return m_is_fixed; }
    bool IsSuccessChild2() { return m_is_success_child2; }
 };
-+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
 //| کلاس CFamily: مدیریت ساختار فیبوناچی                          |
 //+------------------------------------------------------------------+
 class CFamily
@@ -1392,36 +1392,35 @@ public:
       return true;
    }
 
-   SSignal GetSignal()
+  SSignal GetSignal()
+{
+   SSignal signal = {"", ""};
+   if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
    {
-      SSignal signal = {"", ""};
-      if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
+      string temp_levels[];
+      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+      if(count < 2)
       {
-         string temp_levels[];
-         int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
-         if(count < 2)
-         {
-            Log("خطا: InpGoldenZone باید حداقل دو سطح داشته باشد");
-            return signal;
-         }
-         double level_1 = StringToDouble(temp_levels[0]) / 100.0;
-         double level_2 = StringToDouble(temp_levels[1]) / 100.0;
-         double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
-         double level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
-         double zone_lower = MathMin(price_level_1, price_level_2);
-         double zone_upper = MathMax(price_level_1, price_level_2);
-         double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-         if(current_price >= zone_lower && current_price <= zone_upper)
-         {
-            signal.type = m_direction == LONG ? "Buy" : "Sell";
-            signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Complex" : "Simple");
-            Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id);
-            m_state = COMPLETED;
-         }
+         Log("خطا: InpGoldenZone باید حداقل دو سطح داشته باشد");
+         return signal;
       }
-      return signal;
+      double level_1 = StringToDouble(temp_levels[0]) / 100.0;
+      double level_2 = StringToDouble(temp_levels[1]) / 100.0;
+      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
+      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2; // اصلاح نام متغیر
+      double zone_lower = MathMin(price_level_1, price_level_2);
+      double zone_upper = MathMax(price_level_1, price_level_2);
+      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      if(current_price >= zone_lower && current_price <= zone_upper)
+      {
+         signal.type = m_direction == LONG ? "Buy" : "Sell";
+         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Complex" : "Simple");
+         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id);
+         m_state = COMPLETED;
+      }
    }
-
+   return signal;
+}
    SFibonacciEventData GetLastEventData()
    {
       if(m_child2 != NULL) return m_child2.GetEventData();
