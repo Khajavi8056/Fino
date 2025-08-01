@@ -1054,8 +1054,7 @@ public:
    bool IsFixed() { return m_is_fixed; }
    bool IsSuccessChild2() { return m_is_success_child2; }
 };
-
-//+------------------------------------------------------------------+
++------------------------------------------------------------------+
 //| کلاس CFamily: مدیریت ساختار فیبوناچی                          |
 //+------------------------------------------------------------------+
 class CFamily
@@ -1068,11 +1067,214 @@ private:
    CChildFibo* m_child1;
    CChildFibo* m_child2;
    bool m_is_test;
+   bool m_is_child1_fixed; // پرچم برای فیکس شدن فرزند اول
 
    void Log(string message)
    {
       if(InpEnableLog)
          CStructureManager::AddLog(m_id + ": " + message);
+   }
+
+   // متد جدید برای شبیه‌سازی تاریخچه تا زمان حال
+   void SimulateToPresent()
+   {
+      if(m_mother == NULL) return;
+
+      // آماده‌سازی: پیدا کردن اندیس کندل‌های شروع و پایان
+      int mother_zero_index = iBarShift(_Symbol, _Period, m_mother.GetTime0());
+      int current_index = iBarShift(_Symbol, _Period, TimeCurrent());
+      if(mother_zero_index < 0 || current_index < 0) return;
+
+      ENUM_STRUCTURE_STATE sim_state = MOTHER_ACTIVE;
+      CChildFibo* sim_child1 = NULL;
+      CChildFibo* sim_child2 = NULL;
+      bool is_child1_fixed = false;
+      datetime child1_fix_time = 0;
+      double child1_fix_price = 0.0;
+
+      // حلقه شبیه‌سازی از کندل بعد از نقطه صفر مادر تا کندل فعلی
+      for(int i = mother_zero_index - 1; i >= current_index && sim_state != FAILED && sim_state != COMPLETED; i--)
+      {
+         datetime candle_time = iTime(_Symbol, _Period, i);
+         double high = iHigh(_Symbol, _Period, i);
+         double low = iLow(_Symbol, _Period, i);
+         double close = iClose(_Symbol, _Period, i);
+
+         if(sim_state == MOTHER_ACTIVE)
+         {
+            // بررسی فیکس شدن مادر
+            double level_50 = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * 0.5;
+            bool fix_condition = (m_direction == LONG && close >= level_50 && InpMotherFixMode == FIX_CANDLE_CLOSE) ||
+                                 (m_direction == SHORT && close <= level_50 && InpMotherFixMode == FIX_CANDLE_CLOSE) ||
+                                 (m_direction == LONG && high >= level_50 && InpMotherFixMode == FIX_PRICE_CROSS) ||
+                                 (m_direction == SHORT && low <= level_50 && InpMotherFixMode == FIX_PRICE_CROSS);
+
+            if(fix_condition)
+            {
+               // ایجاد فرزند اول موقت
+               sim_child1 = new CChildFibo(m_id + "_Child1", InpChild1Color, InpChildLevels, m_mother, false, m_is_test);
+               if(sim_child1 == NULL || !sim_child1.Initialize(candle_time))
+               {
+                  Log("خطا در ایجاد فرزند اول در شبیه‌سازی");
+                  delete sim_child1;
+                  sim_state = FAILED;
+                  break;
+               }
+               sim_state = CHILD1_ACTIVE;
+               Log("شبیه‌سازی: مادر فیکس شد، فرزند اول فعال شد در " + TimeToString(candle_time));
+            }
+         }
+         else if(sim_state == CHILD1_ACTIVE && sim_child1 != NULL)
+         {
+            // آپدیت سقف/کف فرزند اول اگر فیکس نشده باشد
+            if(!is_child1_fixed)
+            {
+               sim_child1.UpdateOnTick(candle_time);
+            }
+
+            // بررسی فیکس شدن فرزند اول
+            if(!is_child1_fixed)
+            {
+               double current_price = (InpMotherFixMode == FIX_CANDLE_CLOSE) ? close : (m_direction == LONG ? low : high);
+               if(sim_child1.CheckFixing(current_price))
+               {
+                  is_child1_fixed = true;
+                  child1_fix_time = candle_time;
+                  child1_fix_price = current_price;
+                  Log("شبیه‌سازی: فرزند اول فیکس شد در " + TimeToString(candle_time));
+               }
+            }
+
+            // بررسی شکست سطح 100% مادر برای تولد فرزند دوم ساده
+            double mother_level_100 = m_mother.GetPrice100();
+            bool simple_break_condition = false;
+            if(InpChildBreakMode == CHILD_PRICE_CROSS)
+            {
+               simple_break_condition = (m_direction == LONG && high > mother_level_100) ||
+                                       (m_direction == SHORT && low < mother_level_100);
+            }
+            else if(InpChildBreakMode == CHILD_CONFIRMED_BREAK)
+            {
+               simple_break_condition = (m_direction == LONG && close >= mother_level_100) ||
+                                       (m_direction == SHORT && close <= mother_level_100);
+            }
+
+            if(simple_break_condition)
+            {
+               // بررسی سطح 150 تا 200 مادر برای فرزند دوم ساده
+               double mother_level_150 = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * 1.5;
+               double mother_level_200 = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * 2.0;
+               bool simple_child2_condition = (m_direction == LONG && high >= mother_level_150 && high <= mother_level_200) ||
+                                             (m_direction == SHORT && low <= mother_level_150 && low >= mother_level_200);
+
+               if(simple_child2_condition)
+               {
+                  if(sim_child1 != NULL) { sim_child1.Delete(); delete sim_child1; sim_child1 = NULL; }
+                  sim_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
+                  if(sim_child2 == NULL || !sim_child2.Initialize(candle_time))
+                  {
+                     Log("خطا در ایجاد فرزند دوم ساده در شبیه‌سازی");
+                     delete sim_child2;
+                     sim_state = FAILED;
+                     break;
+                  }
+                  sim_state = CHILD2_ACTIVE;
+                  Log("شبیه‌سازی: فرزند دوم ساده فعال شد در " + TimeToString(candle_time));
+               }
+            }
+
+            // بررسی شکست سطح 100% فرزند اول برای تولد فرزند دوم پیچیده
+            if(is_child1_fixed)
+            {
+               bool complex_break_condition = (m_direction == LONG && high > sim_child1.GetPrice100()) ||
+                                             (m_direction == SHORT && low < sim_child1.GetPrice100());
+               if(complex_break_condition)
+               {
+                  // پیدا کردن نقطه صفر فرزند دوم پیچیده
+                  int fix_index = iBarShift(_Symbol, _Period, child1_fix_time);
+                  int break_index = i;
+                  double new_zero_price = (m_direction == LONG) ? low : high;
+                  datetime new_zero_time = candle_time;
+
+                  for(int j = fix_index; j >= break_index; j--)
+                  {
+                     double candle_low = iLow(_Symbol, _Period, j);
+                     double candle_high = iHigh(_Symbol, _Period, j);
+                     if(m_direction == LONG && candle_low < new_zero_price)
+                     {
+                        new_zero_price = candle_low;
+                        new_zero_time = iTime(_Symbol, _Period, j);
+                     }
+                     else if(m_direction == SHORT && candle_high > new_zero_price)
+                     {
+                        new_zero_price = candle_high;
+                        new_zero_time = iTime(_Symbol, _Period, j);
+                     }
+                  }
+
+                  if(sim_child1 != NULL) { sim_child1.Delete(); delete sim_child1; sim_child1 = NULL; }
+                  sim_child2 = new CChildFibo(m_id + "_SuccessChild2", InpChild2Color, InpChildLevels, m_mother, true, m_is_test);
+                  if(sim_child2 == NULL)
+                  {
+                     Log("خطا در ایجاد فرزند دوم پیچیده در شبیه‌سازی");
+                     sim_state = FAILED;
+                     break;
+                  }
+                  sim_child2.SetPoints(new_zero_time, new_zero_price, candle_time, (m_direction == LONG) ? high : low);
+                  if(!sim_child2.Draw())
+                  {
+                     Log("خطا در رسم فرزند دوم پیچیده در شبیه‌سازی");
+                     delete sim_child2;
+                     sim_state = FAILED;
+                     break;
+                  }
+                  sim_state = CHILD2_ACTIVE;
+                  Log("شبیه‌سازی: فرزند دوم پیچیده فعال شد در " + TimeToString(candle_time));
+               }
+            }
+         }
+         else if(sim_state == CHILD2_ACTIVE && sim_child2 != NULL)
+         {
+            // بررسی ورود به ناحیه طلایی برای تکمیل ساختار
+            double current_price = (InpStructureBreakMode == STRUCTURE_CANDLE_CLOSE) ? close : (m_direction == LONG ? low : high);
+            if(sim_child2.CheckSuccessChild2(current_price))
+            {
+               sim_state = COMPLETED;
+               Log("شبیه‌سازی: ساختار با ورود به ناحیه طلایی کامل شد");
+            }
+            // بررسی شکست ساختار
+            else if(sim_child2.CheckFailureChild2OnTick(current_price))
+            {
+               sim_state = FAILED;
+               Log("شبیه‌سازی: ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
+            }
+            else if(i == current_index && sim_child2.CheckFailureChild2OnNewBar())
+            {
+               sim_state = FAILED;
+               Log("شبیه‌سازی: ساختار شکست خورد: عبور از سطح 250% مادر");
+            }
+         }
+
+         // بررسی شکست کلی ساختار
+         if(sim_state != FAILED)
+         {
+            double mother_zero = m_mother.GetPrice0();
+            bool structure_fail = (m_direction == LONG && low <= mother_zero) ||
+                                 (m_direction == SHORT && high >= mother_zero);
+            if(structure_fail)
+            {
+               sim_state = FAILED;
+               Log("شبیه‌سازی: ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
+            }
+         }
+      }
+
+      // ثبت نتایج نهایی شبیه‌سازی
+      m_state = sim_state;
+      m_child1 = sim_child1;
+      m_child2 = sim_child2;
+      m_is_child1_fixed = is_child1_fixed;
+      Log("شبیه‌سازی تا زمان حال کامل شد، وضعیت نهایی: " + EnumToString(m_state));
    }
 
 public:
@@ -1085,9 +1287,9 @@ public:
       m_child1 = NULL;
       m_child2 = NULL;
       m_is_test = is_test;
+      m_is_child1_fixed = false;
    }
 
-   //vvvvvvvvvv کل تابع Initialize فعلی را با این کد جایگزین کن vvvvvvvvvv
    bool Initialize(SBrokenFractal &fractal)
    {
       m_mother = new CMotherFibo(m_id + "_Mother", InpMotherColor, InpMotherLevels, m_direction, m_is_test);
@@ -1127,7 +1329,7 @@ public:
             }
          }
       }
-      
+
       if(bar_index_0 != -1)
          time0 = iTime(_Symbol, _Period, bar_index_0);
 
@@ -1135,19 +1337,20 @@ public:
       {
          m_state = MOTHER_ACTIVE;
          Log("ساختار در حالت مادر فعال");
+         SimulateToPresent(); // فراخوانی شبیه‌سازی بلافاصله پس از ایجاد مادر
          return true;
       }
       delete m_mother;
       m_mother = NULL;
       return false;
    }
-//^^^^^^^^^^ پایان بخش جایگزینی ^^^^^^^^^^
-
 
    bool UpdateOnTick(double current_price, datetime current_time)
    {
-      if(m_state == SEARCHING) return true;
-      if(m_mother != NULL && m_state != FAILED)
+      if(m_state == SEARCHING || m_state == FAILED || m_state == COMPLETED) return true;
+
+      // بررسی شکست کلی ساختار
+      if(m_mother != NULL)
       {
          if((m_direction == LONG && current_price <= m_mother.GetPrice0()) ||
             (m_direction == SHORT && current_price >= m_mother.GetPrice0()))
@@ -1157,85 +1360,26 @@ public:
             return false;
          }
       }
-      if(m_state == MOTHER_ACTIVE)
+
+      // بررسی ورود به ناحیه طلایی برای فرزند دوم پیچیده
+      if(m_state == CHILD2_ACTIVE && m_child2 != NULL && m_child2.IsSuccessChild2())
       {
-         if(InpMotherFixMode == FIX_PRICE_CROSS)
-         {
-            double level_50 = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * 0.5;
-            bool fix_condition = (m_direction == LONG && current_price >= level_50) ||
-                                 (m_direction == SHORT && current_price <= level_50);
-            if(fix_condition)
-            {
-               m_child1 = new CChildFibo(m_id + "_Child1", InpChild1Color, InpChildLevels, m_mother, false, m_is_test);
-               if(m_child1 == NULL || !m_child1.Initialize(current_time)) return false;
-               m_state = CHILD1_ACTIVE;
-               Log("ساختار به فرزند اول فعال تغییر کرد");
-            }
-         }
-      }
-      else if(m_state == CHILD1_ACTIVE)
-      {
-         if(m_child1.CheckFailure(current_price))
-         {
-            m_child1.Delete();
-            delete m_child1;
-            m_child1 = NULL;
-            m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
-            if(m_child2 == NULL || !m_child2.Initialize(current_time)) return false;
-            m_state = CHILD2_ACTIVE;
-            Log("فرزند اول شکست خورد، ساختار به فرزند دوم (ساده) تغییر کرد");
-         }
-         else if(m_child1.UpdateOnTick(current_time))
-         {
-            if(m_child1.IsFixed() && m_child1.CheckChild1TriggerChild2(current_price))
-            {
-               m_child1.Delete();
-               delete m_child1;
-               m_child1 = NULL;
-               m_child2 = new CChildFibo(m_id + "_SuccessChild2", InpChild2Color, InpChildLevels, m_mother, true, m_is_test);
-               if(m_child2 == NULL || !m_child2.Initialize(current_time)) return false;
-               m_state = CHILD2_ACTIVE;
-               Log("فرزند اول فیکس شد و قیمت از صد آن عبور کرد، ساختار به فرزند دوم (پیچیده) تغییر کرد");
-            }
-            else m_child1.CheckFixing(current_price);
-         }
-      }
-      else if(m_state == CHILD2_ACTIVE)
-      {
-         if(m_child2.CheckFailureChild2OnTick(current_price))
-         {
-            m_state = FAILED;
-            Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
-            return false;
-         }
-         if(m_child2.UpdateOnTick(current_time) && m_child2.CheckSuccessChild2(current_price))
+         if(m_child2.CheckSuccessChild2(current_price))
          {
             m_state = COMPLETED;
             Log("ساختار با ورود به ناحیه طلایی کامل شد");
          }
       }
+
       return true;
    }
 
    bool UpdateOnNewBar()
    {
-      if(m_state == MOTHER_ACTIVE)
-      {
-         if(InpMotherFixMode == FIX_CANDLE_CLOSE)
-         {
-            double level_50 = m_mother.GetPrice100() + (m_mother.GetPrice0() - m_mother.GetPrice100()) * 0.5;
-            bool fix_condition = (m_direction == LONG && iClose(_Symbol, _Period, 1) >= level_50) ||
-                                 (m_direction == SHORT && iClose(_Symbol, _Period, 1) <= level_50);
-            if(fix_condition)
-            {
-               m_child1 = new CChildFibo(m_id + "_Child1", InpChild1Color, InpChildLevels, m_mother, false, m_is_test);
-               if(m_child1 == NULL || !m_child1.Initialize(TimeCurrent())) return false;
-               m_state = CHILD1_ACTIVE;
-               Log("ساختار به فرزند اول فعال تغییر کرد");
-            }
-         }
-      }
-      else if(m_state == CHILD2_ACTIVE)
+      if(m_state == SEARCHING || m_state == FAILED || m_state == COMPLETED) return true;
+
+      // بررسی شکست ساختار در فرزند دوم
+      if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
       {
          if(m_child2.CheckFailureChild2OnNewBar())
          {
@@ -1244,6 +1388,7 @@ public:
             return false;
          }
       }
+
       return true;
    }
 
@@ -1262,7 +1407,7 @@ public:
          double level_1 = StringToDouble(temp_levels[0]) / 100.0;
          double level_2 = StringToDouble(temp_levels[1]) / 100.0;
          double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
-         double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
+         double level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
          double zone_lower = MathMin(price_level_1, price_level_2);
          double zone_upper = MathMax(price_level_1, price_level_2);
          double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
@@ -1303,6 +1448,8 @@ public:
    ENUM_STRUCTURE_STATE GetState() { return m_state; }
    bool IsActive() { return m_state != COMPLETED && m_state != FAILED; }
 };
+
+
 
 //+------------------------------------------------------------------+
 //| کلاس CStructureManager: مدیریت تمام ساختارها                   |
