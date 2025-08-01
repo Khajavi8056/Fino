@@ -1,18 +1,110 @@
-// در کلاس CStructureManager
-void HFiboOnNewBar()
+//+------------------------------------------------------------------+
+//|                                                  HipoFibonacci.mqh |
+//|                              محصولی از: Hipo Algorithm           |
+//|                              نسخه: ۱.۶.۶                          |
+//|                              تاریخ: ۲۰۲۵/۰۷/۲۵                   |
+//| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
+//+------------------------------------------------------------------+
+
+#property copyright "Hipo Algorithm"
+#property link      "https://hipoalgorithm.com"
+#property version   "1.6.7"
+
+//+------------------------------------------------------------------+
+//| تابع عمومی برای بررسی وجود شیء                                  |
+//+------------------------------------------------------------------+
+bool CheckObjectExists(string name)
 {
-   // به جای کد قبلی، این کد رو قرار بده
-   if(m_analysis_direction == LONG && m_long_analyzer != NULL)
+   for(int i = 0; i < 3; i++)
    {
-      if(!m_long_analyzer.UpdateOnNewBar())
-         m_long_analyzer.Reset();
+      if(ObjectFind(0, name) >= 0) return true;
+      Sleep(50);
    }
-   else if(m_analysis_direction == SHORT && m_short_analyzer != NULL)
+   Print("خطا: عدم رندر شیء " + name);
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| تابع پاک‌سازی اشیاء گرافیکی قدیمی                             |
+//+------------------------------------------------------------------+
+void ClearDebugObjects(bool is_test)
+{
+   string prefix = is_test ? "_Test" : "";
+   for(int i = ObjectsTotal(0, -1, -1) - 1; i >= 0; i--)
    {
-      if(!m_short_analyzer.UpdateOnNewBar())
-         m_short_analyzer.Reset();
+      string obj_name = ObjectName(0, i);
+      if(StringFind(obj_name, "Debug_") >= 0 && StringFind(obj_name, prefix) >= 0)
+         ObjectDelete(0, obj_name);
    }
 }
+
+//+------------------------------------------------------------------+
+//| ورودی‌های کتابخانه                                              |
+//+------------------------------------------------------------------+
+input group "تنظیمات فراکتال"
+input int InpFractalLookback = 200;       // حداکثر تعداد کندل برای جستجوی فراکتال (حداقل 10)
+input int InpFractalPeers = 3;            // تعداد کندل‌های چپ/راست برای فراکتال (حداقل 1)
+
+input group "سطوح فیبوناچی"
+input string InpMotherLevels = "0,38,50,68,100,150,200,250"; // سطوح فیبو مادر (اعداد مثبت، با کاما)
+input string InpChildLevels = "0,38,50,68,100,150,200,250";  // سطوح فیبو فرزندان (اعداد مثبت)
+/*input*/ string InpChild2BreakLevels = "";              // سطوح شکست فرزند دوم (اختیاری، اعداد مثبت، با کاما)
+input string InpGoldenZone = "38,50";                // ناحیه طلایی برای سیگنال (اعداد مثبت)
+
+input group "فیکس شدن مادر"
+enum ENUM_FIX_MODE
+{
+   PRICE_CROSS,   // عبور لحظه‌ای قیمت
+   CANDLE_CLOSE   // کلوز کندل
+};
+input ENUM_FIX_MODE InpMotherFixMode = PRICE_CROSS; // حالت فیکس شدن مادر
+
+input group "تخریب ساختار"
+enum ENUM_STRUCTURE_BREAK_MODE
+{
+   PRICE_CROSS1,   // عبور لحظه‌ای قیمت
+   CANDLE_CLOSE1   // کلوز کندل
+};
+input ENUM_STRUCTURE_BREAK_MODE InpStructureBreakMode = PRICE_CROSS1; // حالت تخریب ساختار
+
+input group "شکست فرزند اول"
+enum ENUM_CHILD_BREAK_MODE
+{
+   PRICE_CROSSS,     // عبور ساده قیمت
+   CONFIRMED_BREAK   // شکست تأییدشده
+};
+input ENUM_CHILD_BREAK_MODE InpChildBreakMode = CONFIRMED_BREAK; // حالت شکست سطح 100% فرزند
+input int InpMaxBreakoutCandles = 3;                            // حداکثر کندل‌های فرصت برای تأیید شکست
+
+input group "رنگ‌بندی اشیاء"
+input color InpMotherColor = clrWhite;    // رنگ فیبوناچی مادر
+input color InpChild1Color = clrMagenta;     // رنگ فیبوناچی فرزند اول
+input color InpChild2Color = clrGreen;    // رنگ فیبوناچی فرزند دوم
+
+/*input*/// group "تنظیمات پنل اصلی"
+/*input*/ bool InpShowPanelEa = true;           // نمایش پنل اصلی اطلاعاتی
+ ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل اصلی
+ int InpPanelOffsetX = 10;           // فاصله افقی پنل اصلی (حداقل 0)
+ int InpPanelOffsetY = 136;           // فاصله عمودی پنل اصلی (حداقل 0)
+
+//input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
+/*input*/ bool InpTestMode = false;            // فعال‌سازی حالت تست داخلی
+/*input*/ ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
+/*input*/ int InpTestPanelOffsetX = 153;      // فاصله افقی پنل تست از مرکز (حداقل 0)
+/*input*/ int InpTestPanelOffsetY = 39;       // فاصله عمودی پنل تست از بالا (حداقل 0)
+/*input*/ color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
+/*input*/ color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Stop
+/*input*/ color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
+/*input*/ color InpTestPanelBgColor = clrDarkGray;      // رنگ پس‌زمینه پنل تست
+
+/*input*/ // group "تنظیمات دیباگ"
+/*input*/  bool InpVisualDebug = false;        // فعال‌سازی حالت تست بصری
+
+input group "تنظیمات لاگ"
+input bool InpEnableLog = false;           // فعال‌سازی لاگ‌گیری
+input string InpLogFilePath = "HipoFibonacci_Log.txt"; // مسیر فایل لاگ (MQL5/Files)
+input int InpMaxFamilies = 1;             // حداکثر تعداد ساختارهای فعال (فقط 1)
+//+------------------------------------------------------------------+
 //| ساختارها و ثابت‌ها                                              |
 //+------------------------------------------------------------------+
 enum ENUM_STRUCTURE_STATE
@@ -1810,14 +1902,20 @@ public:
          m_panel.UpdateStatus(status);
    }
 
-   void HFiboOnNewBar()
+  void HFiboOnNewBar()
+{
+   // به جای کد قبلی، این کد رو قرار بده
+   if(m_analysis_direction == LONG && m_long_analyzer != NULL)
    {
-      if(m_active_family != NULL && !m_active_family.UpdateOnNewBar())
-      {
-         StopCurrentStructure();
-      }
+      if(!m_long_analyzer.UpdateOnNewBar())
+         m_long_analyzer.Reset();
    }
-
+   else if(m_analysis_direction == SHORT && m_short_analyzer != NULL)
+   {
+      if(!m_short_analyzer.UpdateOnNewBar())
+         m_short_analyzer.Reset();
+   }
+}
    void HFiboOnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
    {
       if(!InpTestMode || m_test_panel == NULL) return;
@@ -2019,3 +2117,11 @@ void HFiboSetAnalysisDirection(ENUM_DIRECTION direction)
    if(g_manager != NULL)
       g_manager.SetAnalysisDirection(direction);
 }
+void HFiboStopCurrentStructure()
+{
+   if(g_manager != NULL)
+      g_manager.StopCurrentStructure();
+}
+
+
+
