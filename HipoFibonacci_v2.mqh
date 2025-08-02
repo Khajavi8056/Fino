@@ -11,7 +11,8 @@
 #property link      "https://hipoalgorithm.com"
 #property version   "2.0.1"
 
-#include "HipoTrend.mqh"
+//#include "HipoTrend.mqh"
+#include <HipoTrend.mqh>
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -142,12 +143,12 @@ enum ENUM_STRUCTURE_STATE
    COMPLETED,      // ساختار کامل شده
    FAILED          // ساختار شکست خورده
 };
-
+/*
 enum ENUM_DIRECTION
 {
    LONG,  // خرید
    SHORT  // فروش
-};
+};*/
 
 struct SSignal
 {
@@ -252,7 +253,7 @@ public:
    //+-------------------------------------------------------------+
    //| پیدا کردن فراکتال بالای بعدی که استفاده نشده است          |
    //+-------------------------------------------------------------+
-   bool FindNextUnusedHighFractal(int lookback, int peers, datetime used_times[], SFractal &fractal)
+   bool FindNextUnusedHighFractal(int lookback, int peers, datetime &used_times[], SFractal &fractal)
    {
       for(int i = 1; i <= lookback; i++)
       {
@@ -282,7 +283,7 @@ public:
    //+-------------------------------------------------------------+
    //| پیدا کردن فراکتال پایین بعدی که استفاده نشده است          |
    //+-------------------------------------------------------------+
-   bool FindNextUnusedLowFractal(int lookback, int peers, datetime used_times[], SFractal &fractal)
+   bool FindNextUnusedLowFractal(int lookback, int peers, datetime &used_times[], SFractal &fractal)
    {
       for(int i = 1; i <= lookback; i++)
       {
@@ -485,8 +486,8 @@ private:
 
 public:
    CTestPanel(string name, ENUM_BASE_CORNER corner, int x, int y, color long_color, color short_color, color stop_color, color bg_color)
-   {
-目
+   
+
    {
       m_name = name;
       m_corner = corner;
@@ -1054,7 +1055,12 @@ public:
       Sleep(50);
       return CheckObjectExists(obj_name);
    }
-
+void Swap(int &a, int &b)
+{
+   int temp = a;
+   a = b;
+   b = temp;
+}
    bool Initialize(datetime current_time)
    {
       if(m_parent_mother == NULL) return false;
@@ -1525,8 +1531,13 @@ public:
       m_child2 = NULL;
       m_is_test = is_test;
       m_creation_time = TimeCurrent();
+      
+   
    }
-
+CChildFibo* GetChild2() const { return m_child2; }
+   CMotherFibo* GetMother() const { return m_mother; }
+   string GetId() const { return m_id; }
+   
    bool Initialize()
    {
       SFractal fractal;
@@ -1866,7 +1877,7 @@ public:
    {
       if(m_child2 != NULL) { m_child2.Delete(); delete m_child2; m_child2 = NULL; }
       if(m_child1 != NULL) { m_child1.Delete(); delete m_child1; m_child1 = NULL; }
-      if(m_mother != NULL) { m_mother.Delete();(); delete m_mother; m_mother = NULL; }
+      if(m_mother != NULL) { m_mother.Delete(); delete m_mother; m_mother = NULL; }
       m_state = FAILED;
       if(InpVisualDebug)
          ClearDebugObjects(m_is_test);
@@ -1921,7 +1932,7 @@ private:
    ENUM_DIRECTION m_current_trend;
    bool m_is_locked;
    CFamily* m_selected_family;
-
+CFractalFinder m_fractal_finder; // Add this line
    void Log(string message)
    {
       if(InpEnableLog)
@@ -2035,7 +2046,7 @@ private:
                CFamily* best = NULL;
                for(int i = 0; i < ArraySize(candidates); i++)
                {
-                  if(candidates[i].GetState() == CHILD2_ACTIVE && candidates[i].m_child2 != NULL)
+                  if(candidates[i].GetState() == CHILD2_ACTIVE && candidates[i].GetChild2() != NULL)
                   {
                      string temp_levels[];
                      int count = StringSplit(InpGoldenZone, ',', temp_levels);
@@ -2043,8 +2054,8 @@ private:
                      {
                         double level1 = StringToDouble(temp_levels[0]) / 100.0;
                         double level2 = StringToDouble(temp_levels[1]) / 100.0;
-                        double price_level1 = candidates[i].m_child2.GetLevelPrice(level1);
-                        double price_level2 = candidates[i].m_child2.GetLevelPrice(level2);
+                        double price_level1 = candidates[i].GetChild2().GetLevelPrice(level1);
+                        double price_level2 = candidates[i].GetChild2().GetLevelPrice(level2);
                         double zone_lower = MathMin(price_level1, price_level2);
                         double zone_upper = MathMax(price_level1, price_level2);
                         double distance;
@@ -2233,28 +2244,27 @@ public:
       }
       if(InpMultiStructureMode)
       {
-         while(ArraySize(m_families) < InpMaxBackgroundFamilies)
+         while((uint)ArraySize(m_families) < InpMaxBackgroundFamilies)
          {
             // Check if the last family's mother is fixed before creating a new family
             if(ArraySize(m_families) > 0 && m_families[ArraySize(m_families) - 1] != NULL &&
-               m_families[ArraySize(m_families) - 1].m_mother != NULL &&
-               !m_families[ArraySize(m_families) - 1].m_mother.IsFixed())
+               m_families[ArraySize(m_families) - 1].GetMother() != NULL &&
+               !m_families[ArraySize(m_families) - 1].GetMother().IsFixed())
             {
                break; // Do not create a new family until the last mother is fixed
             }
             datetime used_times[];
             GetUsedFractalTimes(used_times);
             SFractal new_fractal;
-            bool found = (m_current_trend == LONG && m_fractal_finder.FindNextUnusedHighFractal(InpFractalLookback, InpFractalPeers, used_times, new_fractal)) ||
-                         (m_current_trend == SHORT && m_fractal_finder.FindNextUnusedLowFractal(InpFractalLookback, InpFractalPeers, used_times, new_fractal));
+           bool found = (m_current_trend == LONG && m_fractal_finder.FindNextUnusedHighFractal(InpFractalLookback, InpFractalPeers, used_times, new_fractal)) ||
+                        (m_current_trend == SHORT && m_fractal_finder.FindNextUnusedLowFractal(InpFractalLookback, InpFractalPeers, used_times, new_fractal));
             if(!found) break;
             CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()), m_current_trend, m_is_test_mode);
             if(new_family != NULL && new_family.InitializeWithFractal(new_fractal))
             {
                ArrayResize(m_families, ArraySize(m_families) + 1);
                m_families[ArraySize(m_families) - 1] = new_family;
-               Log("ساختار جدید ایجاد شد: ID=" + new_family.m_id + ", جهت=" + (m_current_trend == LONG ? "Long" : "Short"));
-            }
+               Log("ساختار جدید ایجاد شد: ID=" + new_family.GetId() + ", جهت=" + (m_current_trend == LONG ? "Long" : "Short"));            }
             else
             {
                delete new_family;
@@ -2271,7 +2281,7 @@ public:
             {
                ArrayResize(m_families, 1);
                m_families[0] = new_family;
-               Log("ساختار جدید ایجاد شد: ID=" + new_family.m_id + ", جهت=" + (m_current_trend == LONG ? "Long" : "Short"));
+               Log("ساختار جدید ایجاد شد: ID=" + new_family.GetId() + ", جهت=" + (m_current_trend == LONG ? "Long" : "Short"));
             }
             else
             {
@@ -2332,7 +2342,7 @@ public:
       m_selected_family = best_family;
       m_is_locked = true;
       m_selected_family.SetVisible(true);
-      Log("ساختار انتخاب شد و نمایش داده شد: ID=" + m_selected_family.m_id + ", جهت=" + (direction == LONG ? "Long" : "Short"));
+     // Log("ساختار جدید ایجاد شد: ID=" + new_family.GetId() + ", جهت=" + (m_current_trend == LONG ? "Long" : "Short"));
       return true;
    }
 
@@ -2528,7 +2538,6 @@ int GetActiveFamiliesCount()
 //| متغیرهای سراسری                                                |
 //+------------------------------------------------------------------+
 CStructureManager* g_manager = NULL;
-
 //+------------------------------------------------------------------+
 //| توابع سراسری برای استفاده در اکسپرت                           |
 //+------------------------------------------------------------------+
