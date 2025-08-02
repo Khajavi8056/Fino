@@ -122,6 +122,25 @@ bool ValidateCustomSessionTime(string time_str)
    return (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59);
 }
 
+
+//+------------------------------------------------------------------+
+//| تابع پل برای درخواست ساختار جدید از کتابخانه فیبوناچی            |
+//+------------------------------------------------------------------+
+bool HFiboTryScanForNewStructure(ENUM_DIRECTION direction)
+{
+   // این متغیر از تنظیمات ورودی کتابخانه HipoFibonacci.mqh خوانده می‌شود
+   if(InpRunInBackground)
+   {
+      // اگر حالت پس‌زمینه فعاله، بهترین ساختار موجود رو درخواست میدیم
+      return HFiboRequestAndShowStructure(direction);
+   }
+   else
+   {
+      // اگر حالت پس‌زمینه خاموشه، مثل نسخه ۱.۶ یه ساختار جدید میسازیم
+      return HFiboCreateNewStructure(direction);
+   }
+}
+
 //+------------------------------------------------------------------+
 //| تابع راه‌اندازی اکسپرت                                         |
 //+------------------------------------------------------------------+
@@ -288,9 +307,10 @@ g_engine = new CHipoFino(
          delete g_engine;
          HFiboOnDeinit(0);
          return(INIT_FAILED);
+
       }
    }
-   
+            EventSetTimer(1); //
    Print("اکسپرت HipoFino با موفقیت راه‌اندازی شد");
    return(INIT_SUCCEEDED);
 }
@@ -313,6 +333,7 @@ void OnDeinit(const int reason)
       g_engine = NULL;
    }
    HFiboOnDeinit(reason);
+  EventKillTimer(); 
    Print("اکسپرت HipoFino متوقف شد. دلیل: ", reason);
 }
 
@@ -340,3 +361,21 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 {
    HFiboOnChartEvent(id, lparam, dparam, sparam);
 }
+
+
+//+------------------------------------------------------------------+
+//| تابع تایمر برای بررسی کندل جدید                                  |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   static datetime last_candle_time = 0;
+   datetime current_candle_time = iTime(_Symbol, PERIOD_CURRENT, 0);
+
+   if(current_candle_time != last_candle_time)
+   {
+      last_candle_time = current_candle_time;
+      HFiboOnNewBar(); // به کتابخونه فیبوناچی خبر میدیم کندل جدیده
+   }
+}
+
+//+------------------------------------------------------------------+
