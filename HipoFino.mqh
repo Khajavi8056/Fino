@@ -844,6 +844,8 @@ public:
 
       m_position_ticket = result.order;
       Log("معامله باز شد: تیکت=" + (string)m_position_ticket);
+              
+      HFiboAcknowledgeSignal(signal.id);
 
       if(!PositionSelectByTicket(m_position_ticket))
         {
