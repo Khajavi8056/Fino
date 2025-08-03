@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                                  HipoFibonacci.mqh |
 //|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۶.۶                          |
-//|                              تاریخ: ۲۰۲۵/۰۷/۲۵                   |
+//|                              نسخه: ۱.۷.۰                          |
+//|                              تاریخ: ۲۰۲۵/۰۸/۰۱                   |
 //| کتابخانه تحلیل فیبوناچی پویا برای متاتریدر ۵ با حالت تست    |
 //+------------------------------------------------------------------+
 
 #property copyright "Hipo Algorithm"
 #property link      "https://hipoalgorithm.com"
-#property version   "1.6.7"
+#property version   "1.7.0"
 
 //+------------------------------------------------------------------+
 //| تابع عمومی برای بررسی وجود شیء                                  |
@@ -44,11 +44,12 @@ void ClearDebugObjects(bool is_test)
 input group "تنظیمات فراکتال"
 input int InpFractalLookback = 200;       // حداکثر تعداد کندل برای جستجوی فراکتال (حداقل 10)
 input int InpFractalPeers = 3;            // تعداد کندل‌های چپ/راست برای فراکتال (حداقل 1)
+input ENUM_TIMEFRAMES InpFractalTimeframe = PERIOD_CURRENT; // تایم‌فریم برای تشخیص فراکتال
 
 input group "سطوح فیبوناچی"
 input string InpMotherLevels = "0,38,50,68,100,150,200,250"; // سطوح فیبو مادر (اعداد مثبت، با کاما)
 input string InpChildLevels = "0,38,50,68,100,150,200,250";  // سطوح فیبو فرزندان (اعداد مثبت)
-/*input*/ string InpChild2BreakLevels = "";              // سطوح شکست فرزند دوم (اختیاری، اعداد مثبت، با کاما)
+input string InpChild2BreakLevels = "";              // سطوح شکست فرزند دوم (اختیاری، اعداد مثبت، با کاما)
 input string InpGoldenZone = "38,50";                // ناحیه طلایی برای سیگنال (اعداد مثبت)
 
 input group "فیکس شدن مادر"
@@ -78,32 +79,36 @@ input int InpMaxBreakoutCandles = 3;                            // حداکثر 
 
 input group "رنگ‌بندی اشیاء"
 input color InpMotherColor = clrWhite;    // رنگ فیبوناچی مادر
-input color InpChild1Color = clrMagenta;     // رنگ فیبوناچی فرزند اول
+input color InpChild1Color = clrMagenta;  // رنگ فیبوناچی فرزند اول
 input color InpChild2Color = clrGreen;    // رنگ فیبوناچی فرزند دوم
 
-/*input*/// group "تنظیمات پنل اصلی"
-/*input*/ bool InpShowPanelEa = true;           // نمایش پنل اصلی اطلاعاتی
- ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل اصلی
- int InpPanelOffsetX = 10;           // فاصله افقی پنل اصلی (حداقل 0)
- int InpPanelOffsetY = 136;           // فاصله عمودی پنل اصلی (حداقل 0)
+input bool InpShowPanelEa = true;           // نمایش پنل اصلی اطلاعاتی
+input ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER; // گوشه پنل اصلی
+input int InpPanelOffsetX = 10;           // فاصله افقی پنل اصلی (حداقل 0)
+input int InpPanelOffsetY = 136;          // فاصله عمودی پنل اصلی (حداقل 0)
 
-//input group "تنظیمات حالت تست (هشدار: در این حالت اکسپرت نادیده گرفته می‌شود)"
-/*input*/ bool InpTestMode = false;            // فعال‌سازی حالت تست داخلی
-/*input*/ ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست (مرکز بالا)
-/*input*/ int InpTestPanelOffsetX = 153;      // فاصله افقی پنل تست از مرکز (حداقل 0)
-/*input*/ int InpTestPanelOffsetY = 39;       // فاصله عمودی پنل تست از بالا (حداقل 0)
-/*input*/ color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
-/*input*/ color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Stop
-/*input*/ color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
-/*input*/ color InpTestPanelBgColor = clrDarkGray;      // رنگ پس‌زمینه پنل تست
+input bool InpTestMode = false;            // فعال‌سازی حالت تست داخلی
+input ENUM_BASE_CORNER InpTestPanelCorner = CORNER_RIGHT_UPPER; // گوشه پنل تست
+input int InpTestPanelOffsetX = 153;      // فاصله افقی پنل تست
+input int InpTestPanelOffsetY = 39;       // فاصله عمودی پنل تست
+input color InpTestPanelButtonColorLong = clrGreen;  // رنگ دکمه Start Long
+input color InpTestPanelButtonColorShort = clrRed;   // رنگ دکمه Start Short
+input color InpTestPanelButtonColorStop = clrGray;   // رنگ دکمه Stop
+input color InpTestPanelBgColor = clrDarkGray;      // رنگ پس‌زمینه پنل تست
 
-/*input*/ // group "تنظیمات دیباگ"
-/*input*/  bool InpVisualDebug = false;        // فعال‌سازی حالت تست بصری
+input bool InpVisualDebug = false;        // فعال‌سازی حالت تست بصری
+
+input group "تنظیمات شکست فرزند دوم ناموفق"
+input string InpFailureChildTriggerRange = "150,200"; // محدوده سطوح برای تولد و شکست فرزند دوم ناموفق (مثال: "150,200")
+
+input group "تنظیمات سطح شکست نهایی مادر"
+input double InpMotherBreakoutLevel = 250.0; // سطح شکست نهایی مادر برای مسیر ناموفق (مثال: 250.0)
 
 input group "تنظیمات لاگ"
 input bool InpEnableLog = false;           // فعال‌سازی لاگ‌گیری
 input string InpLogFilePath = "HipoFibonacci_Log.txt"; // مسیر فایل لاگ (MQL5/Files)
 input int InpMaxFamilies = 1;             // حداکثر تعداد ساختارهای فعال (فقط 1)
+
 //+------------------------------------------------------------------+
 //| ساختارها و ثابت‌ها                                              |
 //+------------------------------------------------------------------+
@@ -134,9 +139,7 @@ struct SFractal
    double price;
    datetime time;
 };
-// ... بعد از تعریف struct SFractal
 
-// <<-- اضافه شد: ساختار جدید برای نگهداری داده‌های خروجی و رویدادهای کلیدی فیبوناچی -->>
 struct SFibonacciEventData
 {
    datetime child1_fix_time;          // زمان دقیق فیکس شدن فرزند اول
@@ -152,62 +155,74 @@ struct SFibonacciEventData
 class CFractalFinder
 {
 private:
+   //+-------------------------------------------------------------+
+   //| بررسی فراکتال بالایی در تایم‌فریم مشخص‌شده                |
+   //+-------------------------------------------------------------+
    bool IsHighFractal(int index, int peers)
    {
-      if(index + peers >= iBars(_Symbol, _Period)) return false;
+      if(index + peers >= iBars(_Symbol, InpFractalTimeframe)) return false;
       if(index - peers < 0) return false;
-      double high = iHigh(_Symbol, _Period, index);
+      double high = iHigh(_Symbol, InpFractalTimeframe, index);
       for(int i = 1; i <= peers; i++)
       {
-         if(iHigh(_Symbol, _Period, index + i) >= high ||
-            iHigh(_Symbol, _Period, index - i) >= high)
+         if(iHigh(_Symbol, InpFractalTimeframe, index + i) >= high ||
+            iHigh(_Symbol, InpFractalTimeframe, index - i) >= high)
             return false;
       }
       return true;
    }
 
+   //+-------------------------------------------------------------+
+   //| بررسی فراکتال پایینی در تایم‌فریم مشخص‌شده               |
+   //+-------------------------------------------------------------+
    bool IsLowFractal(int index, int peers)
    {
-      if(index + peers >= iBars(_Symbol, _Period)) return false;
+      if(index + peers >= iBars(_Symbol, InpFractalTimeframe)) return false;
       if(index - peers < 0) return false;
-      double low = iLow(_Symbol, _Period, index);
+      double low = iLow(_Symbol, InpFractalTimeframe, index);
       for(int i = 1; i <= peers; i++)
       {
-         if(iLow(_Symbol, _Period, index + i) <= low ||
-            iLow(_Symbol, _Period, index - i) <= low)
+         if(iLow(_Symbol, InpFractalTimeframe, index + i) <= low ||
+            iLow(_Symbol, InpFractalTimeframe, index - i) <= low)
             return false;
       }
       return true;
    }
 
 public:
+   //+-------------------------------------------------------------+
+   //| پیدا کردن آخرین فراکتال بالایی در تایم‌فریم مشخص‌شده     |
+   //+-------------------------------------------------------------+
    void FindRecentHigh(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
       fractal.price = 0.0;
       fractal.time = 0;
-      int startIndex = iBarShift(_Symbol, _Period, startTime);
-      for(int i = startIndex; i <= MathMin(startIndex + lookback, iBars(_Symbol, _Period) - peers - 1); i++)
+      int startIndex = iBarShift(_Symbol, InpFractalTimeframe, startTime);
+      for(int i = startIndex; i <= MathMin(startIndex + lookback, iBars(_Symbol, InpFractalTimeframe) - peers - 1); i++)
       {
          if(IsHighFractal(i, peers))
          {
-            fractal.price = iHigh(_Symbol, _Period, i);
-            fractal.time = iTime(_Symbol, _Period, i);
+            fractal.price = iHigh(_Symbol, InpFractalTimeframe, i);
+            fractal.time = iTime(_Symbol, InpFractalTimeframe, i);
             break;
          }
       }
    }
 
+   //+-------------------------------------------------------------+
+   //| پیدا کردن آخرین فراکتال پایینی در تایم‌فریم مشخص‌شده    |
+   //+-------------------------------------------------------------+
    void FindRecentLow(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
       fractal.price = 0.0;
       fractal.time = 0;
-      int startIndex = iBarShift(_Symbol, _Period, startTime);
-      for(int i = startIndex; i <= MathMin(startIndex + lookback, iBars(_Symbol, _Period) - peers - 1); i++)
+      int startIndex = iBarShift(_Symbol, InpFractalTimeframe, startTime);
+      for(int i = startIndex; i <= MathMin(startIndex + lookback, iBars(_Symbol, InpFractalTimeframe) - peers - 1); i++)
       {
          if(IsLowFractal(i, peers))
          {
-            fractal.price = iLow(_Symbol, _Period, i);
-            fractal.time = iTime(_Symbol, _Period, i);
+            fractal.price = iLow(_Symbol, InpFractalTimeframe, i);
+            fractal.time = iTime(_Symbol, InpFractalTimeframe, i);
             break;
          }
       }
@@ -476,6 +491,7 @@ protected:
    datetime m_time0, m_time100;
    double m_price0, m_price100;
    bool m_is_test;
+   bool m_is_visible;
 
 public:
    CBaseFibo(string name, color clr, string levels, bool is_test)
@@ -483,6 +499,7 @@ public:
       m_name = name;
       m_color = clr;
       m_is_test = is_test;
+      m_is_visible = true;
       ArrayFree(m_levels);
       string temp_levels[];
       int count = StringSplit(levels, StringGetCharacter(",", 0), temp_levels);
@@ -499,8 +516,23 @@ public:
       }
    }
 
+   void SetVisible(bool visible)
+   {
+      if(m_is_visible == visible) return;
+      m_is_visible = visible;
+      if(m_is_visible)
+         Draw();
+      else
+         Delete();
+   }
+
    virtual bool Draw()
    {
+      if(!m_is_visible)
+      {
+         Delete();
+         return true;
+      }
       string obj_name = m_name + (m_is_test ? "_Test" : "");
       ObjectDelete(0, obj_name);
       if(!ObjectCreate(0, obj_name, OBJ_FIBO, 0, m_time0, m_price0, m_time100, m_price100))
@@ -536,7 +568,16 @@ public:
       m_time100 = time100;
       m_price100 = price100;
    }
-datetime GetTime100() { return m_time100; }
+
+   //+-------------------------------------------------------------+
+   //| محاسبه قیمت برای یک سطح فیبوناچی مشخص                     |
+   //+-------------------------------------------------------------+
+   double GetLevelPrice(double level)
+   {
+      return m_price100 + (m_price0 - m_price100) * (level / 100.0);
+   }
+
+   datetime GetTime100() { return m_time100; }
    datetime GetTime0() { return m_time0; }
    double GetPrice0() { return m_price0; }
    double GetPrice100() { return m_price100; }
@@ -552,25 +593,30 @@ class CMotherFibo : public CBaseFibo
 private:
    bool m_is_fixed;
    ENUM_DIRECTION m_direction;
-   double m_breakout_failure_price; // قیمت سطح شکست نهایی (مثل 200% یا بالاترین سطح)
-   
+   double m_breakout_failure_price;
+
    void Log(string message)
    {
       if(InpEnableLog)
          Print(TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS) + ": " + message);
    }
 
-
 public:
-  CMotherFibo(string name, color clr, string levels, ENUM_DIRECTION dir, bool is_test)
-   : CBaseFibo(name, clr, levels, is_test)
-{
-   m_is_fixed = false;
-   m_direction = dir;
-   m_breakout_failure_price = 0.0;
-}
+   CMotherFibo(string name, color clr, string levels, ENUM_DIRECTION dir, bool is_test)
+      : CBaseFibo(name, clr, levels, is_test)
+   {
+      m_is_fixed = false;
+      m_direction = dir;
+      m_breakout_failure_price = 0.0;
+   }
+
    virtual bool Draw() override
    {
+      if(!m_is_visible)
+      {
+         Delete();
+         return true;
+      }
       string obj_name = m_name + (m_is_test ? "_Test" : "");
       ObjectDelete(0, obj_name);
       if(!ObjectCreate(0, obj_name, OBJ_FIBO, 0, m_time100, m_price100, m_time0, m_price0))
@@ -668,146 +714,137 @@ public:
       }
       return true;
    }
-bool CheckFixingPriceCross(double current_price)
-{
-   if(m_is_fixed) return true;
-   double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
-   bool fix_condition = (m_direction == LONG && current_price >= level_50) ||
-                        (m_direction == SHORT && current_price <= level_50);
-   if(fix_condition)
+
+   bool CheckFixingPriceCross(double current_price)
    {
-      m_is_fixed = true;
-      Log("مادر فیکس شد (عبور قیمت): صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
-
-      // محاسبه و ذخیره قیمت سطح شکست نهایی (فقط سطح 250%)
-      double target_level = 250.0;
-      bool level_found = false;
-      for(int i = 0; i < ArraySize(m_levels); i++)
+      if(m_is_fixed) return true;
+      double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
+      bool fix_condition = (m_direction == LONG && current_price >= level_50) ||
+                           (m_direction == SHORT && current_price <= level_50);
+      if(fix_condition)
       {
-         if(MathAbs(m_levels[i] - target_level) < 0.01) // بررسی وجود سطح 250%
+         m_is_fixed = true;
+         Log("مادر فیکس شد (عبور قیمت): صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         double target_level = InpMotherBreakoutLevel;
+         bool level_found = false;
+         for(int i = 0; i < ArraySize(m_levels); i++)
          {
-            level_found = true;
-            if(m_direction == LONG)
-               m_breakout_failure_price = m_price100 + (m_price100 - m_price0) * (target_level / 100.0);
-            else // SHORT
-               m_breakout_failure_price = m_price100 - (m_price0 - m_price100) * (target_level / 100.0);
-            Log("سطح شکست نهایی مادر در قیمت " + DoubleToString(m_breakout_failure_price, _Digits) + " محاسبه شد (سطح " + DoubleToString(target_level, 1) + "%)");
-            break;
-         }
-      }
-      if(!level_found)
-      {
-         Log("هشدار: سطح 250% در InpMotherLevels یافت نشد. سطح شکست محاسبه نشد.");
-         m_breakout_failure_price = 0.0;
-      }
-
-      if(InpVisualDebug)
-      {
-         string arrow_name = "Debug_Arrow_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-         if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
-         {
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
-            CheckObjectExists(arrow_name);
-         }
-         string label_name = "Debug_Label_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-         if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price0))
-         {
-            ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر فیکس شد: صفر=" + DoubleToString(m_price0, _Digits));
-            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
-         }
-      }
-      return true;
-   }
-   return false;
-}
-bool CheckFixingCandleClose()
-{
-   if(m_is_fixed) return true;
-   double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
-   bool fix_condition = (m_direction == LONG && iClose(_Symbol, _Period, 1) >= level_50) ||
-                        (m_direction == SHORT && iClose(_Symbol, _Period, 1) <= level_50);
-   if(fix_condition)
-   {
-      m_is_fixed = true;
-      Log("مادر فیکس شد (کلوز کندل): صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
-
-      // محاسبه و ذخیره قیمت سطح شکست نهایی (فقط سطح 250%)
-      double target_level = 250.0;
-      bool level_found = false;
-      for(int i = 0; i < ArraySize(m_levels); i++)
-      {
-         if(MathAbs(m_levels[i] - target_level) < 0.01) // بررسی وجود سطح 250%
-         {
-            level_found = true;
-            if(m_direction == LONG)
-               m_breakout_failure_price = m_price100 + (m_price100 - m_price0) * (target_level / 100.0);
-            else // SHORT
-               m_breakout_failure_price = m_price100 - (m_price0 - m_price100) * (target_level / 100.0);
-            Log("سطح شکست نهایی مادر در قیمت " + DoubleToString(m_breakout_failure_price, _Digits) + " محاسبه شد (سطح " + DoubleToString(target_level, 1) + "%)");
-            break;
-         }
-      }
-      if(!level_found)
-      {
-         Log("هشدار: سطح 250% در InpMotherLevels یافت نشد. سطح شکست محاسبه نشد.");
-         m_breakout_failure_price = 0.0;
-      }
-
-      if(InpVisualDebug)
-      {
-         string arrow_name = "Debug_Arrow_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-         if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
-         {
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
-            CheckObjectExists(arrow_name);
-         }
-         string label_name = "Debug_Label_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-         if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price0))
-         {
-            ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر فیکس شد: صفر=" + DoubleToString(m_price0, _Digits));
-            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
-         }
-      }
-      return true;
-   }
-   return false;
-}
-bool CheckBreakoutFailure(double current_price)
-{
-   if(m_breakout_failure_price == 0.0 || !m_is_fixed) return false;
-
-   bool fail_condition = (m_direction == LONG && current_price >= m_breakout_failure_price) ||
-                         (m_direction == SHORT && current_price <= m_breakout_failure_price);
-
-   if(fail_condition)
-   {
-      Log("ساختار شکست خورد: عبور از سطح نهایی مادر: قیمت=" + DoubleToString(current_price, _Digits) + ", سطح شکست=" + DoubleToString(m_breakout_failure_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
-      if(InpVisualDebug)
-      {
-         string arrow_name = "Debug_Arrow_BreakoutFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-         if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
-         {
-            ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrRed);
-            CheckObjectExists(arrow_name);
-         }
-         string label_name = "Debug_Label_BreakoutFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-         if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
-         {
-            double max_level_value = 0.0;
-            for(int i = 0; i < ArraySize(m_levels); i++)
+            if(MathAbs(m_levels[i] - target_level) < 0.01)
             {
-               if(m_levels[i] > 100.0 && m_levels[i] > max_level_value)
-                  max_level_value = m_levels[i];
+               level_found = true;
+               if(m_direction == LONG)
+                  m_breakout_failure_price = m_price100 + (m_price100 - m_price0) * (target_level / 100.0);
+               else
+                  m_breakout_failure_price = m_price100 - (m_price0 - m_price100) * (target_level / 100.0);
+               Log("سطح شکست نهایی مادر در قیمت " + DoubleToString(m_breakout_failure_price, _Digits) + " محاسبه شد (سطح " + DoubleToString(target_level, 1) + "%)");
+               break;
             }
-            ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار شکست خورد: عبور از سطح " + DoubleToString(max_level_value, 1) + "% مادر");
-            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
-            CheckObjectExists(label_name);
          }
+         if(!level_found)
+         {
+            Log("هشدار: سطح " + DoubleToString(target_level, 1) + "% در InpMotherLevels یافت نشد. سطح شکست محاسبه نشد.");
+            m_breakout_failure_price = 0.0;
+         }
+         if(InpVisualDebug)
+         {
+            string arrow_name = "Debug_Arrow_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
+               CheckObjectExists(arrow_name);
+            }
+            string label_name = "Debug_Label_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price0))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر فیکس شد: صفر=" + DoubleToString(m_price0, _Digits));
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            }
+         }
+         return true;
       }
-      return true;
+      return false;
    }
-   return false;
-}
+
+   bool CheckFixingCandleClose()
+   {
+      if(m_is_fixed) return true;
+      double level_50 = m_price100 + (m_price0 - m_price100) * 0.5;
+      bool fix_condition = (m_direction == LONG && iClose(_Symbol, _Period, 1) >= level_50) ||
+                           (m_direction == SHORT && iClose(_Symbol, _Period, 1) <= level_50);
+      if(fix_condition)
+      {
+         m_is_fixed = true;
+         Log("مادر فیکس شد (کلوز کندل): صفر=" + DoubleToString(m_price0, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         double target_level = InpMotherBreakoutLevel;
+         bool level_found = false;
+         for(int i = 0; i < ArraySize(m_levels); i++)
+         {
+            if(MathAbs(m_levels[i] - target_level) < 0.01)
+            {
+               level_found = true;
+               if(m_direction == LONG)
+                  m_breakout_failure_price = m_price100 + (m_price100 - m_price0) * (target_level / 100.0);
+               else
+                  m_breakout_failure_price = m_price100 - (m_price0 - m_price100) * (target_level / 100.0);
+               Log("سطح شکست نهایی مادر در قیمت " + DoubleToString(m_breakout_failure_price, _Digits) + " محاسبه شد (سطح " + DoubleToString(target_level, 1) + "%)");
+               break;
+            }
+         }
+         if(!level_found)
+         {
+            Log("هشدار: سطح " + DoubleToString(target_level, 1) + "% در InpMotherLevels یافت نشد. سطح شکست محاسبه نشد.");
+            m_breakout_failure_price = 0.0;
+         }
+         if(InpVisualDebug)
+         {
+            string arrow_name = "Debug_Arrow_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, m_direction == LONG ? clrLimeGreen : clrMagenta);
+               CheckObjectExists(arrow_name);
+            }
+            string label_name = "Debug_Label_MotherFix_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), m_price0))
+            {
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "مادر فیکس شد: صفر=" + DoubleToString(m_price0, _Digits));
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+            }
+         }
+         return true;
+      }
+      return false;
+   }
+
+   bool CheckBreakoutFailure(double current_price)
+   {
+      if(m_breakout_failure_price == 0.0 || !m_is_fixed) return false;
+      bool fail_condition = (m_direction == LONG && current_price >= m_breakout_failure_price) ||
+                            (m_direction == SHORT && current_price <= m_breakout_failure_price);
+      if(fail_condition)
+      {
+         Log("ساختار شکست خورد: عبور از سطح نهایی مادر: قیمت=" + DoubleToString(current_price, _Digits) + ", سطح شکست=" + DoubleToString(m_breakout_failure_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         if(InpVisualDebug)
+         {
+            string arrow_name = "Debug_Arrow_BreakoutFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, arrow_name, m_direction == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
+            {
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrRed);
+               CheckObjectExists(arrow_name);
+            }
+            string label_name = "Debug_Label_BreakoutFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
+            {
+               double max_level_value = InpMotherBreakoutLevel;
+               ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار شکست خورد: عبور از سطح " + DoubleToString(max_level_value, 1) + "% مادر");
+               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+               CheckObjectExists(label_name);
+            }
+         }
+         return true;
+      }
+      return false;
+   }
+
    bool CheckStructureFailure(double current_price)
    {
       if(!m_is_fixed) return false;
@@ -840,23 +877,22 @@ bool CheckBreakoutFailure(double current_price)
 //+------------------------------------------------------------------+
 class CChildFibo : public CBaseFibo
 {
-
 private:
    bool m_is_fixed;
    bool m_is_success_child2;
    CMotherFibo* m_parent_mother;
-   ENUM_DIRECTION m_direction; // جهت‌گیری فرزند (جدید)
-   // متغیرهای جدید برای شکست تأییدشده
+   ENUM_DIRECTION m_direction;
    bool m_breakout_triggered;
    datetime m_breakout_candle_time;
    double m_breakout_candle_high;
    double m_breakout_candle_low;
    int m_breakout_candle_count;
    datetime m_fixation_time;
-   double   m_fixation_price;
+   double m_fixation_price;
    datetime m_breakout_time;
-   double   m_breakout_price;
-   
+   double m_breakout_price;
+   datetime m_interval_start, m_interval_end;
+
    void Log(string message)
    {
       if(InpEnableLog)
@@ -891,77 +927,112 @@ private:
    }
 
 public:
- CChildFibo(string name, color clr, string levels, CMotherFibo* mother, bool is_success_child2, bool is_test)
+   CChildFibo(string name, color clr, string levels, CMotherFibo* mother, bool is_success_child2, bool is_test, datetime interval_start = 0, datetime interval_end = 0)
       : CBaseFibo(name, clr, levels, is_test)
    {
       m_is_fixed = false;
       m_is_success_child2 = is_success_child2;
       m_parent_mother = mother;
-      m_direction = mother != NULL ? mother.GetDirection() : LONG; // مقداردهی اولیه جهت‌گیری
+      m_direction = mother != NULL ? mother.GetDirection() : LONG;
       m_breakout_triggered = false;
       m_breakout_candle_time = 0;
       m_breakout_candle_high = 0.0;
       m_breakout_candle_low = 0.0;
       m_breakout_candle_count = 0;
+      m_interval_start = interval_start;
+      m_interval_end = interval_end;
    }
-//+------------------------------------------------------------------+
-//| CChildFibo::Draw (نسخه اصلاح شده و صحیح)                         |
-//+------------------------------------------------------------------+
-virtual bool Draw() override
+void Swap(int &a, int &b)
 {
-   string obj_name = m_name + (m_is_test ? "_Test" : "");
-   ObjectDelete(0, obj_name);
-   
-   // قانون ساده است: نقطه اول همیشه 100% و نقطه دوم همیشه 0% است.
-   // خود متغیرها از قبل می‌دانند کدام بالا و کدام پایین است.
-   // پس نیاز به هیچ منطق اضافی برای جهت‌گیری نیست.
-   if(!ObjectCreate(0, obj_name, OBJ_FIBO, 0, m_time100, m_price100, m_time0, m_price0))
-   {
-      Print("خطا در ایجاد شیء فیبوناچی فرزند: ", obj_name);
-      return false;
-   }
-   
-   ObjectSetInteger(0, obj_name, OBJPROP_COLOR, m_color);
-   ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_SOLID);
-   ObjectSetInteger(0, obj_name, OBJPROP_LEVELS, ArraySize(m_levels));
-   for(int i = 0; i < ArraySize(m_levels); i++)
-   {
-      ObjectSetDouble(0, obj_name, OBJPROP_LEVELVALUE, i, m_levels[i] / 100.0);
-      ObjectSetString(0, obj_name, OBJPROP_LEVELTEXT, i, DoubleToString(m_levels[i], 1) + "%");
-      ObjectSetInteger(0, obj_name, OBJPROP_LEVELCOLOR, i, m_color);
-      ObjectSetInteger(0, obj_name, OBJPROP_LEVELSTYLE, i, STYLE_SOLID);
-   }
-   
-   // لاگ برای دیباگ
-   Log("رسم فیبوناچی فرزند: نام=" + obj_name +
-       ", نقطه 100 (زمان=" + TimeToString(m_time100) + ", قیمت=" + DoubleToString(m_price100, _Digits) + ")" +
-       ", نقطه 0 (زمان=" + TimeToString(m_time0) + ", قیمت=" + DoubleToString(m_price0, _Digits) + ")");
-   
-   ChartRedraw(0);
-   Sleep(50);
-   return CheckObjectExists(obj_name);
+   int temp = a;
+   a = b;
+   b = temp;
 }
-
-
+   virtual bool Draw() override
+   {
+      if(!m_is_visible)
+      {
+         Delete();
+         return true;
+      }
+      string obj_name = m_name + (m_is_test ? "_Test" : "");
+      ObjectDelete(0, obj_name);
+      if(!ObjectCreate(0, obj_name, OBJ_FIBO, 0, m_time100, m_price100, m_time0, m_price0))
+      {
+         Print("خطا در ایجاد شیء فیبوناچی فرزند: ", obj_name);
+         return false;
+      }
+      ObjectSetInteger(0, obj_name, OBJPROP_COLOR, m_color);
+      ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, obj_name, OBJPROP_LEVELS, ArraySize(m_levels));
+      for(int i = 0; i < ArraySize(m_levels); i++)
+      {
+         ObjectSetDouble(0, obj_name, OBJPROP_LEVELVALUE, i, m_levels[i] / 100.0);
+         ObjectSetString(0, obj_name, OBJPROP_LEVELTEXT, i, DoubleToString(m_levels[i], 1) + "%");
+         ObjectSetInteger(0, obj_name, OBJPROP_LEVELCOLOR, i, m_color);
+         ObjectSetInteger(0, obj_name, OBJPROP_LEVELSTYLE, i, STYLE_SOLID);
+      }
+      Log("رسم فیبوناچی فرزند: نام=" + obj_name +
+          ", نقطه 100 (زمان=" + TimeToString(m_time100) + ", قیمت=" + DoubleToString(m_price100, _Digits) + ")" +
+          ", نقطه 0 (زمان=" + TimeToString(m_time0) + ", قیمت=" + DoubleToString(m_price0, _Digits) + ")");
+      ChartRedraw(0);
+      Sleep(50);
+      return CheckObjectExists(obj_name);
+   }
 
    bool Initialize(datetime current_time)
    {
       if(m_parent_mother == NULL) return false;
-      m_time0 = m_parent_mother.GetTime0();
-      m_price0 = m_parent_mother.GetPrice0();
-      if(m_parent_mother.GetDirection() == LONG)
+      if(m_is_success_child2 && m_interval_start != 0 && m_interval_end != 0)
       {
-         m_price100 = iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, current_time));
+         int start_index = iBarShift(_Symbol, _Period, m_interval_start);
+         int end_index = iBarShift(_Symbol, _Period, m_interval_end);
+         if(start_index < end_index) Swap(start_index, end_index);
+         if(m_direction == LONG)
+         {
+            m_price0 = DBL_MAX;
+            for(int i = end_index; i <= start_index; i++)
+            {
+               double low = iLow(_Symbol, _Period, i);
+               if(low < m_price0)
+               {
+                  m_price0 = low;
+                  m_time0 = iTime(_Symbol, _Period, i);
+               }
+            }
+         }
+         else
+         {
+            m_price0 = DBL_MIN;
+            for(int i = end_index; i <= start_index; i++)
+            {
+               double high = iHigh(_Symbol, _Period, i);
+               if(high > m_price0)
+               {
+                  m_price0 = high;
+                  m_time0 = iTime(_Symbol, _Period, i);
+               }
+            }
+         }
+      }
+      else
+      {
+         m_time0 = m_parent_mother.GetTime0();
+         m_price0 = m_parent_mother.GetPrice0();
+      }
+      m_time100 = current_time;
+      if(m_direction == LONG)
+      {
+         m_price100 = DBL_MIN;
          for(int i = iBarShift(_Symbol, _Period, m_time0); i >= iBarShift(_Symbol, _Period, current_time); i--)
             m_price100 = MathMax(m_price100, iHigh(_Symbol, _Period, i));
       }
       else
       {
-         m_price100 = iLow(_Symbol, _Period, iBarShift(_Symbol, _Period, current_time));
+         m_price100 = DBL_MAX;
          for(int i = iBarShift(_Symbol, _Period, m_time0); i >= iBarShift(_Symbol, _Period, current_time); i--)
             m_price100 = MathMin(m_price100, iLow(_Symbol, _Period, i));
       }
-      m_time100 = current_time;
       if(Draw())
       {
          Log("فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : (m_is_success_child2 ? "دوم (موفق)" : "دوم (ناموفق)")) +
@@ -984,44 +1055,43 @@ virtual bool Draw() override
    }
 
    bool UpdateOnTick(datetime new_time)
-{
-   if(m_is_fixed || m_parent_mother == NULL) return true;
-   double old_price100 = m_price100;
-   if(m_direction == LONG)
    {
-      m_price100 = MathMax(m_price100, iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, new_time)));
-   }
-   else
-   {
-      m_price100 = MathMin(m_price100, iLow(_Symbol, _Period, iBarShift(_Symbol, _Period, new_time)));
-   }
-   if(m_price100 != old_price100)
-   {
-      m_time100 = new_time;
-      string obj_name = m_name + (m_is_test ? "_Test" : "");
-      if(CheckObjectExists(obj_name) && ObjectMove(0, obj_name, 0, m_time100, m_price100))
+      if(m_is_fixed || m_parent_mother == NULL) return true;
+      double old_price100 = m_price100;
+      if(m_direction == LONG)
       {
-         Log("صد فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : (m_is_success_child2 ? "دوم (موفق)" : "دوم (ناموفق)")) +
-             " آپدیت شد: صد=" + DoubleToString(m_price100, _Digits) + ", زمان=" + TimeToString(new_time) +
-             ", جهت=" + (m_direction == LONG ? "Long" : "Short"));
-         if(InpVisualDebug)
-         {
-            string line_name = "Debug_HLine_" + (StringFind(m_name, "Child1") >= 0 ? "Child1Hundred_" : "Child2Hundred_") +
-                               TimeToString(new_time) + (m_is_test ? "_Test" : "");
-            if(ObjectCreate(0, line_name, OBJ_HLINE, 0, 0, m_price100))
-            {
-               ObjectSetInteger(0, line_name, OBJPROP_COLOR, clrLightGray);
-               ObjectSetInteger(0, line_name, OBJPROP_STYLE, STYLE_DOT);
-               CheckObjectExists(line_name);
-            }
-         }
-         // بازرسم فیبوناچی برای اطمینان از صحت نمایش
-         return Draw();
+         m_price100 = MathMax(m_price100, iHigh(_Symbol, _Period, iBarShift(_Symbol, _Period, new_time)));
       }
-      return false;
+      else
+      {
+         m_price100 = MathMin(m_price100, iLow(_Symbol, _Period, iBarShift(_Symbol, _Period, new_time)));
+      }
+      if(m_price100 != old_price100)
+      {
+         m_time100 = new_time;
+         string obj_name = m_name + (m_is_test ? "_Test" : "");
+         if(CheckObjectExists(obj_name) && ObjectMove(0, obj_name, 0, m_time100, m_price100))
+         {
+            Log("صد فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : (m_is_success_child2 ? "دوم (موفق)" : "دوم (ناموفق)")) +
+                " آپدیت شد: صد=" + DoubleToString(m_price100, _Digits) + ", زمان=" + TimeToString(new_time));
+            if(InpVisualDebug)
+            {
+               string line_name = "Debug_HLine_" + (StringFind(m_name, "Child1") >= 0 ? "Child1Hundred_" : "Child2Hundred_") +
+                                  TimeToString(new_time) + (m_is_test ? "_Test" : "");
+               if(ObjectCreate(0, line_name, OBJ_HLINE, 0, 0, m_price100))
+               {
+                  ObjectSetInteger(0, line_name, OBJPROP_COLOR, clrLightGray);
+                  ObjectSetInteger(0, line_name, OBJPROP_STYLE, STYLE_DOT);
+                  CheckObjectExists(line_name);
+               }
+            }
+            return Draw();
+         }
+         return false;
+      }
+      return true;
    }
-   return true;
-}
+
    bool CheckFixing(double current_price)
    {
       if(m_is_fixed || StringFind(m_name, "Child2") >= 0 || m_parent_mother == NULL) return false;
@@ -1031,11 +1101,8 @@ virtual bool Draw() override
       if(fix_condition)
       {
          m_is_fixed = true;
-         
-          // <<-- اضافه شد: ثبت زمان و قیمت فیکس شدن -->>
-          m_fixation_time = TimeCurrent();
+         m_fixation_time = TimeCurrent();
          m_fixation_price = current_price;
-   
          Log("فرزند اول فیکس شد: صد=" + DoubleToString(m_price100, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
          if(InpVisualDebug)
          {
@@ -1065,8 +1132,8 @@ virtual bool Draw() override
                                  (m_parent_mother.GetDirection() == SHORT && current_price < m_price100);
          if(trigger_condition)
          {
-         m_breakout_time = TimeCurrent();
-        m_breakout_price = current_price;
+            m_breakout_time = TimeCurrent();
+            m_breakout_price = current_price;
             Log("فرزند دوم (موفق) فعال شد: عبور از صد فرزند اول: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
             return true;
          }
@@ -1074,109 +1141,100 @@ virtual bool Draw() override
       return false;
    }
 
- bool CheckFailure(double current_price)
-{
-   if(m_is_fixed || m_parent_mother == NULL) return false;
-   
-   if(InpChildBreakMode == PRICE_CROSSS)
+   bool CheckFailure(double current_price)
    {
-      double mother_100_level = m_parent_mother.GetPrice100();
-      bool fail_condition = (m_parent_mother.GetDirection() == LONG && current_price > mother_100_level) ||
-                            (m_parent_mother.GetDirection() == SHORT && current_price < mother_100_level);
-      if(fail_condition)
+      if(m_is_fixed || m_parent_mother == NULL) return false;
+      if(InpChildBreakMode == PRICE_CROSSS)
       {
-         Log("فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : (m_is_success_child2 ? "دوم (موفق)" : "دوم (ناموفق)")) +
-             " شکست خورد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
-         if(InpVisualDebug)
-         {
-            string label_name = "Debug_Label_ChildFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
-            {
-               ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : "دوم") + " شکست خورد");
-               ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
-            }
-         }
-         return true;
-      }
-   }
-   else if(InpChildBreakMode == CONFIRMED_BREAK)
-   {
-      // اگر شکست اولیه هنوز فعال نشده، بررسی کلوز کندل
-      if(!m_breakout_triggered)
-      {
-         bool close_condition = (m_parent_mother.GetDirection() == LONG && iClose(_Symbol, _Period, 1) >= m_parent_mother.GetPrice100()) ||
-                               (m_parent_mother.GetDirection() == SHORT && iClose(_Symbol, _Period, 1) <= m_parent_mother.GetPrice100());
-         if(close_condition)
-         {
-            m_breakout_triggered = true;
-            m_breakout_candle_time = iTime(_Symbol, _Period, 1);
-            m_breakout_candle_high = iHigh(_Symbol, _Period, 1);
-            m_breakout_candle_low = iLow(_Symbol, _Period, 1);
-            m_breakout_candle_count = 0;
-            Log("شکست اولیه سطح 100% مادر: قیمت کلوز=" + DoubleToString(iClose(_Symbol, _Period, 1), _Digits) +
-                ", High=" + DoubleToString(m_breakout_candle_high, _Digits) +
-                ", Low=" + DoubleToString(m_breakout_candle_low, _Digits) +
-                ", زمان=" + TimeToString(m_breakout_candle_time));
-         }
-      }
-      // اگر شکست اولیه فعال شده، بررسی کندل‌های بعدی
-      else if(m_breakout_candle_time != 0)
-      {
-         int shift = iBarShift(_Symbol, _Period, m_breakout_candle_time);
-         if(shift <= 0 || m_breakout_candle_count >= InpMaxBreakoutCandles)
-         {
-            m_breakout_triggered = false;
-            m_breakout_candle_time = 0;
-            m_breakout_candle_high = 0.0;
-            m_breakout_candle_low = 0.0;
-            m_breakout_candle_count = 0;
-            Log("شکست تأیید نشد: تعداد کندل‌های فرصت به پایان رسید");
-            return false;
-         }
-         m_breakout_candle_count++;
-         bool confirm_condition = (m_parent_mother.GetDirection() == LONG && iHigh(_Symbol, _Period, 1) >= m_breakout_candle_high) ||
-                                 (m_parent_mother.GetDirection() == SHORT && iLow(_Symbol, _Period, 1) <= m_breakout_candle_low);
-         if(confirm_condition)
+         double mother_100_level = m_parent_mother.GetPrice100();
+         bool fail_condition = (m_parent_mother.GetDirection() == LONG && current_price > mother_100_level) ||
+                               (m_parent_mother.GetDirection() == SHORT && current_price < mother_100_level);
+         if(fail_condition)
          {
             Log("فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : (m_is_success_child2 ? "دوم (موفق)" : "دوم (ناموفق)")) +
-                " شکست خورد (تأییدشده): قیمت=" + DoubleToString(iClose(_Symbol, _Period, 1), _Digits) +
-                ", کندل شماره=" + IntegerToString(m_breakout_candle_count) +
-                ", زمان=" + TimeToString(TimeCurrent()));
+                " شکست خورد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
             if(InpVisualDebug)
             {
-               string arrow_name = "Debug_Arrow_ChildFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-               if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
-               {
-                  ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrRed);
-                  CheckObjectExists(arrow_name);
-               }
                string label_name = "Debug_Label_ChildFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-               if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
+               if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), current_price))
                {
-                  ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : "دوم") + " شکست خورد (تأییدشده)");
+                  ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : "دوم") + " شکست خورد");
                   ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
                }
             }
             return true;
          }
       }
+      else if(InpChildBreakMode == CONFIRMED_BREAK)
+      {
+         if(!m_breakout_triggered)
+         {
+            bool close_condition = (m_parent_mother.GetDirection() == LONG && iClose(_Symbol, _Period, 1) >= m_parent_mother.GetPrice100()) ||
+                                  (m_parent_mother.GetDirection() == SHORT && iClose(_Symbol, _Period, 1) <= m_parent_mother.GetPrice100());
+            if(close_condition)
+            {
+               m_breakout_triggered = true;
+               m_breakout_candle_time = iTime(_Symbol, _Period, 1);
+               m_breakout_candle_high = iHigh(_Symbol, _Period, 1);
+               m_breakout_candle_low = iLow(_Symbol, _Period, 1);
+               m_breakout_candle_count = 0;
+               Log("شکست اولیه سطح 100% مادر: قیمت کلوز=" + DoubleToString(iClose(_Symbol, _Period, 1), _Digits) +
+                   ", High=" + DoubleToString(m_breakout_candle_high, _Digits) +
+                   ", Low=" + DoubleToString(m_breakout_candle_low, _Digits) +
+                   ", زمان=" + TimeToString(m_breakout_candle_time));
+            }
+         }
+         else if(m_breakout_candle_time != 0)
+         {
+            int shift = iBarShift(_Symbol, _Period, m_breakout_candle_time);
+            if(shift <= 0 || m_breakout_candle_count >= InpMaxBreakoutCandles)
+            {
+               m_breakout_triggered = false;
+               m_breakout_candle_time = 0;
+               m_breakout_candle_high = 0.0;
+               m_breakout_candle_low = 0.0;
+               m_breakout_candle_count = 0;
+               Log("شکست تأیید نشد: تعداد کندل‌های فرصت به پایان رسید");
+               return false;
+            }
+            m_breakout_candle_count++;
+            bool confirm_condition = (m_parent_mother.GetDirection() == LONG && iHigh(_Symbol, _Period, 1) >= m_breakout_candle_high) ||
+                                    (m_parent_mother.GetDirection() == SHORT && iLow(_Symbol, _Period, 1) <= m_breakout_candle_low);
+            if(confirm_condition)
+            {
+               Log("فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : (m_is_success_child2 ? "دوم (موفق)" : "دوم (ناموفق)")) +
+                   " شکست خورد (تأییدشده): قیمت=" + DoubleToString(iClose(_Symbol, _Period, 1), _Digits) +
+                   ", کندل شماره=" + IntegerToString(m_breakout_candle_count) +
+                   ", زمان=" + TimeToString(TimeCurrent()));
+               if(InpVisualDebug)
+               {
+                  string arrow_name = "Debug_Arrow_ChildFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+                  if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
+                  {
+                     ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrRed);
+                     CheckObjectExists(arrow_name);
+                  }
+                  string label_name = "Debug_Label_ChildFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+                  if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
+                  {
+                     ObjectSetString(0, label_name, OBJPROP_TEXT, "فرزند " + (StringFind(m_name, "Child1") >= 0 ? "اول" : "دوم") + " شکست خورد (تأییدشده)");
+                     ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+                  }
+               }
+               return true;
+            }
+         }
+      }
+      return false;
    }
-   return false;
-}
 
-
-   // <<-- اضافه شد: تابع اصلی برای خروجی گرفتن از تمام داده‌های کلیدی این فرزند -->>
    SFibonacciEventData GetEventData()
    {
       SFibonacciEventData data;
-      
-      // پر کردن اطلاعاتی که ثبت کردیم
       data.child1_fix_time = m_fixation_time;
       data.child1_fix_price = m_fixation_price;
       data.child1_breakout_time = m_breakout_time;
       data.child1_breakout_price = m_breakout_price;
-
-      // پر کردن رشته سطوح فیبوناچی
       string result = "";
       for(int i = 0; i < ArraySize(m_levels); i++)
       {
@@ -1184,74 +1242,56 @@ virtual bool Draw() override
          result += "L" + (string)m_levels[i] + ":" + DoubleToString(level_price, _Digits) + ";";
       }
       data.child2_levels_string = result;
-      
       return data;
    }
 
-//+------------------------------------------------------------------+
-//| CChildFibo::CheckSuccessChild2 (نسخه کامل و نهایی)                |
-//+------------------------------------------------------------------+
-bool CheckSuccessChild2(double current_price)
-{
-    // این شرط که فقط برای فرزند موفق بود حذف شد تا برای هر دو مسیر کار کند
-    if (m_parent_mother == NULL) return false; 
-    
-    string temp_levels[];
-    int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
-    if (count < 2)
-    {
-        Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone);
-        return false;
-    }
-    
-    double level_1 = StringToDouble(temp_levels[0]) / 100.0;
-    double level_2 = StringToDouble(temp_levels[1]) / 100.0;
-    
-    if (level_1 >= level_2)
-    {
-        Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone);
-        return false;
-    }
-    
-    // محاسبه قیمت در دو سطح ناحیه طلایی
-    double price_level_1 = m_price100 + (m_price0 - m_price100) * level_1;
-    double price_level_2 = m_price100 + (m_price0 - m_price100) * level_2;
-    
-    // پیدا کردن کران بالا و پایین واقعی ناحیه با MathMin و MathMax
-    double zone_lower_bound = MathMin(price_level_1, price_level_2);
-    double zone_upper_bound = MathMax(price_level_1, price_level_2);
-    
-    // حالا شرط رو خیلی ساده و تمیز بررسی می‌کنیم
-    bool success_condition = (current_price >= zone_lower_bound && current_price <= zone_upper_bound);
-    
-    if (success_condition)
-    {
-        Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
-        if (InpVisualDebug)
-        {
+   bool CheckSuccessChild2(double current_price)
+   {
+      if(m_parent_mother == NULL) return false;
+      string temp_levels[];
+      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+      if(count < 2)
+      {
+         Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone);
+         return false;
+      }
+      double level_1 = StringToDouble(temp_levels[0]) / 100.0;
+      double level_2 = StringToDouble(temp_levels[1]) / 100.0;
+      if(level_1 >= level_2)
+      {
+         Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone);
+         return false;
+      }
+      double price_level_1 = m_price100 + (m_price0 - m_price100) * level_1;
+      double price_level_2 = m_price100 + (m_price0 - m_price100) * level_2;
+      double zone_lower_bound = MathMin(price_level_1, price_level_2);
+      double zone_upper_bound = MathMax(price_level_1, price_level_2);
+      bool success_condition = (current_price >= zone_lower_bound && current_price <= zone_upper_bound);
+      if(success_condition)
+      {
+         Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+         if(InpVisualDebug)
+         {
             string rect_name = "Debug_Rect_GoldenZone_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            if (ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, TimeCurrent(), zone_lower_bound, TimeCurrent() + PeriodSeconds(), zone_upper_bound))
+            if(ObjectCreate(0, rect_name, OBJ_RECTANGLE, 0, TimeCurrent(), zone_lower_bound, TimeCurrent() + PeriodSeconds(), zone_upper_bound))
             {
-                ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrGoldenrod);
-                ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrGoldenrod);
-                ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
-                ObjectSetInteger(0, rect_name, OBJPROP_ZORDER, -1);
-                CheckObjectExists(rect_name);
+               ObjectSetInteger(0, rect_name, OBJPROP_COLOR, clrGoldenrod);
+               ObjectSetInteger(0, rect_name, OBJPROP_BGCOLOR, clrGoldenrod);
+               ObjectSetInteger(0, rect_name, OBJPROP_FILL, true);
+               ObjectSetInteger(0, rect_name, OBJPROP_ZORDER, -1);
+               CheckObjectExists(rect_name);
             }
             string arrow_name = "Debug_Arrow_Signal_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-            if (ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
+            if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), current_price))
             {
-                ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
-                CheckObjectExists(arrow_name);
+               ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrGold);
+               CheckObjectExists(arrow_name);
             }
-        }
-        return true;
-    }
-    
-    return false;
-}
-
-
+         }
+         return true;
+      }
+      return false;
+   }
 
    bool CheckFailureChild2OnTick(double current_price)
    {
@@ -1276,67 +1316,67 @@ bool CheckSuccessChild2(double current_price)
       return false;
    }
 
- bool CheckFailureChild2OnNewBar()
-{
-   if(m_parent_mother == NULL) return false;
-   if(!m_is_success_child2)
+   bool CheckFailureChild2OnNewBar()
    {
-      double target_level = 250.0;
-      bool level_found = false;
-      for(int i = 0; i < m_parent_mother.GetLevelsCount(); i++)
+      if(m_parent_mother == NULL) return false;
+      if(!m_is_success_child2)
       {
-         if(MathAbs(m_parent_mother.GetLevel(i) - target_level) < 0.01) // بررسی وجود سطح 250%
+         double target_level = InpMotherBreakoutLevel;
+         bool level_found = false;
+         for(int i = 0; i < m_parent_mother.GetLevelsCount(); i++)
          {
-            level_found = true;
-            double break_level;
-            if(m_parent_mother.GetDirection() == LONG)
-               break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice100() - m_parent_mother.GetPrice0()) * (target_level / 100.0);
-            else // SHORT
-               break_level = m_parent_mother.GetPrice100() - (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * (target_level / 100.0);
-            
-            bool break_condition = false;
-            if(InpStructureBreakMode == PRICE_CROSS1)
+            if(MathAbs(m_parent_mother.GetLevel(i) - target_level) < 0.01)
             {
-               break_condition = (m_parent_mother.GetDirection() == LONG && iHigh(_Symbol, _Period, 1) >= break_level) ||
-                                 (m_parent_mother.GetDirection() == SHORT && iLow(_Symbol, _Period, 1) <= break_level);
-            }
-            else if(InpStructureBreakMode == CANDLE_CLOSE1)
-            {
-               break_condition = (m_parent_mother.GetDirection() == LONG && iClose(_Symbol, _Period, 1) >= break_level && iOpen(_Symbol, _Period, 0) >= break_level) ||
-                                 (m_parent_mother.GetDirection() == SHORT && iClose(_Symbol, _Period, 1) <= break_level && iOpen(_Symbol, _Period, 0) <= break_level);
-            }
-            if(break_condition)
-            {
-               Log("ساختار شکست خورد: عبور از سطح " + DoubleToString(target_level, 1) + "% مادر: قیمت=" + DoubleToString(iClose(_Symbol, _Period, 1), _Digits) + 
-                   ", سطح شکست=" + DoubleToString(break_level, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
-               if(InpVisualDebug)
+               level_found = true;
+               double break_level;
+               if(m_parent_mother.GetDirection() == LONG)
+                  break_level = m_parent_mother.GetPrice100() + (m_parent_mother.GetPrice100() - m_parent_mother.GetPrice0()) * (target_level / 100.0);
+               else
+                  break_level = m_parent_mother.GetPrice100() - (m_parent_mother.GetPrice0() - m_parent_mother.GetPrice100()) * (target_level / 100.0);
+               bool break_condition = false;
+               if(InpStructureBreakMode == PRICE_CROSS1)
                {
-                  string label_name = "Debug_Label_StructureFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-                  if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
-                  {
-                     ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار شکست خورد: عبور از سطح " + DoubleToString(target_level, 1) + "% مادر");
-                     ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
-                     CheckObjectExists(label_name);
-                  }
-                  string arrow_name = "Debug_Arrow_StructureFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
-                  if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
-                  {
-                     ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrRed);
-                     CheckObjectExists(arrow_name);
-                  }
+                  break_condition = (m_parent_mother.GetDirection() == LONG && iHigh(_Symbol, _Period, 1) >= break_level) ||
+                                    (m_parent_mother.GetDirection() == SHORT && iLow(_Symbol, _Period, 1) <= break_level);
                }
-               return true;
+               else if(InpStructureBreakMode == CANDLE_CLOSE1)
+               {
+                  break_condition = (m_parent_mother.GetDirection() == LONG && iClose(_Symbol, _Period, 1) >= break_level && iOpen(_Symbol, _Period, 0) >= break_level) ||
+                                    (m_parent_mother.GetDirection() == SHORT && iClose(_Symbol, _Period, 1) <= break_level && iOpen(_Symbol, _Period, 0) <= break_level);
+               }
+               if(break_condition)
+               {
+                  Log("ساختار شکست خورد: عبور از سطح " + DoubleToString(target_level, 1) + "% مادر: قیمت=" + DoubleToString(iClose(_Symbol, _Period, 1), _Digits) +
+                      ", سطح شکست=" + DoubleToString(break_level, _Digits) + ", زمان=" + TimeToString(TimeCurrent()));
+                  if(InpVisualDebug)
+                  {
+                     string label_name = "Debug_Label_StructureFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+                     if(ObjectCreate(0, label_name, OBJ_TEXT, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
+                     {
+                        ObjectSetString(0, label_name, OBJPROP_TEXT, "ساختار شکست خورد: عبور از سطح " + DoubleToString(target_level, 1) + "% مادر");
+                        ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrRed);
+                        CheckObjectExists(label_name);
+                     }
+                     string arrow_name = "Debug_Arrow_StructureFail_" + TimeToString(TimeCurrent()) + (m_is_test ? "_Test" : "");
+                     if(ObjectCreate(0, arrow_name, m_parent_mother.GetDirection() == LONG ? OBJ_ARROW_UP : OBJ_ARROW_DOWN, 0, TimeCurrent(), iClose(_Symbol, _Period, 1)))
+                     {
+                        ObjectSetInteger(0, arrow_name, OBJPROP_COLOR, clrRed);
+                        CheckObjectExists(arrow_name);
+                     }
+                  }
+                  return true;
+               }
+               break;
             }
-            break;
+         }
+         if(!level_found)
+         {
+            Log("هشدار: سطح " + DoubleToString(target_level, 1) + "% در InpMotherLevels یافت نشد. بررسی شکست انجام نشد.");
          }
       }
-      if(!level_found)
-      {
-         Log("هشدار: سطح 250% در InpMotherLevels یافت نشد. بررسی شکست انجام نشد.");
-      }
+      return false;
    }
-   return false;
-}
+
    bool CheckChild2Trigger(double current_price)
    {
       if(m_is_success_child2 || m_parent_mother == NULL) return false;
@@ -1377,6 +1417,28 @@ private:
    {
       if(InpEnableLog)
          CStructureManager::AddLog(m_id + ": " + message);
+   }
+
+   //+-------------------------------------------------------------+
+   //| دریافت سطوح محدوده شکست برای فرزند دوم ناموفق            |
+   //+-------------------------------------------------------------+
+   bool GetFailureChildTriggerLevels(double &lower, double &upper)
+   {
+      string temp_levels[];
+      int count = StringSplit(InpFailureChildTriggerRange, ',', temp_levels);
+      if(count != 2)
+      {
+         Log("خطا: InpFailureChildTriggerRange نامعتبر است: " + InpFailureChildTriggerRange);
+         return false;
+      }
+      lower = StringToDouble(temp_levels[0]);
+      upper = StringToDouble(temp_levels[1]);
+      if(lower >= upper || lower < 0 || upper < 0)
+      {
+         Log("خطا: مقادیر InpFailureChildTriggerRange نامعتبر هستند: " + InpFailureChildTriggerRange);
+         return false;
+      }
+      return true;
    }
 
 public:
@@ -1420,147 +1482,143 @@ public:
       return false;
    }
 
-//+------------------------------------------------------------------+
-//| CFamily::UpdateOnTick (نسخه نهایی با منطق نگهبان مادر)            |
-//| این تابع را به طور کامل با نسخه فعلی جایگزین کنید                 |
-//+------------------------------------------------------------------+
-bool CFamily::UpdateOnTick(double current_price, datetime current_time)
-{
-   // --- بخش اول: جستجو برای مادر ---
-   if(m_state == SEARCHING)
+   bool UpdateOnTick(double current_price, datetime current_time)
    {
-      return Initialize();
-   }
-   
-   // --- بخش دوم: بررسی شکست کلی ساختار (سطح نهایی مادر) ---
-   // این بخش برای هر دو حالت مادر و فرزند اول فعال است
-   else if(m_state == MOTHER_ACTIVE || m_state == CHILD1_ACTIVE)
-   {
-      if(m_mother != NULL && m_mother.CheckBreakoutFailure(current_price))
+      if(m_state == SEARCHING)
       {
-         m_state = FAILED;
-         Log("ساختار شکست خورد: عبور از سطح نهایی مادر");
-         return false;
+         return Initialize();
       }
-   }
+      else if(m_state == MOTHER_ACTIVE || m_state == CHILD1_ACTIVE)
+      {
+         if(m_mother != NULL && m_mother.CheckBreakoutFailure(current_price))
+         {
+            m_state = FAILED;
+            Log("ساختار شکست خورد: عبور از سطح نهایی مادر");
+            return false;
+         }
+      }
 
-   // --- بخش سوم: مدیریت وضعیت مادر ---
-   if(m_state == MOTHER_ACTIVE)
-   {
-      //==================================================================
-      // >> بخش جدید: فراخوانی نگهبان مادر <<
-      // اولین و مهم‌ترین کار در هر تیک، چک کردن اعتبار مادر فعلی است
-      //==================================================================
-      if(TryUpdateMotherFractal())
+      if((m_state == MOTHER_ACTIVE || (m_state == CHILD1_ACTIVE && m_child1 != NULL && !m_child1.IsFixed())) && m_mother != NULL)
       {
-         // اگر مادر با موفقیت ریست شد، در این تیک کار دیگری انجام نمی‌دهیم
-         // و منتظر تیک بعدی با مادر جدید و تازه نفس می‌مانیم.
-         return true;
-      }
-      //==================================================================
-      
-      // اگر مادر ریست نشد، به منطق عادی ادامه می‌دهیم
-      if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
-      {
-         m_state = FAILED;
-         Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
-         return false;
-      }
-      if(m_mother != NULL && !m_mother.UpdateOnTick(current_time)) return false;
-      if(m_mother != NULL && InpMotherFixMode == PRICE_CROSS && m_mother.CheckFixingPriceCross(current_price))
-      {
-         m_child1 = new CChildFibo(m_id + "_Child1", InpChild1Color, InpChildLevels, m_mother, false, m_is_test);
-         if(m_child1 == NULL || !m_child1.Initialize(current_time))
+         double lower, upper;
+         if(GetFailureChildTriggerLevels(lower, upper))
          {
-            Log("خطا: نمی‌توان فرزند اول را ایجاد کرد");
-            delete m_child1;
-            m_child1 = NULL;
-            m_state = FAILED;
-            return false;
-         }
-         m_state = CHILD1_ACTIVE;
-         Log("ساختار به فرزند اول فعال تغییر کرد");
-      }
-   }
-   // --- بخش چهارم: مدیریت وضعیت فرزند اول ---
-   else if(m_state == CHILD1_ACTIVE)
-   {
-      if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
-      {
-         m_state = FAILED;
-         Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
-         return false;
-      }
-      if(m_child1 != NULL && m_child1.CheckFailure(current_price))
-      {
-         m_child1.Delete();
-         delete m_child1;
-         m_child1 = NULL;
-         m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
-         if(m_child2 == NULL || !m_child2.Initialize(current_time))
-         {
-            Log("خطا: نمی‌توان فرزند دوم (ناموفق) را ایجاد کرد");
-            delete m_child2;
-            m_child2 = NULL;
-            m_state = FAILED;
-            return false;
-         }
-         m_state = CHILD2_ACTIVE;
-         Log("فرزند اول شکست خورد، ساختار به فرزند دوم (ناموفق) تغییر کرد");
-      }
-      else if(m_child1 != NULL && m_child1.UpdateOnTick(current_time))
-      {
-         if(m_child1.IsFixed() && m_child1.CheckChild1TriggerChild2(current_price))
-         {
-            m_child1.Delete();
-            delete m_child1;
-            m_child1 = NULL;
-            m_child2 = new CChildFibo(m_id + "_SuccessChild2", InpChild2Color, InpChildLevels, m_mother, true, m_is_test);
-            if(m_child2 == NULL || !m_child2.Initialize(current_time))
+            double lower_price = m_mother.GetLevelPrice(lower);
+            bool trigger_condition = (m_direction == LONG && current_price <= lower_price) ||
+                                     (m_direction == SHORT && current_price >= lower_price);
+            if(trigger_condition)
             {
-               Log("خطا: نمی‌توان فرزند دوم (موفق) را ایجاد کرد");
-               delete m_child2;
-               m_child2 = NULL;
+               m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
+               if(m_child2 == NULL || !m_child2.Initialize(current_time))
+               {
+                  Log("خطا: نمی‌توان فرزند دوم (ناموفق) را ایجاد کرد");
+                  delete m_child2;
+                  m_child2 = NULL;
+                  m_state = FAILED;
+                  return false;
+               }
+               m_state = CHILD2_ACTIVE;
+               Log("فرزند دوم (ناموفق) متولد شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time));
+            }
+         }
+      }
+
+      if(m_state == MOTHER_ACTIVE)
+      {
+         if(TryUpdateMotherFractal())
+         {
+            return true;
+         }
+         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
+         {
+            m_state = FAILED;
+            Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
+            return false;
+         }
+         if(m_mother != NULL && !m_mother.UpdateOnTick(current_time)) return false;
+         if(m_mother != NULL && InpMotherFixMode == PRICE_CROSS && m_mother.CheckFixingPriceCross(current_price))
+         {
+            m_child1 = new CChildFibo(m_id + "_Child1", InpChild1Color, InpChildLevels, m_mother, false, m_is_test);
+            if(m_child1 == NULL || !m_child1.Initialize(current_time))
+            {
+               Log("خطا: نمی‌توان فرزند اول را ایجاد کرد");
+               delete m_child1;
+               m_child1 = NULL;
                m_state = FAILED;
                return false;
             }
-            m_state = CHILD2_ACTIVE;
-            Log("فرزند اول فیکس شد و قیمت از صد آن عبور کرد، ساختار به فرزند دوم (موفق) تغییر کرد");
-         }
-         else
-         {
-            m_child1.CheckFixing(current_price);
+            m_state = CHILD1_ACTIVE;
+            Log("ساختار به فرزند اول فعال تغییر کرد");
          }
       }
-   }
-   // --- بخش پنجم: مدیریت وضعیت فرزند دوم ---
-   else if(m_state == CHILD2_ACTIVE)
-   {
-      if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
+      else if(m_state == CHILD1_ACTIVE)
       {
-         m_state = FAILED;
-         Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
-         return false;
+         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
+         {
+            m_state = FAILED;
+            Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
+            return false;
+         }
+         if(m_child1 != NULL && m_child1.UpdateOnTick(current_time))
+         {
+            if(m_child1.IsFixed() && m_child1.CheckChild1TriggerChild2(current_price))
+            {
+               datetime interval_start = m_child1.GetTime100();
+               datetime interval_end = current_time;
+               m_child2 = new CChildFibo(m_id + "_SuccessChild2", InpChild2Color, InpChildLevels, m_mother, true, m_is_test, interval_start, interval_end);
+               if(m_child2 == NULL || !m_child2.Initialize(current_time))
+               {
+                  Log("خطا: نمی‌توان فرزند دوم (موفق) را ایجاد کرد");
+                  delete m_child2;
+                  m_child2 = NULL;
+                  m_state = FAILED;
+                  return false;
+               }
+               m_child1.Delete();
+               delete m_child1;
+               m_child1 = NULL;
+               m_state = CHILD2_ACTIVE;
+               Log("فرزند اول فیکس شد و قیمت از صد آن عبور کرد، ساختار به فرزند دوم (موفق) تغییر کرد");
+            }
+            else
+            {
+               m_child1.CheckFixing(current_price);
+            }
+         }
       }
-      
-     if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
+      else if(m_state == CHILD2_ACTIVE)
+      {
+         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
+         {
+            m_state = FAILED;
+            Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
+            return false;
+         }
+         if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
          {
             if(m_child2.CheckSuccessChild2(current_price))
             {
-               // m_state = COMPLETED; // 👈 این خط رو حذف کن
-               // Log("ساختار با ورود به ناحیه طلایی کامل شد."); // 👈 این لاگ رو هم حذف کن
-               // return true; // 👈 این return رو هم حذف کن
-               
-               // نیازی به تغییر وضعیت در اینجا نیست، چون سیگنال باید یک مرحله جلوتر دریافت شود.
-               // فقط اطمینان حاصل میکنیم که متد CheckSuccessChild2 سیگنال را آماده کرده است.
-               Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time) + " (سیگنال آماده)"); // 👈 این لاگ رو اینجا بزار
+               Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time) + " (سیگنال آماده)");
+            }
+            if(m_state == CHILD2_ACTIVE && m_child2 != NULL && !m_child2.IsSuccessChild2())
+            {
+               double lower, upper;
+               if(GetFailureChildTriggerLevels(lower, upper))
+               {
+                  double upper_price = m_mother.GetLevelPrice(upper);
+                  bool fail_condition = (m_direction == LONG && current_price <= upper_price) ||
+                                        (m_direction == SHORT && current_price >= upper_price);
+                  if(fail_condition)
+                  {
+                     m_state = FAILED;
+                     Log("ساختار شکست خورد: عبور از سطح بالایی: قیمت=" + DoubleToString(current_price, _Digits) + ", سطح=" + DoubleToString(upper_price, _Digits));
+                  }
+               }
             }
          }
+      }
+      return true;
    }
-   
-   return true;
-}
-
 
    bool UpdateOnNewBar()
    {
@@ -1593,141 +1651,99 @@ bool CFamily::UpdateOnTick(double current_price, datetime current_time)
       return true;
    }
 
-
    SFibonacciEventData GetLastEventData()
    {
-      // اگر فرزند دوم فعال است، اطلاعات آن را برمیگردانیم
       if(m_child2 != NULL)
       {
          return m_child2.GetEventData();
       }
-      // اگر فرزند اول فعال است، اطلاعات آن را برمیگردانیم
       if(m_child1 != NULL)
       {
          return m_child1.GetEventData();
       }
-      
-      // اگر هیچ فرزندی فعال نیست، یک ساختار خالی برمیگردانیم
       SFibonacciEventData empty_data;
       return empty_data;
    }
-//==================================================================
-// >> نسخه اصلاح شده و نهایی تابع نگهبان مادر <<
-//==================================================================
 
-bool CFamily::TryUpdateMotherFractal()
-{
-   // اگر مادری وجود ندارد یا از قبل فیکس شده، کاری انجام نده
-   if(m_mother == NULL || m_mother.IsFixed())
-      return false;
-
-   // ۱. زمان فراکتال مادر فعلی را برای مقایسه ذخیره کن
-   datetime current_mother_time = m_mother.GetTime100();
-
-   // ۲. با استفاده از همان ابزار قبلی، جدیدترین فراکتال را پیدا کن
-   SFractal new_fractal;
-   if(m_direction == LONG)
-      m_fractal_finder.FindRecentHigh(TimeCurrent(), InpFractalLookback, InpFractalPeers, new_fractal);
-   else // SHORT
-      m_fractal_finder.FindRecentLow(TimeCurrent(), InpFractalLookback, InpFractalPeers, new_fractal);
-
-   // ۳. بررسی کن که آیا یک فراکتال معتبر و *جدیدتر* پیدا شده است
-   if(new_fractal.price != 0.0 && new_fractal.time > current_mother_time)
+   bool TryUpdateMotherFractal()
    {
-      Log("نگهبان مادر: فراکتال بی‌اعتبار در " + TimeToString(current_mother_time) + " شناسایی شد.");
-      Log("--> فراکتال جدید در " + TimeToString(new_fractal.time) + " یافت شد. در حال ریست کردن مادر...");
-
-      // ۴. مادر قدیمی را با تمام متعلقاتش از بین ببر
-      m_mother.Delete(); // <<-- اصلاح شد: از Destroy به Delete تغییر کرد
-      delete m_mother;
-      m_mother = NULL;
-      
-      if(InpVisualDebug)
-         ClearDebugObjects(m_is_test);
-
-      // ۵. یک مادر کاملاً جدید با فراکتال جدید بساز
-      m_mother = new CMotherFibo(m_id + "_Mother", InpMotherColor, InpMotherLevels, m_direction, m_is_test);
-      if(m_mother == NULL)
-      {
-         Log("خطای حیاتی: ایجاد مادر جدید پس از ریست ناموفق بود.");
-         m_state = FAILED;
+      if(m_mother == NULL || m_mother.IsFixed())
          return false;
-      }
-
-      if(m_mother.Initialize(new_fractal, TimeCurrent()))
-      {
-         Log("مادر با موفقیت بر اساس فراکتال جدید در " + DoubleToString(new_fractal.price, _Digits) + " ریست شد.");
-         return true;
-      }
+      datetime current_mother_time = m_mother.GetTime100();
+      SFractal new_fractal;
+      if(m_direction == LONG)
+         m_fractal_finder.FindRecentHigh(TimeCurrent(), InpFractalLookback, InpFractalPeers, new_fractal);
       else
+         m_fractal_finder.FindRecentLow(TimeCurrent(), InpFractalLookback, InpFractalPeers, new_fractal);
+      if(new_fractal.price != 0.0 && new_fractal.time > current_mother_time)
       {
-         Log("خطا: راه‌اندازی مادر جدید پس از ریست ناموفق بود.");
+         Log("نگهبان مادر: فراکتال بی‌اعتبار در " + TimeToString(current_mother_time) + " شناسایی شد.");
+         Log("--> فراکتال جدید در " + TimeToString(new_fractal.time) + " یافت شد. در حال ریست کردن مادر...");
+         m_mother.Delete();
          delete m_mother;
          m_mother = NULL;
-         m_state = FAILED;
-         return false;
+         if(InpVisualDebug)
+            ClearDebugObjects(m_is_test);
+         m_mother = new CMotherFibo(m_id + "_Mother", InpMotherColor, InpMotherLevels, m_direction, m_is_test);
+         if(m_mother == NULL)
+         {
+            Log("خطای حیاتی: ایجاد مادر جدید پس از ریست ناموفق بود.");
+            m_state = FAILED;
+            return false;
+         }
+         if(m_mother.Initialize(new_fractal, TimeCurrent()))
+         {
+            Log("مادر با موفقیت بر اساس فراکتال جدید در " + DoubleToString(new_fractal.price, _Digits) + " ریست شد.");
+            return true;
+         }
+         else
+         {
+            Log("خطا: راه‌اندازی مادر جدید پس از ریست ناموفق بود.");
+            delete m_mother;
+            m_mother = NULL;
+            m_state = FAILED;
+            return false;
+         }
       }
+      return false;
    }
 
-   return false;
-}
-
-
-
-   //+------------------------------------------------------------------+
-//| CFamily::GetSignal (نسخه کامل و نهایی)                           |
-//+------------------------------------------------------------------+
-SSignal CFamily::GetSignal() //
-{
-   SSignal signal = {"", ""};
-   
-   // سیگنال فقط وقتی صادر میشه که در حالت CHILD2_ACTIVE باشیم
-   // و تازه وارد ناحیه طلایی شده باشیم.
-   // و هنوز سیگنالی از این فاز صادر نکرده باشیم.
-   if(m_state == CHILD2_ACTIVE && m_child2 != NULL) //
+   SSignal GetSignal()
    {
-      string temp_levels[]; //
-      int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels); //
-      if(count < 2) //
+      SSignal signal = {"", ""};
+      if(m_state == CHILD2_ACTIVE && m_child2 != NULL)
       {
-         Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone); //
-         return signal; //
+         string temp_levels[];
+         int count = StringSplit(InpGoldenZone, StringGetCharacter(",", 0), temp_levels);
+         if(count < 2)
+         {
+            Log("خطا: ناحیه طلایی نامعتبر است: " + InpGoldenZone);
+            return signal;
+         }
+         double level_1 = StringToDouble(temp_levels[0]) / 100.0;
+         double level_2 = StringToDouble(temp_levels[1]) / 100.0;
+         if(level_1 >= level_2)
+         {
+            Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone);
+            return signal;
+         }
+         double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1;
+         double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2;
+         double zone_lower_bound = MathMin(price_level_1, price_level_2);
+         double zone_upper_bound = MathMax(price_level_1, price_level_2);
+         double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+         bool in_golden_zone = (current_price >= zone_lower_bound && current_price <= zone_upper_bound);
+         if(in_golden_zone)
+         {
+            signal.type = m_direction == LONG ? "Buy" : "Sell";
+            signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure");
+            Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits));
+            m_state = COMPLETED;
+            Log("ساختار با ورود به ناحیه طلایی کامل شد و سیگنال صادر گردید.");
+         }
       }
-      
-      double level_1 = StringToDouble(temp_levels[0]) / 100.0; //
-      double level_2 = StringToDouble(temp_levels[1]) / 100.0; //
-      
-      if(level_1 >= level_2) //
-      {
-         Log("خطا: ناحیه طلایی نامعتبر است، حداقل باید کوچکتر از حداکثر باشد: " + InpGoldenZone); //
-         return signal; //
-      }
-      
-      double price_level_1 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_1; //
-      double price_level_2 = m_child2.GetPrice100() + (m_child2.GetPrice0() - m_child2.GetPrice100()) * level_2; //
-      
-      double zone_lower_bound = MathMin(price_level_1, price_level_2); //
-      double zone_upper_bound = MathMax(price_level_1, price_level_2); //
-      
-      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID); //
-      
-      bool in_golden_zone = (current_price >= zone_lower_bound && current_price <= zone_upper_bound); //
-                               
-      if(in_golden_zone) //
-      {
-         signal.type = m_direction == LONG ? "Buy" : "Sell"; //
-         signal.id = m_id + "_" + TimeToString(TimeCurrent()) + "_" + (m_direction == LONG ? "Long" : "Short") + "_" + (m_child2.IsSuccessChild2() ? "Success" : "Failure"); //
-         Log("سیگنال " + signal.type + " صادر شد: ID=" + signal.id + ", قیمت=" + DoubleToString(current_price, _Digits)); //
-         
-         // حالا که سیگنال رو صادر کردیم، وضعیت رو به COMPLETED تغییر میدیم.
-         // این باعث میشه دفعه بعد دیگه این سیگنال صادر نشه.
-         m_state = COMPLETED; // 👈 این خط الان اینجاست!
-              Log("ساختار با ورود به ناحیه طلایی کامل شد و سیگنال صادر گردید."); // 👈 لاگ جدید
-      }
+      return signal;
    }
-   
-   return signal; //
-}
 
    bool IsActive()
    {
@@ -1743,7 +1759,15 @@ SSignal CFamily::GetSignal() //
       if(InpVisualDebug)
          ClearDebugObjects(m_is_test);
    }
-  //اضافه کن
+
+   void ApplyVisibility(bool visible)
+   {
+      if(m_mother != NULL) m_mother.SetVisible(visible);
+      if(m_child1 != NULL) m_child1.SetVisible(visible);
+      if(m_child2 != NULL) m_child2.SetVisible(visible);
+      if(!visible && InpVisualDebug)
+         ClearDebugObjects(m_is_test);
+   }
 
    double GetMotherPrice0()
    {
@@ -1778,27 +1802,23 @@ private:
       }
    }
 
-void CompactFamiliesArray()
-{
-   CFamily* temp_families[];
-   int new_size = 0;
-
-   // تمام اعضای غیر نال را به آرایه موقت کپی کن
-   for(int i = 0; i < ArraySize(m_families); i++)
+   void CompactFamiliesArray()
    {
-      if(m_families[i] != NULL)
+      CFamily* temp_families[];
+      int new_size = 0;
+      for(int i = 0; i < ArraySize(m_families); i++)
       {
-         ArrayResize(temp_families, new_size + 1);
-         temp_families[new_size] = m_families[i];
-         new_size++;
+         if(m_families[i] != NULL)
+         {
+            ArrayResize(temp_families, new_size + 1);
+            temp_families[new_size] = m_families[i];
+            new_size++;
+         }
       }
+      ArrayFree(m_families);
+      if(new_size > 0)
+         ArrayCopy(m_families, temp_families, 0, 0, WHOLE_ARRAY);
    }
-
-   // آرایه اصلی را با آرایه تمیز و جدید جایگزین کن
-   ArrayFree(m_families);
-   if(new_size > 0)
-      ArrayCopy(m_families, temp_families, 0, 0, WHOLE_ARRAY);
-}
 
    void FlushLog()
    {
@@ -1825,11 +1845,13 @@ public:
       m_current_command = "";
       m_log_buffer = "";
    }
+
    static void AddLog(string message)
    {
       if(g_manager != NULL)
          g_manager.Log(message);
    }
+
    bool HFiboOnInit()
    {
       ChartSetInteger(0, CHART_EVENT_OBJECT_CREATE, true);
@@ -1851,16 +1873,12 @@ public:
       return true;
    }
 
-   // <<-- اضافه شد: تابعی برای گرفتن داده‌های رویداد از تنها خانواده فعال -->>
    SFibonacciEventData GetActiveFamilyEventData()
    {
-      // ما فقط یک ساختار فعال داریم، پس همیشه سراغ اولین عضو آرایه (اندیس صفر) میریم
       if(ArraySize(m_families) > 0 && m_families[0] != NULL)
       {
          return m_families[0].GetLastEventData();
       }
-      
-      // اگر ساختاری فعال نبود، ساختار خالی برمیگردانیم
       SFibonacciEventData empty_data;
       return empty_data;
    }
@@ -1877,55 +1895,51 @@ public:
       FlushLog();
       Log("کتابخانه HipoFibonacci متوقف شد. دلیل: " + IntegerToString(reason));
    }
-void HFiboOnTick()
-{
-   double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   datetime current_time = TimeCurrent();
-   bool needs_compacting = false;
 
-   for(int i = ArraySize(m_families) - 1; i >= 0; i--)
+   void HFiboOnTick()
    {
-      if(m_families[i] != NULL && !m_families[i].UpdateOnTick(current_price, current_time))
+      double current_price = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      datetime current_time = TimeCurrent();
+      bool needs_compacting = false;
+      for(int i = ArraySize(m_families) - 1; i >= 0; i--)
       {
-         m_families[i].Destroy();
-         delete m_families[i];
-         m_families[i] = NULL;
-         needs_compacting = true;
+         if(m_families[i] != NULL && !m_families[i].UpdateOnTick(current_price, current_time))
+         {
+            m_families[i].Destroy();
+            delete m_families[i];
+            m_families[i] = NULL;
+            needs_compacting = true;
+         }
       }
-   }
-
-   if(needs_compacting)
-   {
-      CompactFamiliesArray();
-   }
-
-   string status = "ساختارهای فعال: " + IntegerToString(ArraySize(m_families));
-   if(m_panel != NULL)
-      m_panel.UpdateStatus(status);
-}
-
-  void HFiboOnNewBar()
-{
-   bool needs_compacting = false;
-
-   for(int i = ArraySize(m_families) - 1; i >= 0; i--)
-   {
-      if(m_families[i] != NULL && !m_families[i].UpdateOnNewBar())
+      if(needs_compacting)
       {
-         m_families[i].Destroy();
-         delete m_families[i];
-         m_families[i] = NULL;
-         needs_compacting = true;
+         CompactFamiliesArray();
       }
+      string status = "ساختارهای فعال: " + IntegerToString(ArraySize(m_families));
+      if(m_panel != NULL)
+         m_panel.UpdateStatus(status);
    }
 
-   if(needs_compacting)
+   void HFiboOnNewBar()
    {
-      CompactFamiliesArray();
+      bool needs_compacting = false;
+      for(int i = ArraySize(m_families) - 1; i >= 0; i--)
+      {
+         if(m_families[i] != NULL && !m_families[i].UpdateOnNewBar())
+         {
+            m_families[i].Destroy();
+            delete m_families[i];
+            m_families[i] = NULL;
+            needs_compacting = true;
+         }
+      }
+      if(needs_compacting)
+      {
+         CompactFamiliesArray();
+      }
+      FlushLog();
    }
 
-   FlushLog();
-}
    bool CreateNewStructure(ENUM_DIRECTION direction)
    {
       if(ArraySize(m_families) >= InpMaxFamilies)
@@ -2059,17 +2073,14 @@ void HFiboOnTick()
       }
    }
 
-// این متد رو به انتهای کلاس CStructur
    double GetMotherZeroPoint()
    {
-      // ما فقط یک ساختار فعال داریم، پس همیشه سراغ اولین عضو آرایه میریم
       if(ArraySize(m_families) > 0 && m_families[0] != NULL)
       {
          return m_families[0].GetMotherPrice0();
       }
-      return 0.0; // اگر ساختاری وجود نداشت، صفر برگردون
+      return 0.0;
    }
-
 
    void StopCurrentStructure()
    {
@@ -2085,7 +2096,17 @@ void HFiboOnTick()
       }
       ArrayResize(m_families, 0);
    }
-int GetActiveFamiliesCount()
+
+   void SetVisibility(bool visible)
+   {
+      for(int i = 0; i < ArraySize(m_families); i++)
+      {
+         if(m_families[i] != NULL)
+            m_families[i].ApplyVisibility(visible);
+      }
+   }
+
+   int GetActiveFamiliesCount()
    {
       return ArraySize(m_families);
    }
@@ -2160,39 +2181,40 @@ bool HFiboCreateNewStructure(ENUM_DIRECTION direction)
    return false;
 }
 
-
-// این تابع جدید رو به انتهای فایل، کنار بقیه توابع HFibo اضافه کن
-
 double HFiboGetMotherZeroPoint()
 {
    if(g_manager != NULL)
       return g_manager.GetMotherZeroPoint();
    return 0.0;
 }
+
 void HFiboStopCurrentStructure()
 {
    if(g_manager != NULL)
       g_manager.StopCurrentStructure();
 }
+
 bool HFiboIsStructureBroken()
 {
    if(g_manager != NULL && g_manager.GetActiveFamiliesCount() == 0)
    {
-      return true; // هیچ ساختاری فعال نیست، یعنی ساختار تخریب شده
+      return true;
    }
-   return false; // ساختار همچنان فعال است
+   return false;
 }
 
-
-//تابع نهایی برای دسترسی عمومی به آخرین داده‌های رویداد فیبوناچی -->>
 SFibonacciEventData HFiboGetLastEventData()
 {
    if(g_manager != NULL)
    {
       return g_manager.GetActiveFamilyEventData();
    }
-   
-   // اگر مدیر اصلی وجود نداشت، ساختار خالی برمیگردانیم
    SFibonacciEventData empty_data;
    return empty_data;
+}
+
+void HFiboSetVisibility(bool visible)
+{
+   if(g_manager != NULL)
+      g_manager.SetVisibility(visible);
 }
