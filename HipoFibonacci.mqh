@@ -1580,7 +1580,7 @@ public:
             }
          }
       }
-      // کد صحیح و جایگزین
+      // کد اصلاح شده نهایی
 else if(m_state == CHILD2_ACTIVE)
 {
    if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
@@ -1588,13 +1588,14 @@ else if(m_state == CHILD2_ACTIVE)
       // اگر فرزند دوم موفق بود، فقط ناحیه طلایی رو چک کن
       if(m_child2.IsSuccessChild2())
       {
-         if(m_child2.CheckSuccessChild2(current_price))
+         // اینجا فقط لاگ میکنیم و GetSignal() رو صدا نمیزنیم
+         // اکسپرت خودش از بیرون HFiboGetSignal() رو برای گرفتن سیگنال صدا میزنه
+         if(m_child2.CheckSuccessChild2(current_time))
          {
-            // GetSignal() بقیه کارها مثل COMPLETED کردن ساختار رو انجام میده
-            GetSignal();
+            Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time) + " (سیگنال آماده)");
          }
       }
-      // اگر فرزند دوم ناموفق بود، شرط شکست رو چک کن
+      // اگر فرزند دوم ناموفق بود، شرط شکست رو چک کن (این بخش درست بود)
       else
       {
          double lower, upper;
@@ -1603,10 +1604,8 @@ else if(m_state == CHILD2_ACTIVE)
             double price_lower = m_mother.GetLevelPrice(lower);
             double price_upper = m_mother.GetLevelPrice(upper);
             
-            // مرز بیرونی ناحیه (دورترین سطح از سطح ۱۰۰ مادر)
             double outer_bound = (m_direction == LONG) ? MathMax(price_lower, price_upper) : MathMin(price_lower, price_upper);
 
-            // شرط شکست صحیح: قیمت از مرز بیرونی عبور کند
             bool fail_condition = (m_direction == LONG && current_price > outer_bound) ||
                                   (m_direction == SHORT && current_price < outer_bound);
             
