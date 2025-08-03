@@ -1,12 +1,12 @@
 //+------------------------------------------------------------------+
 //|                                                      Memento.mq5 |
 //|                                  Copyright 2025, Mohammad & Gemini |
-//|                                               Final & Bulletproof |
+//|                                           Version 7.0 - Final Spec |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Mohammad & Gemini"
 #property link      ""
-#property version   "6.2" // نسخه اصلاح شده برای سازگاری
-#property description "اکسپرت معاملاتی پیشرفته ممنتو بر اساس تلاقی و کراس ایچیموکو با قابلیت نمایش خطوط در حالت ویژوال"
+#property version   "7.0" // نسخه نهایی منطبق بر فلوچارت دقیق
+#property description "اکسپرت ممنتو بر اساس فلوچارت نهایی تلاقی و تایید"
 
 #include <Trade\Trade.mqh>
 #include <Object.mqh>
@@ -55,9 +55,6 @@ input color  Inp_Tenkan_Color = clrRed;       // رنگ تنکان-سن
 input color  Inp_Kijun_Color = clrDodgerBlue; // رنگ کیجون-سن
 input color  Inp_Chikou_Color = clrWhite;     // رنگ چیکو اسپن
 
-//+------------------------------------------------------------------+
-//| کلاس برای نگهداری و مدیریت تمام تنظیمات ورودی                     |
-//+------------------------------------------------------------------+
 class CSettings {
 public:
     string symbols_list;
@@ -75,13 +72,11 @@ public:
     double object_distance_multiplier;
     int max_trades_per_symbol;
     int max_total_trades;
-    //--- متغیرهای جدید برای نمایش خطوط
     bool show_ichimoku_lines;
     color tenkan_color;
     color kijun_color;
     color chikou_color;
 
-    // تابع مقداردهی اولیه تنظیمات از ورودی‌های اکسپرت
     void Init() {
         symbols_list = Inp_Symbols_List;
         tenkan_period = Inp_Tenkan_Period;
@@ -100,7 +95,6 @@ public:
         object_distance_multiplier = Inp_Object_Distance_Multiplier;
         max_trades_per_symbol = Inp_Max_Trades_Per_Symbol;
         max_total_trades = Inp_Max_Total_Trades;
-        //--- مقداردهی متغیرهای جدید
         show_ichimoku_lines = Inp_Show_Ichimoku_Lines;
         tenkan_color = Inp_Tenkan_Color;
         kijun_color = Inp_Kijun_Color;
@@ -108,17 +102,14 @@ public:
     }
 };
 
-//+------------------------------------------------------------------+
-//| کلاس برای مدیریت تمام عملیات مربوط به یک نماد خاص                |
-//+------------------------------------------------------------------+
 class CSymbolManager {
 private:
-    bool is_valid;              // وضعیت اعتبار نماد
-    string symbol;              // نام نماد معاملاتی
-    int ichimoku_handle;        // هندل اندیکاتور ایچیموکو (برای محاسبات)
-    int chart_indicator_handle; // هندل اندیکاتور روی چارت
-    datetime last_bar_time;     // زمان آخرین کندل پردازش شده
-    CTrade trade;               // شیء مدیریت معاملات
+    bool is_valid;
+    string symbol;
+    int ichimoku_handle;
+    int chart_indicator_handle;
+    datetime last_bar_time;
+    CTrade trade;
 
     struct PotentialSignal {
         datetime time;
@@ -145,45 +136,35 @@ private:
     }
 
 public:
-    bool IsValid() {
-        return is_valid;
-    }
+    bool IsValid() { return is_valid; }
 
     void Init(string sym) {
         is_valid = false;
         symbol = sym;
         ichimoku_handle = iIchimoku(symbol, PERIOD_CURRENT, settings.tenkan_period, settings.kijun_period, settings.senkou_span_b_period);
         if (ichimoku_handle == INVALID_HANDLE) {
-            Log("خطا در ایجاد اندیکاتور Ichimoku. لطفاً از صحت نام نماد اطمینان حاصل کنید.");
+            Log("خطا در ایجاد اندیکاتور Ichimoku.");
             return;
         }
         last_bar_time = 0;
         ArrayFree(potential_signals);
         trade.SetExpertMagicNumber(settings.magic_number);
         
-        //--- بخش جدید و اصلاح شده: ایجاد اندیکاتور روی چارت اگر کاربر بخواهد
-        chart_indicator_handle = -1; // مقداردهی اولیه
+        chart_indicator_handle = -1;
         if (settings.show_ichimoku_lines && MQLInfoInteger(MQL_VISUAL_MODE)) {
             chart_indicator_handle = iIchimoku(symbol, PERIOD_CURRENT, settings.tenkan_period, settings.kijun_period, settings.senkou_span_b_period);
             if(chart_indicator_handle != INVALID_HANDLE) {
-                // تنظیم رنگ‌ها قبل از اضافه کردن به چارت
-                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 0, settings.tenkan_color); // Tenkan
-                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 1, settings.kijun_color);  // Kijun
-                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 2, clrNONE);               // Senkou A (ابر) - مخفی
-                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 3, clrNONE);               // Senkou B (ابر) - مخفی
-                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 4, settings.chikou_color); // Chikou
-                
-                // اضافه کردن اندیکاتور تنظیم شده به چارت اصلی
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 0, settings.tenkan_color);
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 1, settings.kijun_color);
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 2, clrNONE);
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 3, clrNONE);
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 4, settings.chikou_color);
                 ChartIndicatorAdd(0, 0, chart_indicator_handle);
             }
         }
-
         is_valid = true;
         Log("نماد با موفقیت مقداردهی اولیه شد.");
     }
-
-    // بقیه توابع کلاس CSymbolManager بدون تغییر باقی می‌مانند ...
-    // ... (CheckConfluence, CheckConfirmations, OpenTrade, etc.)
 
     void ProcessNewBar() {
         datetime current_bar_time = iTime(symbol, PERIOD_CURRENT, 0);
@@ -211,6 +192,7 @@ public:
         double tolerance = settings.talaqi_tolerance_multiplier * SymbolInfoDouble(symbol, SYMBOL_POINT);
 
         if (max_val - min_val < tolerance) {
+            DrawConfluenceObject(shift);
             double chikou1 = iClose(symbol, PERIOD_CURRENT, shift + 1);
             double tenkan1[], kijun1[];
             ArraySetAsSeries(tenkan1, true);
@@ -221,11 +203,9 @@ public:
             }
             if ((chikou1 < tenkan1[0] || chikou1 < kijun1[0]) && chikou > tenkan[0] && chikou > kijun[0]) {
                 AddPotentialSignal(true);
-                DrawConfluenceObject(shift);
                 DrawFlagObject(shift, true);
             } else if ((chikou1 > tenkan1[0] || chikou1 > kijun1[0]) && chikou < tenkan[0] && chikou < kijun[0]) {
                 AddPotentialSignal(false);
-                DrawConfluenceObject(shift);
                 DrawFlagObject(shift, false);
             }
         }
@@ -279,66 +259,46 @@ public:
     }
 
     void OpenTrade(bool is_buy) {
-        //--- بررسی محدودیت‌های تعداد معاملات
-        if (CountTotalTrades() >= settings.max_total_trades) {
-            Log("رسیدن به حد مجاز کل معاملات (" + (string)settings.max_total_trades + "). معامله جدید باز نشد.");
+        if (CountTotalTrades() >= settings.max_total_trades || CountSymbolTrades() >= settings.max_trades_per_symbol) {
+            Log("رسیدن به حد مجاز معاملات. معامله جدید باز نشد.");
             return;
         }
-        if (CountSymbolTrades() >= settings.max_trades_per_symbol) {
-            Log("رسیدن به حد مجاز معاملات برای نماد " + symbol + " (" + (string)settings.max_trades_per_symbol + "). معامله جدید باز نشد.");
-            return;
-        }
-
         double sl = CalculateSL(is_buy);
         if (sl == 0) {
             Log("نمی‌توان استاپ لاس را محاسبه کرد. معامله باز نشد.");
             return;
         }
-
         double entry_price = is_buy ? SymbolInfoDouble(symbol, SYMBOL_ASK) : SymbolInfoDouble(symbol, SYMBOL_BID);
         double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
         double tick_value = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-        
-        //--- محکم‌کاری برای جلوگیری از خطای تقسیم بر صفر
         if (tick_value <= 0) {
-            Log("مقدار Tick Value برای نماد " + symbol + " نامعتبر است. معامله باز نشد.");
+            Log("مقدار Tick Value نامعتبر است.");
             return;
         }
-        
         double sl_distance_points = MathAbs(entry_price - sl) / point;
         if (sl_distance_points < 1) {
-            Log("فاصله استاپ لاس بسیار کم است. معامله باز نشد.");
+            Log("فاصله استاپ لاس بسیار کم است.");
             return;
         }
-        
         double risk_amount = AccountInfoDouble(ACCOUNT_BALANCE) * (settings.risk_percent_per_trade / 100.0);
         double lot_size = risk_amount / (sl_distance_points * tick_value);
-        
         double min_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
         double max_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
         double lot_step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
         lot_size = MathMax(min_lot, MathMin(max_lot, MathRound(lot_size / lot_step) * lot_step));
         lot_size = NormalizeDouble(lot_size, 2);
-
         double tp_distance_points = sl_distance_points * settings.take_profit_ratio;
         double tp = is_buy ? entry_price + tp_distance_points * point : entry_price - tp_distance_points * point;
-        
         int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
         sl = NormalizeDouble(sl, digits);
         tp = NormalizeDouble(tp, digits);
-
+        string comment = is_buy ? "Memento Buy" : "Memento Sell";
         if (is_buy) {
-            if (!trade.Buy(lot_size, symbol, 0, sl, tp, "Memento Buy")) {
-                Log("خطا در باز کردن معامله خرید: " + IntegerToString(GetLastError()));
-            } else {
-                Log("معامله خرید با لات " + DoubleToString(lot_size, 2) + " باز شد.");
-            }
+            if (!trade.Buy(lot_size, symbol, 0, sl, tp, comment)) Log("خطا در باز کردن معامله خرید: " + IntegerToString(GetLastError()));
+            else Log("معامله خرید با لات " + DoubleToString(lot_size, 2) + " باز شد.");
         } else {
-            if (!trade.Sell(lot_size, symbol, 0, sl, tp, "Memento Sell")) {
-                Log("خطا در باز کردن معامله فروش: " + IntegerToString(GetLastError()));
-            } else {
-                Log("معامله فروش با لات " + DoubleToString(lot_size, 2) + " باز شد.");
-            }
+            if (!trade.Sell(lot_size, symbol, 0, sl, tp, comment)) Log("خطا در باز کردن معامله فروش: " + IntegerToString(GetLastError()));
+            else Log("معامله فروش با لات " + DoubleToString(lot_size, 2) + " باز شد.");
         }
     }
 
@@ -408,7 +368,6 @@ public:
         return 0;
     }
     
-    //--- توابع کمکی برای شمارش معاملات
     int CountSymbolTrades(){
        int count = 0;
        for(int i=PositionsTotal()-1; i>=0; i--){
@@ -460,14 +419,10 @@ public:
     }
 };
 
-//--- متغیرهای سراسری
 CSettings settings;
 CSymbolManager symbolManagers[];
 string symbols[];
 
-//+------------------------------------------------------------------+
-//| تابع شروع اکسپرت                                                 |
-//+------------------------------------------------------------------+
 int OnInit() {
     settings.Init();
     StringSplit(settings.symbols_list, ',', symbols);
@@ -482,26 +437,17 @@ int OnInit() {
     return(INIT_SUCCEEDED);
 }
 
-//+------------------------------------------------------------------+
-//| تابع پایان اکسپرت                                                |
-//+------------------------------------------------------------------+
 void OnDeinit(const int reason) {
     EventKillTimer();
     ObjectsDeleteAll(0, "Confluence_");
     ObjectsDeleteAll(0, "Flag_");
     ObjectsDeleteAll(0, "Confirm_");
     
-    // پاک کردن اندیکاتور از روی چارت هنگام خروج از حالت ویژوال
-    // این کد به سادگی تمام اندیکاتورها را در پایان تست ویژوال پاک می‌کند
-    if(MQLInfoInteger(MQL_VISUAL_MODE))
-    {
+    if(MQLInfoInteger(MQL_VISUAL_MODE)) {
        ChartRedraw(0);
     }
 }
 
-//+------------------------------------------------------------------+
-//| تابع تایمر                                                      |
-//+------------------------------------------------------------------+
 void OnTimer() {
     for (int i = 0; i < ArraySize(symbolManagers); i++) {
         if (symbolManagers[i].IsValid()) {
@@ -509,4 +455,3 @@ void OnTimer() {
         }
     }
 }
-//+------------------------------------------------------------------+
