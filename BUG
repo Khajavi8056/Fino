@@ -1,344 +1,56 @@
-//+------------------------------------------------------------------+
-//|                                                  HipoFinoExpert.mq5 |
-//|                              محصولی از: Hipo Algorithm           |
-//|                              نسخه: ۱.۲.۰                          |
-//|                              تاریخ: ۲۰۲۵/۰۸/۰۳                   |
-//| اکسپرت معاملاتی پیشرفته با پشتیبانی از ناحیه طلایی فیبوناچی   |
-//+------------------------------------------------------------------+
-
-#property copyright "Hipo Algorithm"
-#property link      "https://hipoalgorithm.com"
-#property version   "1.2.0"
-
-// --- شامل کردن کتابخانه‌ها ---
-#include <Trade\Trade.mqh>
-#include <HipoFibonacci.mqh>
-#include "HipoFino.mqh"
-#include "HipoDashboard.mqh"
-#include "HipoMomentumFractals.mqh"
-#include "HipoCvtChannel.mqh"
-#include "HipoInitialStopLoss.mqh"
-
-// --- تنظیمات ورودی ---
-
-// گروه تنظیمات عمومی
-input group "تنظیمات عمومی"
-input bool InpShowPanel = true;                    // نمایش داشبورد
-input bool InpShowMacd = false;                    // نمایش اندیکاتور مکدی
-input ENUM_TIMEFRAMES InpHTF = PERIOD_H1;           // تایم‌فریم روند (HTF)
-input ENUM_TIMEFRAMES InpLTF = PERIOD_M5;           // تایم‌فریم تریگر (LTF)
-input double InpRiskPercent = 1.0;                 // درصد ریسک معامله (0.1 تا 10)
-input long InpMagicNumber = 123456;                // شماره جادویی (Magic Number)
-
-// گروه تنظیمات مکدی HTF
-input group "تنظیمات مکدی روند (HTF)"
-input int InpHTFFastEMA = 48;                      // دوره EMA سریع
-input int InpHTFSlowEMA = 104;                     // دوره EMA کند
-input int InpHTFSignal = 36;                       // دوره خط سیگنال
-
-// گروه تنظیمات مکدی LTF
-input group "تنظیمات مکدی تریگر (LTF)"
-input int InpLTFFastEMA = 6;                       // دوره EMA سریع
-input int InpLTFSlowEMA = 13;                      // دوره EMA کند
-input int InpLTFSignal = 5;                        // دوره خط سیگنال
-
-// گروه فیلتر سشن معاملاتی
-input group "فیلتر سشن معاملاتی"
-input bool InpUseSessionFilter = false;            // استفاده از فیلتر سشن
-input bool InpTokyoSession = true;                 // سشن توکیو
-input bool InpLondonSession = true;                // سشن لندن
-input bool InpNewYorkSession = true;               // سشن نیویورک
-input string InpCustomSessionStart = "00:00";      // شروع سشن سفارشی (HH:MM)
-input string InpCustomSessionEnd = "23:59";        // پایان سشن سفارشی (HH:MM)
-
-// گروه مدیریت خروج پله‌ای
-input group "مدیریت خروج پله‌ای (Partial TP)"
-input bool InpUsePartialTP = true;                 // استفاده از تیک پروفیت پله‌ای
-input string InpPartialTP_Percentages = "33,33,34"; // درصدهای تیک پروفیت پله‌ای
-input double InpFixedTP_RR = 2.0;                  // نسبت ریسک به ریوارد ثابت
-
-// گروه مدیریت حد ضرر متحرک
-input group "مدیریت حد ضرر متحرک (Trailing Stop)"
-input bool InpUseTrailingStop = true;              // استفاده از حد ضرر متحرک
-input double InpTrailingActivationRR = 1.5;        // نسبت فعال‌سازی تریلینگ (RR)
-input ENUM_STOP_METHOD InpStopMethod = STOP_CVT;   // روش تریلینگ استاپ
-input bool InpShowStopLine = true;                 // نمایش خط حد ضرر
-
-// گروه تنظیمات SAR
-input group "تنظیمات روش SAR"
-input double InpSarStep = 0.02;                    // گام SAR
-input double InpSarMaximum = 0.2;                  // حداکثر SAR
-
-// گروه تنظیمات CVT Channel
-input group "تنظیمات روش CVT Channel"
-input int InpMinLookback = 5;                      // حداقل دوره بررسی
-input int InpMaxLookback = 20;                     // حداکثر دوره بررسی
-
-// گروه تنظیمات فراکتال
-input group "تنظیمات فراکتال"
-input bool InpShowFractals = true;                 // نمایش فراکتال‌ها
-input int InpFractalBars = 3;                      // تعداد میله‌های فراکتال
-input int InpFractalBufferPips = 5;                // بافر پیپ فراکتال
-
-// گروه تنظیمات استاپ لاس اولیه
-input group "تنظیمات استاپ لاس اولیه"
-input ENUM_INITIAL_STOP_METHOD InpInitialStopMethod = INITIAL_STOP_MOTHER_ZERO; // روش استاپ لاس اولیه
-input int InpInitialSLBufferPips = 10;             // بافر پیپ استاپ لاس اولیه
-
-// گروه فیلتر ورود با مووینگ اوریج
-input group "فیلتر ورود با مووینگ اوریج"
-input bool InpUseMAEntryFilter = false;            // استفاده از فیلتر MA
-input int InpMAFilterPeriod = 5;                   // دوره MA
-input ENUM_MA_METHOD InpMAFilterMethod = MODE_EMA; // روش MA
-input ENUM_APPLIED_PRICE InpMAFilterPrice = PRICE_CLOSE; // قیمت اعمال MA
-
-// گروه تنظیمات ATR و میانگین متحرک
-input group "تنظیمات ATR و میانگین متحرک"
-input ENUM_TIMEFRAMES InpATRMATimeframe = PERIOD_H1; // تایم‌فریم ATR/MA
-input ENUM_MA_METHOD InpMAMethod = MODE_EMA;       // روش MA
-input int InpMAPeriod = 50;                        // دوره MA
-input ENUM_APPLIED_PRICE InpMAPrice = PRICE_CLOSE; // قیمت اعمال MA
-input int InpATRPeriod = 14;                       // دوره ATR
-input double InpATRMultiplier = 1.5;               // ضریب ATR
-
-// گروه تنظیمات فراکتال ساده
-input group "تنظیمات فراکتال ساده"
-input ENUM_TIMEFRAMES InpSimpleFractalTimeframe = PERIOD_M15; // تایم‌فریم فراکتال ساده
-input int InpSimpleFractalBars = 20;               // تعداد میله‌های فراکتال ساده
-input int InpSimpleFractalPeers = 2;               // تعداد همسایگان فراکتال ساده
-input double InpSimpleFractalBufferPips = 3;       // بافر پیپ فراکتال ساده
-
-// گروه تنظیمات ناحیه طلایی فیبوناچی
-input group "تنظیمات ناحیه طلایی فیبوناچی"
-input double InpGoldenZoneMin = 61.8;              // حداقل سطح ناحیه طلایی (درصد)
-input double InpGoldenZoneMax = 78.6;              // حداکثر سطح ناحیه طلایی (درصد)
-
-// گروه تنظیمات فیبوناچی
-input group "تنظیمات فیبوناچی"
-input bool InpRunInBackground = true;              // اجرای فیبوناچی در پس‌زمینه
-input bool InpMultiStructureMode = true;           // استفاده از حالت چندساختاری
-input int InpMaxBackgroundFamilies = 3;            // حداکثر تعداد ساختارهای پس‌زمینه
-
-// --- متغیرهای سراسری ---
-CHipoFino* g_engine = NULL;
-CHipoDashboard* g_dashboard = NULL;
-datetime g_last_tick_time = 0;
-
-// --- توابع کمکی ---
-
-// اعتبارسنجی فرمت زمان سشن سفارشی
-bool ValidateCustomSessionTime(string time_str)
-{
-   string parts[];
-   if(StringSplit(time_str, ':', parts) != 2) return false;
-   int hour = (int)StringToInteger(parts[0]);
-   int minute = (int)StringToInteger(parts[1]);
-   return (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59);
-}
-
-// انتخاب ساختار فیبوناچی در حالت چندساختاری
-bool SelectFibonacciStructure(ENUM_DIRECTION direction)
-{
-   if(!InpMultiStructureMode)
-   {
-      return HFiboCreateNewStructure(direction);
-   }
-   
-   // دریافت تمام ساختارهای فعال
-   string structure_ids[];
-   int count = HFiboGetActiveStructures(direction, structure_ids);
-   if(count == 0)
-   {
-      Print("هیچ ساختار فعالی یافت نشد.");
-      return false;
-   }
-
-   // انتخاب جوان‌ترین ساختار یا قوی‌ترین بر اساس معیار
-   string selected_id = "";
-   datetime youngest_time = TimeCurrent();
-   for(int i = 0; i < count && i < InpMaxBackgroundFamilies; i++)
-   {
-      datetime structure_time = HFiboGetStructureCreationTime(structure_ids[i]);
-      if(structure_time < youngest_time)
-      {
-         youngest_time = structure_time;
-         selected_id = structure_ids[i];
-      }
-   }
-
-   if(selected_id == "")
-   {
-      Print("خطا: ناتوانی در انتخاب ساختار فیبوناچی.");
-      return false;
-   }
-
-   return HFiboSetActiveStructure(selected_id);
-}
-
-// --- رویدادهای اصلی ---
-
-int OnInit()
-{
-   // تنظیمات نمای چارت
-   ChartSetInteger(0, CHART_SHOW_GRID, false);
-   ChartSetInteger(0, CHART_COLOR_CANDLE_BULL, clrGreen);
-   ChartSetInteger(0, CHART_COLOR_CANDLE_BEAR, clrRed);
-   ChartSetInteger(0, CHART_COLOR_CHART_UP, clrGreen);
-   ChartSetInteger(0, CHART_COLOR_CHART_DOWN, clrRed);
-
-   // اعتبارسنجی ورودی‌ها
-   if(InpRiskPercent < 0.1 || InpRiskPercent > 10.0)
-   {
-      Print("خطا: درصد ریسک باید بین 0.1 تا 10.0 باشد");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpFixedTP_RR < 1.0 || InpFixedTP_RR > 5.0)
-   {
-      Print("خطا: نسبت ریسک به ریوارد باید بین 1.0 تا 5.0 باشد");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpInitialSLBufferPips < 0)
-   {
-      Print("خطا: بافر حد ضرر اولیه نمی‌تواند منفی باشد");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpHTFFastEMA <= 0 || InpHTFSlowEMA <= InpHTFFastEMA || InpHTFSignal <= 0)
-   {
-      Print("خطا: تنظیمات مکدی HTF نامعتبر است");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpLTFFastEMA <= 0 || InpLTFSlowEMA <= InpLTFFastEMA || InpLTFSignal <= 0)
-   {
-      Print("خطا: تنظیمات مکدی LTF نامعتبر است");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpUseSessionFilter && !InpTokyoSession && !InpLondonSession && !InpNewYorkSession &&
-      InpCustomSessionStart == InpCustomSessionEnd)
-   {
-      Print("خطا: حداقل یک سشن باید فعال باشد یا سشن سفارشی معتبر باشد");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(!ValidateCustomSessionTime(InpCustomSessionStart) || !ValidateCustomSessionTime(InpCustomSessionEnd))
-   {
-      Print("خطا: فرمت زمان سشن سفارشی نامعتبر است (باید HH:MM باشد)");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpSarStep <= 0 || InpSarMaximum <= 0)
-   {
-      Print("خطا: گام یا حداکثر SAR نمی‌تواند صفر یا منفی باشد");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpMinLookback <= 0 || InpMaxLookback < InpMinLookback)
-   {
-      Print("خطا: تنظیمات دوره کانال CVT نامعتبر است");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpFractalBars <= 0 || InpFractalBufferPips < 0)
-   {
-      Print("خطا: تنظیمات فراکتال نامعتبر است");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpMAPeriod <= 0 || InpATRPeriod <= 0 || InpATRMultiplier <= 0)
-   {
-      Print("خطا: تنظیمات ATR/MA نامعتبر است");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpSimpleFractalBars <= 0 || InpSimpleFractalPeers <= 0 || InpSimpleFractalBufferPips < 0)
-   {
-      Print("خطا: تنظیمات فراکتال ساده نامعتبر است");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpGoldenZoneMin < 0 || InpGoldenZoneMax <= InpGoldenZoneMin || InpGoldenZoneMax > 100)
-   {
-      Print("خطا: تنظیمات ناحیه طلایی نامعتبر است. باید 0 <= Min < Max <= 100 باشد");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-   if(InpMaxBackgroundFamilies < 1)
-   {
-      Print("خطا: حداکثر تعداد ساختارهای پس‌زمینه باید حداقل 1 باشد");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-
-   // تنظیم فیبوناچی
-   if(!HFiboSetMaxFamilies(InpMaxBackgroundFamilies))
-   {
-      Print("خطا: تنظیم حداکثر تعداد ساختارهای فیبوناچی ناموفق بود");
-      return(INIT_PARAMETERS_INCORRECT);
-   }
-
-   // راه‌اندازی موتور اصلی
-   g_engine = new CHipoFino(
-      InpHTF, InpLTF,
-      InpHTFFastEMA, InpHTFSlowEMA, InpHTFSignal,
-      InpLTFFastEMA, InpLTFSlowEMA, InpLTFSignal,
-      InpRiskPercent,
-      InpMagicNumber,
-      InpUseSessionFilter,
-      InpTokyoSession, InpLondonSession, InpNewYorkSession,
-      InpCustomSessionStart, InpCustomSessionEnd,
-      InpUsePartialTP, InpPartialTP_Percentages, InpFixedTP_RR,
-      InpUseTrailingStop, InpTrailingActivationRR,
-      InpStopMethod, InpSarStep, InpSarMaximum,
-      InpMinLookback, InpMaxLookback,
-      InpFractalBars, InpFractalBufferPips,
-      InpShowStopLine, InpShowFractals,
-      InpUseMAEntryFilter, InpMAFilterPeriod, InpMAFilterMethod, InpMAFilterPrice,
-      InpInitialStopMethod, InpInitialSLBufferPips,
-      InpATRMATimeframe, InpMAMethod, InpMAPeriod, InpMAPrice,
-      InpATRPeriod, InpATRMultiplier,
-      InpSimpleFractalTimeframe, InpSimpleFractalBars, InpSimpleFractalPeers, InpSimpleFractalBufferPips,
-      InpGoldenZoneMin, InpGoldenZoneMax
-   );
-
-   if(g_engine == NULL || !g_engine.Initialize())
-   {
-      Print("خطا: راه‌اندازی موتور اصلی ناموفق بود");
-      delete g_engine;
-      g_engine = NULL;
-      return(INIT_FAILED);
-   }
-
-   // راه‌اندازی داشبورد
-   if(InpShowPanel)
-   {
-      g_dashboard = new CHipoDashboard(InpHTF, InpLTF, InpShowMacd);
-      if(g_dashboard == NULL || !g_dashboard.Initialize())
-      {
-         Print("خطا: راه‌اندازی داشبورد ناموفق بود");
-         delete g_engine;
-         g_engine = NULL;
-         return(INIT_FAILED);
-      }
-   }
-
-   Print("اکسپرت HipoFino با موفقیت راه‌اندازی شد");
-   return(INIT_SUCCEEDED);
-}
-
-void OnDeinit(const int reason)
-{
-   if(g_dashboard != NULL)
-   {
-      g_dashboard.Deinitialize();
-      delete g_dashboard;
-      g_dashboard = NULL;
-   }
-   if(g_engine != NULL)
-   {
-      g_engine.Deinitialize();
-      delete g_engine;
-      g_engine = NULL;
-   }
-   Print("اکسپرت HipoFino متوقف شد. دلیل: ", reason);
-}
-
-void OnTick()
-{
-   if(g_last_tick_time == TimeCurrent()) return;
-   g_last_tick_time = TimeCurrent();
-
-   if(g_engine != NULL)
-      g_engine.OnTick();
-}
-
-//+------------------------------------------------------------------+
+variable already defined	FINO.mq5	119	12
+   see declaration of variable 'InpMultiStructureMode'	HipoFibonacci.mqh	95	12
+idenfitier 'InpMultiStructureMode' already used	HipoFibonacci.mqh	95	12
+   see declaration of variable 'InpMultiStructureMode'	HipoFibonacci.mqh	95	12
+variable already defined	FINO.mq5	120	11
+   see declaration of variable 'InpMaxBackgroundFamilies'	HipoFibonacci.mqh	97	12
+idenfitier 'InpMaxBackgroundFamilies' already used	HipoFibonacci.mqh	97	12
+   see declaration of variable 'InpMaxBackgroundFamilies'	HipoFibonacci.mqh	97	12
+'HFiboSetMaxFamilies' - undeclared identifier	FINO.mq5	263	8
+'InpMaxBackgroundFamilies' - some operator expected	FINO.mq5	263	28
+wrong parameters count, 3 passed, but 5 requires	FINO.mq5	304	25
+   CHipoDashboard::CHipoDashboard(bool,bool,ENUM_TIMEFRAMES,ENUM_TIMEFRAMES,long)	HipoDashboard.mqh	129	4
+expression is always 'false'	HipoDashboard.mqh	183	56
+expression is always 'false'	HipoDashboard.mqh	183	106
+implicit conversion from 'string' to 'int'	HipoMomentumFractals.mqh	110	96
+'struct FractalObject' initialized from type type 'FractalObject' using assignment operator, this behavior is deprecated and will be removed in future	HipoMomentumFractals.mqh	158	38
+   consider defining copy constructor 'FractalObject(const FractalObject&)'	HipoMomentumFractals.mqh	15	8
+'HFiboGetGoldenZone' - undeclared identifier	HipoFino.mqh	130	11
+',' - unexpected token	HipoFino.mqh	130	32
+'' - some operator expected	HipoFino.mqh	130	31
+'(' - unbalanced left parenthesis	HipoFino.mqh	130	9
+',' - unexpected token	HipoFino.mqh	130	55
+expression has no effect	HipoFino.mqh	130	34
+')' - unexpected token	HipoFino.mqh	130	78
+expression has no effect	HipoFino.mqh	130	57
+')' - unexpected token	HipoFino.mqh	130	79
+possible use of uninitialized variable 'golden_zone_min_price'	HipoFino.mqh	138	55
+possible use of uninitialized variable 'golden_zone_max_price'	HipoFino.mqh	138	95
+'HFiboTryScanForNewStructure' - undeclared identifier	HipoFino.mqh	785	22
+'direction' - some operator expected	HipoFino.mqh	785	50
+'struct SSignal' initialized from type type 'SSignal' using assignment operator, this behavior is deprecated and will be removed in future	HipoFino.mqh	814	28
+   consider defining copy constructor 'SSignal(const SSignal&)'	HipoFibonacci.mqh	153	8
+'HFiboGetGoldenZone' - undeclared identifier	HipoFino.mqh	818	20
+',' - unexpected token	HipoFino.mqh	818	48
+'id' - some operator expected	HipoFino.mqh	818	46
+'(' - unbalanced left parenthesis	HipoFino.mqh	818	18
+',' - unexpected token	HipoFino.mqh	818	71
+expression has no effect	HipoFino.mqh	818	50
+')' - unexpected token	HipoFino.mqh	818	94
+expression has no effect	HipoFino.mqh	818	73
+')' - unexpected token	HipoFino.mqh	818	95
+possible use of uninitialized variable 'golden_zone_min_price'	HipoFino.mqh	828	60
+possible use of uninitialized variable 'golden_zone_max_price'	HipoFino.mqh	828	102
+'HFiboGetActiveStructures' - undeclared identifier	FINO.mq5	149	16
+',' - unexpected token	FINO.mq5	149	50
+'direction' - some operator expected	FINO.mq5	149	41
+'structure_ids' - semicolon expected	FINO.mq5	149	52
+')' - unexpected token	FINO.mq5	149	65
+expression has no effect	FINO.mq5	149	52
+sign mismatch	FINO.mq5	159	34
+'HFiboGetStructureCreationTime' - undeclared identifier	FINO.mq5	161	33
+'[' - some operator expected	FINO.mq5	161	76
+'HFiboSetActiveStructure' - undeclared identifier	FINO.mq5	175	11
+'selected_id' - some operator expected	FINO.mq5	175	35
+expression not boolean	FINO.mq5	175	11
+34 errors, 17 warnings		34	17
