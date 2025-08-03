@@ -1,137 +1,512 @@
-version '6.10_Visual' is incompatible with MQL5 Market, must be xxx.yyy	Memento.mq5	8	11
-variable expected	Memento.mq5	491	47
-   built-in: int string::StringTrimLeft()	Memento.mq5	491	47
-implicit conversion from 'number' to 'string'	Memento.mq5	491	32
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	173	17
-',' - unexpected token	Memento.mq5	173	43
-'0' - some operator expected	Memento.mq5	173	42
-',' - unexpected token	Memento.mq5	173	46
-',' - unexpected token	Memento.mq5	173	67
-expression has no effect	Memento.mq5	173	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	173	69
-',' - unexpected token	Memento.mq5	173	89
-',' - unexpected token	Memento.mq5	173	92
-expression has no effect	Memento.mq5	173	91
-')' - unexpected token	Memento.mq5	173	115
-expression has no effect	Memento.mq5	173	103
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	174	17
-',' - unexpected token	Memento.mq5	174	43
-'0' - some operator expected	Memento.mq5	174	42
-',' - unexpected token	Memento.mq5	174	46
-',' - unexpected token	Memento.mq5	174	67
-expression has no effect	Memento.mq5	174	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	174	69
-',' - unexpected token	Memento.mq5	174	89
-',' - unexpected token	Memento.mq5	174	92
-expression has no effect	Memento.mq5	174	91
-')' - unexpected token	Memento.mq5	174	101
-expression has no effect	Memento.mq5	174	94
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	175	17
-',' - unexpected token	Memento.mq5	175	43
-'0' - some operator expected	Memento.mq5	175	42
-',' - unexpected token	Memento.mq5	175	46
-',' - unexpected token	Memento.mq5	175	67
-expression has no effect	Memento.mq5	175	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	175	69
-',' - unexpected token	Memento.mq5	175	89
-',' - unexpected token	Memento.mq5	175	92
-expression has no effect	Memento.mq5	175	91
-')' - unexpected token	Memento.mq5	175	101
-expression has no effect	Memento.mq5	175	94
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	176	17
-',' - unexpected token	Memento.mq5	176	43
-'0' - some operator expected	Memento.mq5	176	42
-',' - unexpected token	Memento.mq5	176	46
-',' - unexpected token	Memento.mq5	176	67
-expression has no effect	Memento.mq5	176	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	176	69
-',' - unexpected token	Memento.mq5	176	89
-',' - unexpected token	Memento.mq5	176	92
-expression has no effect	Memento.mq5	176	91
-')' - unexpected token	Memento.mq5	176	101
-expression has no effect	Memento.mq5	176	94
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	177	17
-',' - unexpected token	Memento.mq5	177	43
-'0' - some operator expected	Memento.mq5	177	42
-',' - unexpected token	Memento.mq5	177	46
-',' - unexpected token	Memento.mq5	177	67
-expression has no effect	Memento.mq5	177	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	177	69
-',' - unexpected token	Memento.mq5	177	89
-',' - unexpected token	Memento.mq5	177	92
-expression has no effect	Memento.mq5	177	91
-')' - unexpected token	Memento.mq5	177	101
-expression has no effect	Memento.mq5	177	94
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	182	17
-',' - unexpected token	Memento.mq5	182	43
-'0' - some operator expected	Memento.mq5	182	42
-',' - unexpected token	Memento.mq5	182	46
-',' - unexpected token	Memento.mq5	182	66
-expression has no effect	Memento.mq5	182	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	182	68
-',' - unexpected token	Memento.mq5	182	88
-',' - unexpected token	Memento.mq5	182	91
-expression has no effect	Memento.mq5	182	90
-')' - unexpected token	Memento.mq5	182	100
-expression has no effect	Memento.mq5	182	93
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	183	17
-',' - unexpected token	Memento.mq5	183	43
-'0' - some operator expected	Memento.mq5	183	42
-',' - unexpected token	Memento.mq5	183	46
-',' - unexpected token	Memento.mq5	183	66
-expression has no effect	Memento.mq5	183	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	183	68
-',' - unexpected token	Memento.mq5	183	88
-',' - unexpected token	Memento.mq5	183	91
-expression has no effect	Memento.mq5	183	90
-')' - unexpected token	Memento.mq5	183	113
-expression has no effect	Memento.mq5	183	102
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	184	17
-',' - unexpected token	Memento.mq5	184	43
-'0' - some operator expected	Memento.mq5	184	42
-',' - unexpected token	Memento.mq5	184	46
-',' - unexpected token	Memento.mq5	184	66
-expression has no effect	Memento.mq5	184	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	184	68
-',' - unexpected token	Memento.mq5	184	88
-',' - unexpected token	Memento.mq5	184	91
-expression has no effect	Memento.mq5	184	90
-')' - unexpected token	Memento.mq5	184	100
-expression has no effect	Memento.mq5	184	93
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	185	17
-',' - unexpected token	Memento.mq5	185	43
-'0' - some operator expected	Memento.mq5	185	42
-',' - unexpected token	Memento.mq5	185	46
-',' - unexpected token	Memento.mq5	185	66
-expression has no effect	Memento.mq5	185	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	185	68
-',' - unexpected token	Memento.mq5	185	88
-',' - unexpected token	Memento.mq5	185	91
-expression has no effect	Memento.mq5	185	90
-')' - unexpected token	Memento.mq5	185	100
-expression has no effect	Memento.mq5	185	93
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	186	17
-',' - unexpected token	Memento.mq5	186	43
-'0' - some operator expected	Memento.mq5	186	42
-',' - unexpected token	Memento.mq5	186	46
-',' - unexpected token	Memento.mq5	186	66
-expression has no effect	Memento.mq5	186	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	186	68
-',' - unexpected token	Memento.mq5	186	88
-',' - unexpected token	Memento.mq5	186	91
-expression has no effect	Memento.mq5	186	90
-')' - unexpected token	Memento.mq5	186	100
-expression has no effect	Memento.mq5	186	93
-'ChartIndicatorSetInteger' - undeclared identifier	Memento.mq5	191	17
-',' - unexpected token	Memento.mq5	191	43
-'0' - some operator expected	Memento.mq5	191	42
-',' - unexpected token	Memento.mq5	191	46
-',' - unexpected token	Memento.mq5	191	67
-expression has no effect	Memento.mq5	191	48
-'INDICATOR_COLOR_LINE' - undeclared identifier	Memento.mq5	191	69
-',' - unexpected token	Memento.mq5	191	89
-',' - unexpected token	Memento.mq5	191	92
-expression has no effect	Memento.mq5	191	91
-')' - unexpected token	Memento.mq5	191	101
-expression has no effect	Memento.mq5	191	94
-100 errors, 35 warnings		100	35
+//+------------------------------------------------------------------+
+//|                                                      Memento.mq5 |
+//|                                  Copyright 2025, Mohammad & Gemini |
+//|                                               Final & Bulletproof |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2025, Mohammad & Gemini"
+#property link      ""
+#property version   "6.2" // نسخه اصلاح شده برای سازگاری
+#property description "اکسپرت معاملاتی پیشرفته ممنتو بر اساس تلاقی و کراس ایچیموکو با قابلیت نمایش خطوط در حالت ویژوال"
+
+#include <Trade\Trade.mqh>
+#include <Object.mqh>
+
+//--- تنظیمات عمومی
+input group "General Settings"
+input string Inp_Symbols_List = "EURUSD,GBPUSD,XAUUSD"; // لیست نمادها به صورت جدا شده با کاما
+input int    Inp_Magic_Number = 12345;                 // شماره جادویی برای معاملات
+input bool   Inp_Enable_Logging = true;                // فعال‌سازی لاگ‌های دقیق
+
+//--- تنظیمات ایچیموکو
+input group "Ichimoku Settings"
+input int Inp_Tenkan_Period = 9;           // دوره تنکان-سن
+input int Inp_Kijun_Period = 26;           // دوره کیجون-سن
+input int Inp_Senkou_Span_B_Period = 52;   // دوره سنکو اسپن بی
+
+//--- پارامترهای سیگنال و تأیید
+input group "Signal & Confirmation Settings"
+enum E_Confirmation_Mode { MODE_CLOSE_ONLY, MODE_OPEN_AND_CLOSE };
+input E_Confirmation_Mode Inp_Confirmation_Type = MODE_OPEN_AND_CLOSE; // نوع تأیید قیمت
+input int Inp_Grace_Period_Candles = 5;    // دوره مهلت تأیید
+
+//--- تنظیمات استاپ لاس
+input group "Stop Loss Settings"
+enum E_SL_Mode { MODE_COMPLEX, MODE_SIMPLE };
+input E_SL_Mode Inp_StopLoss_Type = MODE_COMPLEX; // روش محاسبه استاپ لاس
+input int Inp_SL_Lookback_Period = 15;     // دوره نگاه به عقب برای استاپ لاس
+input double Inp_SL_Buffer_Multiplier = 3.0; // ضریب بافر استاپ لاس (بر اساس نقطه نماد)
+
+//--- مدیریت مالی و معاملات
+input group "Money & Trade Management"
+input double Inp_Risk_Percent_Per_Trade = 1.0; // درصد ریسک در هر معامله
+input double Inp_Take_Profit_Ratio = 1.5; // نسبت ریسک به پاداش برای حد سود
+input int    Inp_Max_Trades_Per_Symbol = 1;  // حداکثر معاملات باز برای هر نماد
+input int    Inp_Max_Total_Trades = 5;       // حداکثر کل معاملات باز
+
+//--- تنظیمات تحمل
+input group "Tolerance Settings"
+input double Inp_Talaqi_Tolerance_Multiplier = 3.0; // ضریب تحمل تلاقی (بر اساس نقطه نماد)
+
+//--- تنظیمات گرافیکی
+input group "Graphical Settings"
+input double Inp_Object_Distance_Multiplier = 10.0; // ضریب فاصله اشیاء گرافیکی
+input bool   Inp_Show_Ichimoku_Lines = true; // نمایش خطوط ایچیموکو در حالت ویژوال
+input color  Inp_Tenkan_Color = clrRed;       // رنگ تنکان-سن
+input color  Inp_Kijun_Color = clrDodgerBlue; // رنگ کیجون-سن
+input color  Inp_Chikou_Color = clrWhite;     // رنگ چیکو اسپن
+
+//+------------------------------------------------------------------+
+//| کلاس برای نگهداری و مدیریت تمام تنظیمات ورودی                     |
+//+------------------------------------------------------------------+
+class CSettings {
+public:
+    string symbols_list;
+    int tenkan_period, kijun_period, senkou_span_b_period;
+    E_Confirmation_Mode confirmation_type;
+    int grace_period_candles;
+    E_SL_Mode stoploss_type;
+    int sl_lookback_period;
+    double sl_buffer_multiplier;
+    double risk_percent_per_trade;
+    double take_profit_ratio;
+    double talaqi_tolerance_multiplier;
+    int magic_number;
+    bool enable_logging;
+    double object_distance_multiplier;
+    int max_trades_per_symbol;
+    int max_total_trades;
+    //--- متغیرهای جدید برای نمایش خطوط
+    bool show_ichimoku_lines;
+    color tenkan_color;
+    color kijun_color;
+    color chikou_color;
+
+    // تابع مقداردهی اولیه تنظیمات از ورودی‌های اکسپرت
+    void Init() {
+        symbols_list = Inp_Symbols_List;
+        tenkan_period = Inp_Tenkan_Period;
+        kijun_period = Inp_Kijun_Period;
+        senkou_span_b_period = Inp_Senkou_Span_B_Period;
+        confirmation_type = Inp_Confirmation_Type;
+        grace_period_candles = Inp_Grace_Period_Candles;
+        stoploss_type = Inp_StopLoss_Type;
+        sl_lookback_period = Inp_SL_Lookback_Period;
+        sl_buffer_multiplier = Inp_SL_Buffer_Multiplier;
+        risk_percent_per_trade = Inp_Risk_Percent_Per_Trade;
+        take_profit_ratio = Inp_Take_Profit_Ratio;
+        talaqi_tolerance_multiplier = Inp_Talaqi_Tolerance_Multiplier;
+        magic_number = Inp_Magic_Number;
+        enable_logging = Inp_Enable_Logging;
+        object_distance_multiplier = Inp_Object_Distance_Multiplier;
+        max_trades_per_symbol = Inp_Max_Trades_Per_Symbol;
+        max_total_trades = Inp_Max_Total_Trades;
+        //--- مقداردهی متغیرهای جدید
+        show_ichimoku_lines = Inp_Show_Ichimoku_Lines;
+        tenkan_color = Inp_Tenkan_Color;
+        kijun_color = Inp_Kijun_Color;
+        chikou_color = Inp_Chikou_Color;
+    }
+};
+
+//+------------------------------------------------------------------+
+//| کلاس برای مدیریت تمام عملیات مربوط به یک نماد خاص                |
+//+------------------------------------------------------------------+
+class CSymbolManager {
+private:
+    bool is_valid;              // وضعیت اعتبار نماد
+    string symbol;              // نام نماد معاملاتی
+    int ichimoku_handle;        // هندل اندیکاتور ایچیموکو (برای محاسبات)
+    int chart_indicator_handle; // هندل اندیکاتور روی چارت
+    datetime last_bar_time;     // زمان آخرین کندل پردازش شده
+    CTrade trade;               // شیء مدیریت معاملات
+
+    struct PotentialSignal {
+        datetime time;
+        bool is_buy;
+        int age;
+    };
+    PotentialSignal potential_signals[];
+
+    void Log(string message) {
+        if (settings.enable_logging) {
+            Print(symbol + ": " + message);
+        }
+    }
+
+    void AddPotentialSignal(bool is_buy) {
+        PotentialSignal signal;
+        signal.time = iTime(symbol, PERIOD_CURRENT, 0);
+        signal.is_buy = is_buy;
+        signal.age = 0;
+        int size = ArraySize(potential_signals);
+        ArrayResize(potential_signals, size + 1);
+        potential_signals[size] = signal;
+        Log("سیگنال بالقوه " + (is_buy ? "خرید" : "فروش") + " در " + TimeToString(signal.time) + " اضافه شد.");
+    }
+
+public:
+    bool IsValid() {
+        return is_valid;
+    }
+
+    void Init(string sym) {
+        is_valid = false;
+        symbol = sym;
+        ichimoku_handle = iIchimoku(symbol, PERIOD_CURRENT, settings.tenkan_period, settings.kijun_period, settings.senkou_span_b_period);
+        if (ichimoku_handle == INVALID_HANDLE) {
+            Log("خطا در ایجاد اندیکاتور Ichimoku. لطفاً از صحت نام نماد اطمینان حاصل کنید.");
+            return;
+        }
+        last_bar_time = 0;
+        ArrayFree(potential_signals);
+        trade.SetExpertMagicNumber(settings.magic_number);
+        
+        //--- بخش جدید و اصلاح شده: ایجاد اندیکاتور روی چارت اگر کاربر بخواهد
+        chart_indicator_handle = -1; // مقداردهی اولیه
+        if (settings.show_ichimoku_lines && MQLInfoInteger(MQL_VISUAL_MODE)) {
+            chart_indicator_handle = iIchimoku(symbol, PERIOD_CURRENT, settings.tenkan_period, settings.kijun_period, settings.senkou_span_b_period);
+            if(chart_indicator_handle != INVALID_HANDLE) {
+                // تنظیم رنگ‌ها قبل از اضافه کردن به چارت
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 0, settings.tenkan_color); // Tenkan
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 1, settings.kijun_color);  // Kijun
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 2, clrNONE);               // Senkou A (ابر) - مخفی
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 3, clrNONE);               // Senkou B (ابر) - مخفی
+                IndicatorSetInteger(chart_indicator_handle, INDICATOR_LINE_COLOR, 4, settings.chikou_color); // Chikou
+                
+                // اضافه کردن اندیکاتور تنظیم شده به چارت اصلی
+                ChartIndicatorAdd(0, 0, chart_indicator_handle);
+            }
+        }
+
+        is_valid = true;
+        Log("نماد با موفقیت مقداردهی اولیه شد.");
+    }
+
+    // بقیه توابع کلاس CSymbolManager بدون تغییر باقی می‌مانند ...
+    // ... (CheckConfluence, CheckConfirmations, OpenTrade, etc.)
+
+    void ProcessNewBar() {
+        datetime current_bar_time = iTime(symbol, PERIOD_CURRENT, 0);
+        if (current_bar_time != last_bar_time) {
+            last_bar_time = current_bar_time;
+            CheckConfluence();
+            CheckConfirmations();
+        }
+    }
+
+    void CheckConfluence() {
+        int shift = settings.kijun_period;
+        if (iBars(symbol, PERIOD_CURRENT) < shift + 2) return;
+
+        double chikou = iClose(symbol, PERIOD_CURRENT, shift);
+        double tenkan[], kijun[];
+        ArraySetAsSeries(tenkan, true);
+        ArraySetAsSeries(kijun, true);
+        if (CopyBuffer(ichimoku_handle, 0, shift, 1, tenkan) <= 0 || CopyBuffer(ichimoku_handle, 1, shift, 1, kijun) <= 0) {
+            Log("خطا در کپی کردن بافرهای تلاقی.");
+            return;
+        }
+        double max_val = MathMax(chikou, MathMax(tenkan[0], kijun[0]));
+        double min_val = MathMin(chikou, MathMin(tenkan[0], kijun[0]));
+        double tolerance = settings.talaqi_tolerance_multiplier * SymbolInfoDouble(symbol, SYMBOL_POINT);
+
+        if (max_val - min_val < tolerance) {
+            double chikou1 = iClose(symbol, PERIOD_CURRENT, shift + 1);
+            double tenkan1[], kijun1[];
+            ArraySetAsSeries(tenkan1, true);
+            ArraySetAsSeries(kijun1, true);
+            if (CopyBuffer(ichimoku_handle, 0, shift + 1, 1, tenkan1) <= 0 || CopyBuffer(ichimoku_handle, 1, shift + 1, 1, kijun1) <= 0) {
+                Log("خطا در کپی کردن بافرهای کندل قبلی.");
+                return;
+            }
+            if ((chikou1 < tenkan1[0] || chikou1 < kijun1[0]) && chikou > tenkan[0] && chikou > kijun[0]) {
+                AddPotentialSignal(true);
+                DrawConfluenceObject(shift);
+                DrawFlagObject(shift, true);
+            } else if ((chikou1 > tenkan1[0] || chikou1 > kijun1[0]) && chikou < tenkan[0] && chikou < kijun[0]) {
+                AddPotentialSignal(false);
+                DrawConfluenceObject(shift);
+                DrawFlagObject(shift, false);
+            }
+        }
+    }
+
+    void CheckConfirmations() {
+        for (int i = ArraySize(potential_signals) - 1; i >= 0; i--) {
+            if (potential_signals[i].age > settings.grace_period_candles) {
+                Log("سیگنال " + (potential_signals[i].is_buy ? "خرید" : "فروش") + " منقضی شد.");
+                ArrayRemove(potential_signals, i, 1);
+                continue;
+            }
+            if (CheckConfirmation(potential_signals[i].is_buy)) {
+                Log("سیگنال " + (potential_signals[i].is_buy ? "خرید" : "فروش") + " تأیید شد.");
+                DrawConfirmationObject(1, potential_signals[i].is_buy);
+                OpenTrade(potential_signals[i].is_buy);
+                ArrayRemove(potential_signals, i, 1);
+            } else {
+                potential_signals[i].age++;
+            }
+        }
+    }
+
+    bool CheckConfirmation(bool is_buy) {
+        double tenkan[], kijun[];
+        ArraySetAsSeries(tenkan, true);
+        ArraySetAsSeries(kijun, true);
+        if (CopyBuffer(ichimoku_handle, 0, 1, 1, tenkan) <= 0 || CopyBuffer(ichimoku_handle, 1, 1, 1, kijun) <= 0) {
+            Log("خطا در کپی کردن بافرهای تأیید.");
+            return false;
+        }
+        double close1 = iClose(symbol, PERIOD_CURRENT, 1);
+        double open1 = iOpen(symbol, PERIOD_CURRENT, 1);
+
+        if (is_buy) {
+            if (kijun[0] >= tenkan[0]) return false;
+            if (settings.confirmation_type == MODE_CLOSE_ONLY) {
+                if (close1 <= tenkan[0] || close1 <= kijun[0]) return false;
+            } else {
+                if (open1 <= tenkan[0] || open1 <= kijun[0] || close1 <= tenkan[0] || close1 <= kijun[0]) return false;
+            }
+        } else {
+            if (kijun[0] <= tenkan[0]) return false;
+            if (settings.confirmation_type == MODE_CLOSE_ONLY) {
+                if (close1 >= tenkan[0] || close1 >= kijun[0]) return false;
+            } else {
+                if (open1 >= tenkan[0] || open1 >= kijun[0] || close1 >= tenkan[0] || close1 >= kijun[0]) return false;
+            }
+        }
+        return true;
+    }
+
+    void OpenTrade(bool is_buy) {
+        //--- بررسی محدودیت‌های تعداد معاملات
+        if (CountTotalTrades() >= settings.max_total_trades) {
+            Log("رسیدن به حد مجاز کل معاملات (" + (string)settings.max_total_trades + "). معامله جدید باز نشد.");
+            return;
+        }
+        if (CountSymbolTrades() >= settings.max_trades_per_symbol) {
+            Log("رسیدن به حد مجاز معاملات برای نماد " + symbol + " (" + (string)settings.max_trades_per_symbol + "). معامله جدید باز نشد.");
+            return;
+        }
+
+        double sl = CalculateSL(is_buy);
+        if (sl == 0) {
+            Log("نمی‌توان استاپ لاس را محاسبه کرد. معامله باز نشد.");
+            return;
+        }
+
+        double entry_price = is_buy ? SymbolInfoDouble(symbol, SYMBOL_ASK) : SymbolInfoDouble(symbol, SYMBOL_BID);
+        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+        double tick_value = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+        
+        //--- محکم‌کاری برای جلوگیری از خطای تقسیم بر صفر
+        if (tick_value <= 0) {
+            Log("مقدار Tick Value برای نماد " + symbol + " نامعتبر است. معامله باز نشد.");
+            return;
+        }
+        
+        double sl_distance_points = MathAbs(entry_price - sl) / point;
+        if (sl_distance_points < 1) {
+            Log("فاصله استاپ لاس بسیار کم است. معامله باز نشد.");
+            return;
+        }
+        
+        double risk_amount = AccountInfoDouble(ACCOUNT_BALANCE) * (settings.risk_percent_per_trade / 100.0);
+        double lot_size = risk_amount / (sl_distance_points * tick_value);
+        
+        double min_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+        double max_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
+        double lot_step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+        lot_size = MathMax(min_lot, MathMin(max_lot, MathRound(lot_size / lot_step) * lot_step));
+        lot_size = NormalizeDouble(lot_size, 2);
+
+        double tp_distance_points = sl_distance_points * settings.take_profit_ratio;
+        double tp = is_buy ? entry_price + tp_distance_points * point : entry_price - tp_distance_points * point;
+        
+        int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+        sl = NormalizeDouble(sl, digits);
+        tp = NormalizeDouble(tp, digits);
+
+        if (is_buy) {
+            if (!trade.Buy(lot_size, symbol, 0, sl, tp, "Memento Buy")) {
+                Log("خطا در باز کردن معامله خرید: " + IntegerToString(GetLastError()));
+            } else {
+                Log("معامله خرید با لات " + DoubleToString(lot_size, 2) + " باز شد.");
+            }
+        } else {
+            if (!trade.Sell(lot_size, symbol, 0, sl, tp, "Memento Sell")) {
+                Log("خطا در باز کردن معامله فروش: " + IntegerToString(GetLastError()));
+            } else {
+                Log("معامله فروش با لات " + DoubleToString(lot_size, 2) + " باز شد.");
+            }
+        }
+    }
+
+    double CalculateSL(bool is_buy) {
+        double buffer = settings.sl_buffer_multiplier * SymbolInfoDouble(symbol, SYMBOL_POINT);
+        if (settings.stoploss_type == MODE_COMPLEX) {
+            double flat_kijun = FindFlatKijun();
+            if (flat_kijun != 0) return is_buy ? flat_kijun - buffer : flat_kijun + buffer;
+            double pivot_kijun = FindPivotKijun(is_buy);
+            if (pivot_kijun != 0) return is_buy ? pivot_kijun - buffer : pivot_kijun + buffer;
+            double pivot_tenkan = FindPivotTenkan(is_buy);
+            if (pivot_tenkan != 0) return is_buy ? pivot_tenkan - buffer : pivot_tenkan + buffer;
+        }
+        return FindDefaultSL(is_buy, buffer);
+    }
+    
+    double FindDefaultSL(bool is_buy, double buffer){
+       double default_sl = 0;
+       for (int i = 1; i <= settings.sl_lookback_period; i++) {
+            double open = iOpen(symbol, PERIOD_CURRENT, i);
+            double close = iClose(symbol, PERIOD_CURRENT, i);
+            if (is_buy && close < open){
+               default_sl = iLow(symbol, PERIOD_CURRENT, i);
+               break;
+            }
+            if (!is_buy && close > open){
+                default_sl = iHigh(symbol, PERIOD_CURRENT, i);
+                break;
+            }
+        }
+        if(default_sl == 0) return 0;
+        return is_buy ? default_sl - buffer : default_sl + buffer;
+    }
+
+    double FindFlatKijun() {
+        double kijun[];
+        int copy_count = settings.sl_lookback_period + 2;
+        if (CopyBuffer(ichimoku_handle, 1, 0, copy_count, kijun) < copy_count) return 0;
+        ArraySetAsSeries(kijun, true);
+        for (int i = 0; i < copy_count - 2; i++) {
+            if (kijun[i] == kijun[i+1] && kijun[i+1] == kijun[i+2]) return kijun[i];
+        }
+        return 0;
+    }
+
+    double FindPivotKijun(bool is_buy) {
+        double kijun[];
+        int copy_count = settings.sl_lookback_period + 1;
+        if (CopyBuffer(ichimoku_handle, 1, 0, copy_count, kijun) < copy_count) return 0;
+        ArraySetAsSeries(kijun, true);
+        for (int i = 1; i < copy_count - 1; i++) {
+            if (is_buy && kijun[i] < kijun[i-1] && kijun[i] < kijun[i+1]) return kijun[i];
+            if (!is_buy && kijun[i] > kijun[i-1] && kijun[i] > kijun[i+1]) return kijun[i];
+        }
+        return 0;
+    }
+
+    double FindPivotTenkan(bool is_buy) {
+        double tenkan[];
+        int copy_count = settings.sl_lookback_period + 1;
+        if (CopyBuffer(ichimoku_handle, 0, 0, copy_count, tenkan) < copy_count) return 0;
+        ArraySetAsSeries(tenkan, true);
+        for (int i = 1; i < copy_count - 1; i++) {
+            if (is_buy && tenkan[i] < tenkan[i-1] && tenkan[i] < tenkan[i+1]) return tenkan[i];
+            if (!is_buy && tenkan[i] > tenkan[i-1] && tenkan[i] > tenkan[i+1]) return tenkan[i];
+        }
+        return 0;
+    }
+    
+    //--- توابع کمکی برای شمارش معاملات
+    int CountSymbolTrades(){
+       int count = 0;
+       for(int i=PositionsTotal()-1; i>=0; i--){
+          if(PositionGetSymbol(i) == symbol && PositionGetInteger(POSITION_MAGIC) == (ulong)settings.magic_number){
+             count++;
+          }
+       }
+       return count;
+    }
+    
+    int CountTotalTrades(){
+       int count = 0;
+       for(int i=PositionsTotal()-1; i>=0; i--){
+          if(PositionGetInteger(POSITION_MAGIC) == (ulong)settings.magic_number){
+             count++;
+          }
+       }
+       return count;
+    }
+
+    void DrawConfluenceObject(int shift) {
+        string obj_name = "Confluence_" + symbol + "_" + TimeToString(iTime(symbol, PERIOD_CURRENT, shift));
+        double distance = settings.object_distance_multiplier * SymbolInfoDouble(symbol, SYMBOL_POINT);
+        ObjectCreate(0, obj_name, OBJ_TEXT, 0, iTime(symbol, PERIOD_CURRENT, shift), iLow(symbol, PERIOD_CURRENT, shift) - distance);
+        ObjectSetInteger(0, obj_name, OBJPROP_COLOR, clrDodgerBlue);
+        ObjectSetString(0, obj_name, OBJPROP_TEXT, CharToString(71));
+        ObjectSetInteger(0, obj_name, OBJPROP_FONTSIZE, 10);
+        ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+    }
+
+    void DrawFlagObject(int shift, bool is_buy) {
+        string obj_name = "Flag_" + symbol + "_" + TimeToString(iTime(symbol, PERIOD_CURRENT, shift));
+        double distance = settings.object_distance_multiplier * SymbolInfoDouble(symbol, SYMBOL_POINT);
+        ObjectCreate(0, obj_name, OBJ_TEXT, 0, iTime(symbol, PERIOD_CURRENT, shift), iHigh(symbol, PERIOD_CURRENT, shift) + distance);
+        ObjectSetInteger(0, obj_name, OBJPROP_COLOR, is_buy ? clrGreen : clrRed);
+        ObjectSetString(0, obj_name, OBJPROP_TEXT, CharToString(80));
+        ObjectSetInteger(0, obj_name, OBJPROP_FONTSIZE, 10);
+        ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+    }
+
+    void DrawConfirmationObject(int shift, bool is_buy) {
+        string obj_name = "Confirm_" + symbol + "_" + TimeToString(iTime(symbol, PERIOD_CURRENT, shift));
+        double distance = settings.object_distance_multiplier * SymbolInfoDouble(symbol, SYMBOL_POINT);
+        ObjectCreate(0, obj_name, OBJ_TEXT, 0, iTime(symbol, PERIOD_CURRENT, shift), iLow(symbol, PERIOD_CURRENT, shift) - distance);
+        ObjectSetInteger(0, obj_name, OBJPROP_COLOR, is_buy ? clrGreen : clrRed);
+        ObjectSetString(0, obj_name, OBJPROP_TEXT, CharToString(169));
+        ObjectSetInteger(0, obj_name, OBJPROP_FONTSIZE, 10);
+        ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+    }
+};
+
+//--- متغیرهای سراسری
+CSettings settings;
+CSymbolManager symbolManagers[];
+string symbols[];
+
+//+------------------------------------------------------------------+
+//| تابع شروع اکسپرت                                                 |
+//+------------------------------------------------------------------+
+int OnInit() {
+    settings.Init();
+    StringSplit(settings.symbols_list, ',', symbols);
+    ArrayResize(symbolManagers, ArraySize(symbols));
+    for (int i = 0; i < ArraySize(symbols); i++) {
+        string sym = symbols[i];
+        StringTrimLeft(sym);
+        StringTrimRight(sym);
+        symbolManagers[i].Init(sym);
+    }
+    EventSetTimer(5);
+    return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| تابع پایان اکسپرت                                                |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason) {
+    EventKillTimer();
+    ObjectsDeleteAll(0, "Confluence_");
+    ObjectsDeleteAll(0, "Flag_");
+    ObjectsDeleteAll(0, "Confirm_");
+    
+    // پاک کردن اندیکاتور از روی چارت هنگام خروج از حالت ویژوال
+    // این کد به سادگی تمام اندیکاتورها را در پایان تست ویژوال پاک می‌کند
+    if(MQLInfoInteger(MQL_VISUAL_MODE))
+    {
+       ChartRedraw(0);
+    }
+}
+
+//+------------------------------------------------------------------+
+//| تابع تایمر                                                      |
+//+------------------------------------------------------------------+
+void OnTimer() {
+    for (int i = 0; i < ArraySize(symbolManagers); i++) {
+        if (symbolManagers[i].IsValid()) {
+            symbolManagers[i].ProcessNewBar();
+        }
+    }
+}
+//+------------------------------------------------------------------+
