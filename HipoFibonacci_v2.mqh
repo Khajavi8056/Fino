@@ -2213,21 +2213,27 @@ public:
    bool needs_compacting = false;
    for(int i = ArraySize(m_families) - 1; i >= 0; i--)
    {
-      if(m_families[i] != NULL && !m_families[i].UpdateOnNewBar())
+      if(m_families[i] != NULL)
       {
-         m_families[i].Destroy();
-         delete m_families[i];
-         m_families[i] = NULL;
-         needs_compacting = true;
+         if(!m_families[i].UpdateOnNewBar())
+         {
+            m_families[i].Destroy();
+            delete m_families[i];
+            m_families[i] = NULL;
+            needs_compacting = true;
+         }
       }
    }
-   if(m_selected_family != NULL && !m_selected_family.UpdateOnNewBar())
+   if(m_selected_family != NULL)
    {
-      m_selected_family.Destroy();
-      delete m_selected_family;
-      m_selected_family = NULL;
-      m_is_locked = false;
-      needs_compacting = true;
+      if(!m_selected_family.UpdateOnNewBar())
+      {
+         m_selected_family.Destroy();
+         delete m_selected_family;
+         m_selected_family = NULL;
+         m_is_locked = false;
+         needs_compacting = true;
+      }
    }
    if(needs_compacting)
    {
@@ -2246,46 +2252,30 @@ public:
       {
          while((uint)ArraySize(m_families) < InpMaxBackgroundFamilies)
          {
-            // Check if the last family's mother is fixed before creating a new family
-            if(ArraySize(m_families) > 0 && m_families[ArraySize(m_families) - 1] != NULL &&
-               m_families[ArraySize(m_families) - 1].GetMother() != NULL &&
-               !m_families[ArraySize(m_families) - 1].GetMother().IsFixed())
+            if(ArraySize(m_families) > 0 && m_families[ArraySize(m_families) - 1] != NULL)
             {
-               break; // Do not create a new family until the last mother is fixed
+               CMotherFibo* mother = m_families[ArraySize(m_families) - 1].GetMother();
+               if(mother != NULL && !mother.IsFixed())
+               {
+                  break;
+               }
             }
             datetime used_times[];
             GetUsedFractalTimes(used_times);
             SFractal new_fractal;
-           bool found = (m_current_trend == LONG && m_fractal_finder.FindNextUnusedHighFractal(InpFractalLookback, InpFractalPeers, used_times, new_fractal)) ||
-                        (m_current_trend == SHORT && m_fractal_finder.FindNextUnusedLowFractal(InpFractalLookback, InpFractalPeers, used_times, new_fractal));
+            bool found = (m_current_trend == LONG && m_fractal_finder.FindNextUnusedHighFractal(InpFractalLookback, InpFractalPeers, used_times, new_fractal)) ||
+                         (m_current_trend == SHORT && m_fractal_finder.FindNextUnusedLowFractal(InpFractalLookback, InpFractalPeers, used_times, new_fractal));
             if(!found) break;
             CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()), m_current_trend, m_is_test_mode);
             if(new_family != NULL && new_family.InitializeWithFractal(new_fractal))
             {
                ArrayResize(m_families, ArraySize(m_families) + 1);
                m_families[ArraySize(m_families) - 1] = new_family;
-               Log("ساختار جدید ایجاد شد: ID=" + new_family.GetId() + ", جهت=" + (m_current_trend == LONG ? "Long" : "Short"));            }
+            }
             else
             {
                delete new_family;
                break;
-            }
-         }
-      }
-      else
-      {
-         if(ArraySize(m_families) == 0)
-         {
-            CFamily* new_family = new CFamily("Family_" + TimeToString(TimeCurrent()), m_current_trend, m_is_test_mode);
-            if(new_family != NULL && new_family.Initialize())
-            {
-               ArrayResize(m_families, 1);
-               m_families[0] = new_family;
-               Log("ساختار جدید ایجاد شد: ID=" + new_family.GetId() + ", جهت=" + (m_current_trend == LONG ? "Long" : "Short"));
-            }
-            else
-            {
-               delete new_family;
             }
          }
       }
@@ -2543,6 +2533,7 @@ CStructureManager* g_manager = NULL;
 //+------------------------------------------------------------------+
 bool HFiboOnInit()
 {
+ 
    g_manager = new CStructureManager();
    if (g_manager == NULL)
    {
