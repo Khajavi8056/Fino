@@ -1,12 +1,12 @@
 //+------------------------------------------------------------------+
 //|                                                      Memento.mq5 |
 //|                                  Copyright 2025, Mohammad & Gemini |
-//|                                           Version 8.0 - Custom Logic |
+//|                                        Version 9.0 - Dual-Confirm |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Mohammad & Gemini"
 #property link      ""
-#property version   "8.0" // پیاده‌سازی منطق تلاقی سفارشی
-#property description "اکسپرت ممنتو بر اساس تلاقی چیکو اسپن حال با سطوح گذشته"
+#property version   "9.0" // منطق دو مرحله‌ای: کراس چیکو از گذشته و تایید در حال
+#property description "اکسپرت ممنتو بر اساس استراتژی دو مرحله‌ای"
 
 #include <Trade\Trade.mqh>
 #include <Object.mqh>
@@ -176,21 +176,22 @@ public:
     }
 
     // +++ START OF MODIFIED LOGIC +++
-    // این تابع با منطق سفارشی ما بازنویسی شده است
+    // مرحله اول: پیدا کردن سیگنال اولیه بر اساس منطق سفارشی
     void CheckConfluence() {
-        // 1. تعیین محل وقوع رویداد در گذشته
-        int history_shift = settings.kijun_period; // معمولاً 26
+        // 1. محل رویداد در گذشته
+        int history_shift = settings.kijun_period; // 26
 
-        // 2. تعیین کندل شاهد ماجرا در زمان حال
-        int current_shift = 1;
+        // 2. کندل های حال برای بررسی کراس چیکو
+        int current_shift = 1;      // کندل فعلی (آخرین بسته شده)
+        int prev_current_shift = 2; // کندل قبل از اون
 
-        // مطمئن میشیم دیتای کافی داریم
-        if (iBars(symbol, PERIOD_CURRENT) < history_shift + 2) return;
+        if (iBars(symbol, PERIOD_CURRENT) < history_shift + 3) return; // نیاز به دیتای کافی داریم
 
-        // 3. مقدار شاهد ماجرا (چیکواسپن) رو از کندل شماره ۱ می‌خونیم
-        double chikou_value = iClose(symbol, PERIOD_CURRENT, current_shift);
+        // 3. مقادیر چیکو اسپن (قیمت حال و قبل)
+        double chikou_now = iClose(symbol, PERIOD_CURRENT, current_shift);
+        double chikou_prev = iClose(symbol, PERIOD_CURRENT, prev_current_shift);
 
-        // 4. مقادیر دو خط اصلی (تنکان و کیجون) رو از 26 کندل قبل می‌خونیم
+        // 4. مقادیر تنکان و کیجون از 26 کندل قبل
         double tenkan_history[], kijun_history[];
         ArraySetAsSeries(tenkan_history, true);
         ArraySetAsSeries(kijun_history, true);
@@ -199,30 +200,36 @@ public:
             return;
         }
 
-        // 5. بررسی تلاقی بین شاهد امروزی و خطوط قدیمی
-        double tolerance = settings.talaqi_tolerance_multiplier * SymbolInfoDouble(symbol, SYMBOL_POINT);
-        double max_val = MathMax(chikou_value, MathMax(tenkan_history[0], kijun_history[0]));
-        double min_val = MathMin(chikou_value, MathMin(tenkan_history[0], kijun_history[0]));
+        // --- منطق سیگنال خرید ---
+        // آیا در گذشته تنکان بالای کیجون بوده (شرط اولیه روند صعودی)؟
+        bool past_is_bullish = tenkan_history[0] > kijun_history[0];
+        // آیا چیکو اسپن (قیمت) از زیر هر دو خط تاریخی عبور کرده؟
+        bool chikou_crossed_up = (chikou_prev < tenkan_history[0] || chikou_prev < kijun_history[0]) &&
+                                 (chikou_now > tenkan_history[0] && chikou_now > kijun_history[0]);
 
-        if (max_val - min_val < tolerance) {
-            // تلاقی پیدا شد! حالا جهت رو مشخص می‌کنیم
-            Log("تلاقی بین چیکو اسپن فعلی و سطوح گذشته پیدا شد در شیفت: " + IntegerToString(history_shift));
-            DrawConfluenceObject(history_shift); // علامت تلاقی رو در محل رویداد تاریخی میذاریم
+        if (past_is_bullish && chikou_crossed_up) {
+            Log("سیگنال اولیه خرید: چیکو از سطوح تاریخی عبور کرد.");
+            AddPotentialSignal(true);
+            DrawFlagObject(history_shift, true); // پرچم رو در محل رویداد تاریخی میذاریم
+            return; // از تابع خارج میشیم چون سیگنال پیدا شد
+        }
 
-            // اگر در گذشته، تنکان بالای کیجون بوده (روند صعودی) و قیمت الان هم بالای اون سطوح هست -> سیگنال خرید
-            if (tenkan_history[0] > kijun_history[0] && chikou_value > tenkan_history[0]) {
-                AddPotentialSignal(true);
-                DrawFlagObject(history_shift, true);
-            }
-            // اگر در گذشته، کیجون بالای تنکان بوده (روند نزولی) و قیمت الان هم پایین اون سطوح هست -> سیگنال فروش
-            else if (kijun_history[0] > tenkan_history[0] && chikou_value < kijun_history[0]) {
-                AddPotentialSignal(false);
-                DrawFlagObject(history_shift, false);
-            }
+        // --- منطق سیگنال فروش ---
+        // آیا در گذشته کیجون بالای تنکان بوده (شرط اولیه روند نزولی)؟
+        bool past_is_bearish = kijun_history[0] > tenkan_history[0];
+        // آیا چیکو اسپن (قیمت) از بالای هر دو خط تاریخی عبور کرده؟
+        bool chikou_crossed_down = (chikou_prev > tenkan_history[0] || chikou_prev > kijun_history[0]) &&
+                                   (chikou_now < tenkan_history[0] && chikou_now < kijun_history[0]);
+
+        if (past_is_bearish && chikou_crossed_down) {
+            Log("سیگنال اولیه فروش: چیکو از سطوح تاریخی عبور کرد.");
+            AddPotentialSignal(false);
+            DrawFlagObject(history_shift, false); // پرچم رو در محل رویداد تاریخی میذاریم
         }
     }
     // +++ END OF MODIFIED LOGIC +++
 
+    // مرحله دوم: بررسی تاییدیه نهایی در زمان حال (این تابع دست نخورده)
     void CheckConfirmations() {
         for (int i = ArraySize(potential_signals) - 1; i >= 0; i--) {
             if (potential_signals[i].age > settings.grace_period_candles) {
