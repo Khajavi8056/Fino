@@ -1580,31 +1580,46 @@ public:
             }
          }
       }
-      else if(m_state == CHILD2_ACTIVE)
+      // کد صحیح و جایگزین
+else if(m_state == CHILD2_ACTIVE)
+{
+   if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
+   {
+      // اگر فرزند دوم موفق بود، فقط ناحیه طلایی رو چک کن
+      if(m_child2.IsSuccessChild2())
       {
-         if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
+         if(m_child2.CheckSuccessChild2(current_price))
          {
-            if(m_child2.CheckSuccessChild2(current_price))
+            // GetSignal() بقیه کارها مثل COMPLETED کردن ساختار رو انجام میده
+            GetSignal();
+         }
+      }
+      // اگر فرزند دوم ناموفق بود، شرط شکست رو چک کن
+      else
+      {
+         double lower, upper;
+         if(GetFailureChildTriggerLevels(lower, upper))
+         {
+            double price_lower = m_mother.GetLevelPrice(lower);
+            double price_upper = m_mother.GetLevelPrice(upper);
+            
+            // مرز بیرونی ناحیه (دورترین سطح از سطح ۱۰۰ مادر)
+            double outer_bound = (m_direction == LONG) ? MathMax(price_lower, price_upper) : MathMin(price_lower, price_upper);
+
+            // شرط شکست صحیح: قیمت از مرز بیرونی عبور کند
+            bool fail_condition = (m_direction == LONG && current_price > outer_bound) ||
+                                  (m_direction == SHORT && current_price < outer_bound);
+            
+            if(fail_condition)
             {
-               Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time) + " (سیگنال آماده)");
-            }
-            if(!m_child2.IsSuccessChild2())
-            {
-               double lower, upper;
-               if(GetFailureChildTriggerLevels(lower, upper))
-               {
-                  double upper_price = m_mother.GetLevelPrice(upper);
-                  bool fail_condition = (m_direction == LONG && current_price <= upper_price) ||
-                                        (m_direction == SHORT && current_price >= upper_price);
-                  if(fail_condition)
-                  {
-                     m_state = FAILED;
-                     Log("ساختار شکست خورد: عبور از سطح بالایی: قیمت=" + DoubleToString(current_price, _Digits) + ", سطح=" + DoubleToString(upper_price, _Digits));
-                  }
-               }
+               m_state = FAILED;
+               Log("ساختار شکست خورد: عبور از مرز بیرونی ناحیه (" + DoubleToString(outer_bound, _Digits) + ")");
             }
          }
       }
+   }
+}
+
       return true;
    }
 
