@@ -109,6 +109,9 @@ input bool InpEnableLog = false;           // فعال‌سازی لاگ‌گی�
 input string InpLogFilePath = "HipoFibonacci_Log.txt"; // مسیر فایل لاگ (MQL5/Files)
 input int InpMaxFamilies = 1;             // حداکثر تعداد ساختارهای فعال (فقط 1)
 
+input group "تنظیمات طول عمر ساختار"
+input int InpMaxStructureLifeCandles = 500; // حداکثر طول عمر ساختار بر حسب کندل
+
 //+------------------------------------------------------------------+
 //| ساختارها و ثابت‌ها                                              |
 //+------------------------------------------------------------------+
@@ -117,6 +120,7 @@ enum ENUM_STRUCTURE_STATE
    SEARCHING,      // در حال جستجوی فراکتال
    MOTHER_ACTIVE,  // مادر فعال
    CHILD1_ACTIVE,  // فرزند اول فعال
+   AWAITING_FAILURE_CHILD2, // در حال انتظار برای ایجاد فرزند دوم ناموفق
    CHILD2_ACTIVE,  // فرزند دوم فعال
    COMPLETED,      // ساختار کامل شده
    FAILED          // ساختار شکست خورده
@@ -155,9 +159,6 @@ struct SFibonacciEventData
 class CFractalFinder
 {
 private:
-   //+-------------------------------------------------------------+
-   //| بررسی فراکتال بالایی در تایم‌فریم مشخص‌شده                |
-   //+-------------------------------------------------------------+
    bool IsHighFractal(int index, int peers)
    {
       if(index + peers >= iBars(_Symbol, InpFractalTimeframe)) return false;
@@ -172,9 +173,6 @@ private:
       return true;
    }
 
-   //+-------------------------------------------------------------+
-   //| بررسی فراکتال پایینی در تایم‌فریم مشخص‌شده               |
-   //+-------------------------------------------------------------+
    bool IsLowFractal(int index, int peers)
    {
       if(index + peers >= iBars(_Symbol, InpFractalTimeframe)) return false;
@@ -190,9 +188,6 @@ private:
    }
 
 public:
-   //+-------------------------------------------------------------+
-   //| پیدا کردن آخرین فراکتال بالایی در تایم‌فریم مشخص‌شده     |
-   //+-------------------------------------------------------------+
    void FindRecentHigh(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
       fractal.price = 0.0;
@@ -209,9 +204,6 @@ public:
       }
    }
 
-   //+-------------------------------------------------------------+
-   //| پیدا کردن آخرین فراکتال پایینی در تایم‌فریم مشخص‌شده    |
-   //+-------------------------------------------------------------+
    void FindRecentLow(datetime startTime, int lookback, int peers, SFractal &fractal)
    {
       fractal.price = 0.0;
@@ -569,9 +561,6 @@ public:
       m_price100 = price100;
    }
 
-   //+-------------------------------------------------------------+
-   //| محاسبه قیمت برای یک سطح فیبوناچی مشخص                     |
-   //+-------------------------------------------------------------+
    double GetLevelPrice(double level)
    {
       return m_price100 + (m_price0 - m_price100) * (level / 100.0);
@@ -942,12 +931,14 @@ public:
       m_interval_start = interval_start;
       m_interval_end = interval_end;
    }
-void Swap(int &a, int &b)
-{
-   int temp = a;
-   a = b;
-   b = temp;
-}
+
+   void Swap(int &a, int &b)
+   {
+      int temp = a;
+      a = b;
+      b = temp;
+   }
+
    virtual bool Draw() override
    {
       if(!m_is_visible)
@@ -1412,6 +1403,7 @@ private:
    CChildFibo* m_child2;
    CFractalFinder m_fractal_finder;
    bool m_is_test;
+   int m_bar_count;
 
    void Log(string message)
    {
@@ -1419,9 +1411,6 @@ private:
          CStructureManager::AddLog(m_id + ": " + message);
    }
 
-   //+-------------------------------------------------------------+
-   //| دریافت سطوح محدوده شکست برای فرزند دوم ناموفق            |
-   //+-------------------------------------------------------------+
    bool GetFailureChildTriggerLevels(double &lower, double &upper)
    {
       string temp_levels[];
@@ -1451,6 +1440,7 @@ public:
       m_child1 = NULL;
       m_child2 = NULL;
       m_is_test = is_test;
+      m_bar_count = 0;
    }
 
    bool Initialize()
@@ -1474,6 +1464,7 @@ public:
       if(m_mother.Initialize(fractal, TimeCurrent()))
       {
          m_state = MOTHER_ACTIVE;
+         m_bar_count = 0;
          Log("ساختار در حالت مادر فعال");
          return true;
       }
@@ -1488,38 +1479,14 @@ public:
       {
          return Initialize();
       }
-      else if(m_state == MOTHER_ACTIVE || m_state == CHILD1_ACTIVE)
+
+      if(m_state == MOTHER_ACTIVE || m_state == CHILD1_ACTIVE || m_state == AWAITING_FAILURE_CHILD2 || m_state == CHILD2_ACTIVE)
       {
-         if(m_mother != NULL && m_mother.CheckBreakoutFailure(current_price))
+         if(m_mother != NULL && (m_mother.CheckStructureFailure(current_price) || m_mother.CheckBreakoutFailure(current_price)))
          {
             m_state = FAILED;
-            Log("ساختار شکست خورد: عبور از سطح نهایی مادر");
+            Log("ساختار شکست خورد");
             return false;
-         }
-      }
-
-      if((m_state == MOTHER_ACTIVE || (m_state == CHILD1_ACTIVE && m_child1 != NULL && !m_child1.IsFixed())) && m_mother != NULL)
-      {
-         double lower, upper;
-         if(GetFailureChildTriggerLevels(lower, upper))
-         {
-            double lower_price = m_mother.GetLevelPrice(lower);
-            bool trigger_condition = (m_direction == LONG && current_price <= lower_price) ||
-                                     (m_direction == SHORT && current_price >= lower_price);
-            if(trigger_condition)
-            {
-               m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
-               if(m_child2 == NULL || !m_child2.Initialize(current_time))
-               {
-                  Log("خطا: نمی‌توان فرزند دوم (ناموفق) را ایجاد کرد");
-                  delete m_child2;
-                  m_child2 = NULL;
-                  m_state = FAILED;
-                  return false;
-               }
-               m_state = CHILD2_ACTIVE;
-               Log("فرزند دوم (ناموفق) متولد شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time));
-            }
          }
       }
 
@@ -1528,12 +1495,6 @@ public:
          if(TryUpdateMotherFractal())
          {
             return true;
-         }
-         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
-         {
-            m_state = FAILED;
-            Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
-            return false;
          }
          if(m_mother != NULL && !m_mother.UpdateOnTick(current_time)) return false;
          if(m_mother != NULL && InpMotherFixMode == PRICE_CROSS && m_mother.CheckFixingPriceCross(current_price))
@@ -1553,15 +1514,27 @@ public:
       }
       else if(m_state == CHILD1_ACTIVE)
       {
-         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
-         {
-            m_state = FAILED;
-            Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
-            return false;
-         }
          if(m_child1 != NULL && m_child1.UpdateOnTick(current_time))
          {
-            if(m_child1.IsFixed() && m_child1.CheckChild1TriggerChild2(current_price))
+            if(!m_child1.IsFixed())
+            {
+               double mother_100 = m_mother.GetPrice100();
+               bool failure_condition = (m_direction == LONG && current_price > mother_100) ||
+                                        (m_direction == SHORT && current_price < mother_100);
+               if(failure_condition)
+               {
+                  Log("Child 1 Failure: price crossed Mother's 100% level");
+                  m_child1.Delete();
+                  delete m_child1;
+                  m_child1 = NULL;
+                  m_state = AWAITING_FAILURE_CHILD2;
+               }
+               else
+               {
+                  m_child1.CheckFixing(current_price);
+               }
+            }
+            else if(m_child1.IsFixed() && m_child1.CheckChild1TriggerChild2(current_price))
             {
                datetime interval_start = m_child1.GetTime100();
                datetime interval_end = current_time;
@@ -1580,27 +1553,42 @@ public:
                m_state = CHILD2_ACTIVE;
                Log("فرزند اول فیکس شد و قیمت از صد آن عبور کرد، ساختار به فرزند دوم (موفق) تغییر کرد");
             }
-            else
+         }
+      }
+      else if(m_state == AWAITING_FAILURE_CHILD2)
+      {
+         double lower, upper;
+         if(GetFailureChildTriggerLevels(lower, upper))
+         {
+            double level1 = m_mother.GetLevelPrice(lower);
+            double level2 = m_mother.GetLevelPrice(upper);
+            double zone_low = MathMin(level1, level2);
+            double zone_high = MathMax(level1, level2);
+            if(current_price >= zone_low && current_price <= zone_high)
             {
-               m_child1.CheckFixing(current_price);
+               m_child2 = new CChildFibo(m_id + "_FailureChild2", InpChild2Color, InpChildLevels, m_mother, false, m_is_test);
+               if(m_child2 == NULL || !m_child2.Initialize(current_time))
+               {
+                  Log("خطا: نمی‌توان فرزند دوم (ناموفق) را ایجاد کرد");
+                  delete m_child2;
+                  m_child2 = NULL;
+                  m_state = FAILED;
+                  return false;
+               }
+               m_state = CHILD2_ACTIVE;
+               Log("فرزند دوم (ناموفق) متولد شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time));
             }
          }
       }
       else if(m_state == CHILD2_ACTIVE)
       {
-         if(m_mother != NULL && m_mother.CheckStructureFailure(current_price))
-         {
-            m_state = FAILED;
-            Log("ساختار شکست خورد: لنگرگاه مادر سوراخ شد");
-            return false;
-         }
          if(m_child2 != NULL && m_child2.UpdateOnTick(current_time))
          {
             if(m_child2.CheckSuccessChild2(current_price))
             {
                Log("فرزند دوم وارد ناحیه طلایی شد: قیمت=" + DoubleToString(current_price, _Digits) + ", زمان=" + TimeToString(current_time) + " (سیگنال آماده)");
             }
-            if(m_state == CHILD2_ACTIVE && m_child2 != NULL && !m_child2.IsSuccessChild2())
+            if(!m_child2.IsSuccessChild2())
             {
                double lower, upper;
                if(GetFailureChildTriggerLevels(lower, upper))
@@ -1622,6 +1610,14 @@ public:
 
    bool UpdateOnNewBar()
    {
+      m_bar_count++;
+      if(m_bar_count > InpMaxStructureLifeCandles)
+      {
+         m_state = FAILED;
+         Log("ساختار به دلیل گذشتن از حداکثر تعداد کندل‌ها شکست خورد");
+         return false;
+      }
+
       if(m_state == MOTHER_ACTIVE)
       {
          if(m_mother != NULL && InpMotherFixMode == CANDLE_CLOSE && m_mother.CheckFixingCandleClose())
